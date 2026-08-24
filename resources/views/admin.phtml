@@ -1,0 +1,148 @@
+<?php
+
+declare(strict_types=1);
+
+use Fisharebest\Webtrees\I18N;
+
+/**
+ * @var string $title
+ * @var \Schwendinger\Webtrees\Module\Cronjob\CronjobModule $module
+ * @var array<int, object> $jobs
+ * @var bool $offline
+ * @var bool $cron_lib
+ * @var string $cron_now
+ * @var array<string, string> $install
+ */
+
+$admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
+
+?>
+<?= view('components/breadcrumbs', [
+    'links' => [
+        route(\Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel::class) => I18N::translate('Control panel'),
+        $admin_url => $module->title(),
+    ]
+]) ?>
+
+<h1><?= e($title) ?></h1>
+
+<?php if ($offline): ?>
+    <div class="alert alert-warning">
+        <?= I18N::translate('The site is offline (data/offline.txt) - the tick is skipped and no jobs run until it is removed again (e.g. during a webtrees update).') ?>
+    </div>
+<?php endif; ?>
+
+<?php if (!$cron_lib): ?>
+    <div class="alert alert-warning">
+        <?= I18N::translate('Bundled cron library missing: fetch dragonmantank/cron-expression into modules_v4/cronjob/vendor/ (see the module README, section "Bundled dependency"). Scheduling is paused until then.') ?>
+    </div>
+<?php endif; ?>
+
+<p class="text-muted">
+    <?= I18N::translate('All times are UTC (webtrees server time). Current time (UTC): %s', $cron_now) ?>
+</p>
+
+<div class="mb-3">
+    <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm'])) ?>" class="btn btn-primary">
+        <?= I18N::translate('New Job') ?>
+    </a>
+</div>
+
+<?php if ($jobs === []): ?>
+    <p><?= I18N::translate('No jobs yet. Create the first one (e.g. the linkenhancer link-index update).') ?></p>
+<?php else: ?>
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th><?= I18N::translate('Job') ?></th>
+                <th><?= I18N::translate('Schedule') ?></th>
+                <th><?= I18N::translate('Next Run (UTC)') ?></th>
+                <th><?= I18N::translate('Last Run') ?></th>
+                <th><?= I18N::translate('Enabled') ?></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($jobs as $job): ?>
+            <?php
+            $last    = $job->last_run;
+            $enabled = (int) $job->enabled === 1;
+            ?>
+            <tr>
+                <td>
+                    <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])) ?>">
+                        <strong><?= e($job->title) ?></strong>
+                    </a>
+                    <div class="text-muted"><?= e($job->name) ?></div>
+                </td>
+                <td><code><?= e($job->cron) ?></code></td>
+                <td><?= $job->next_run_at !== null ? e((string) $job->next_run_at) : '—' ?></td>
+                <td>
+                    <?php if ($last === null): ?>
+                        —
+                    <?php else: ?>
+                        <?php
+                        $badge = match ((string) $last->status) {
+                            'ok'      => 'success',
+                            'error'   => 'danger',
+                            'timeout' => 'warning',
+                            default   => 'secondary',
+                        };
+                        ?>
+                        <span class="badge bg-<?= $badge ?>"><?= e((string) $last->status) ?></span>
+                        <div class="text-muted">
+                            <?= e((string) $last->started_at) ?>
+                            · <?= (int) $last->duration_ms ?> ms
+                            · exit <?= (int) $last->exit_code ?>
+                        </div>
+                        <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobHistory', 'job' => (int) $job->id])) ?>">
+                            <?= I18N::translate('History') ?>
+                        </a>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobToggle'])) ?>" class="d-inline">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
+                        <button type="submit" class="btn btn-sm <?= $enabled ? 'btn-secondary' : 'btn-outline-secondary' ?>">
+                            <?= $enabled ? I18N::translate('on') : I18N::translate('off') ?>
+                        </button>
+                    </form>
+                </td>
+                <td class="text-end">
+                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobRunNow'])) ?>" class="d-inline">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
+                        <button type="submit" class="btn btn-sm btn-info" title="<?= e(I18N::translate('Run at the next tick (within 60 seconds)')) ?>">
+                            <?= I18N::translate('Run now') ?>
+                        </button>
+                    </form>
+                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobDelete'])) ?>" class="d-inline"
+                          onsubmit="return confirm('<?= e(I18N::translate('Delete this job and its run history?')) ?>');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
+                        <button type="submit" class="btn btn-sm btn-danger">
+                            <?= I18N::translate('Delete') ?>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+<?php endif; ?>
+
+<fieldset class="border rounded p-3 mt-4">
+    <legend><?= I18N::translate('Trigger Installation') ?></legend>
+    <p class="text-muted">
+        <?= I18N::translate('The module itself does not start. One OS timer (classic cron or systemd) must call the tick once per minute. Pick one of the two options below - the paths are already filled in for this installation.') ?>
+    </p>
+
+    <h6><?= I18N::translate('Option A: classic cron (every minute)') ?></h6>
+    <pre class="bg-light p-2 rounded"><?= e($install['cron_line']) ?></pre>
+
+    <h6><?= I18N::translate('Option B: systemd timer (save both files as cronjob-tick.service / cronjob-tick.timer)') ?></h6>
+    <pre class="bg-light p-2 rounded"><?= e($install['service_unit']) ?></pre>
+    <pre class="bg-light p-2 rounded"><?= e($install['timer_unit']) ?></pre>
+    <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
+</fieldset>

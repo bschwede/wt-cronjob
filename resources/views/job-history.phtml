@@ -1,0 +1,105 @@
+<?php
+
+declare(strict_types=1);
+
+use Fisharebest\Webtrees\I18N;
+
+/**
+ * @var string $title
+ * @var \Schwendinger\Webtrees\Module\Cronjob\CronjobModule $module
+ * @var object|null $job
+ * @var array<int, object> $runs
+ * @var int $page
+ * @var int $per_page
+ * @var int $total
+ */
+
+$crumbs = [
+    route(\Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel::class) => I18N::translate('Control panel'),
+    route('module', ['module' => $module->name(), 'action' => 'Admin']) => $module->title(),
+];
+if ($job !== null) {
+    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = $job->title;
+}
+$crumbs[0] = I18N::translate('History');
+
+?>
+<?= view('components/breadcrumbs', ['links' => $crumbs]) ?>
+
+<h1>
+    <?= I18N::translate('Run History') ?>
+    <?php if ($job !== null): ?>
+        - <?= e($job->title) ?>
+    <?php endif; ?>
+</h1>
+
+<?php if ($job === null): ?>
+    <p><?= I18N::translate('Job not found.') ?></p>
+<?php else: ?>
+    <p class="text-muted">
+        <code><?= e($job->cron) ?></code>
+        · <?= e($job->command) ?>
+        <?php if ($job->args !== ''): ?><?= e($job->args) ?><?php endif; ?>
+    </p>
+
+    <?php if ($runs === []): ?>
+        <p><?= I18N::translate('No runs recorded yet.') ?></p>
+    <?php else: ?>
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th><?= I18N::translate('Started (UTC)') ?></th>
+                    <th><?= I18N::translate('Trigger') ?></th>
+                    <th><?= I18N::translate('Status') ?></th>
+                    <th><?= I18N::translate('Exit') ?></th>
+                    <th><?= I18N::translate('Duration') ?></th>
+                    <th><?= I18N::translate('Output') ?></th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($runs as $run): ?>
+                <?php
+                $badge = match ((string) $run->status) {
+                    'ok'      => 'success',
+                    'error'   => 'danger',
+                    'timeout' => 'warning',
+                    default   => 'secondary',
+                };
+                ?>
+                <tr>
+                    <td><?= e((string) $run->started_at) ?></td>
+                    <td><?= e((string) $run->trigger) ?></td>
+                    <td><span class="badge bg-<?= $badge ?>"><?= e((string) $run->status) ?></span></td>
+                    <td><?= $run->exit_code !== null ? (int) $run->exit_code : '—' ?></td>
+                    <td><?= $run->duration_ms !== null ? (int) $run->duration_ms . ' ms' : '—' ?></td>
+                    <td class="text-end">
+                        <?php if ($run->output !== null && $run->output !== ''): ?>
+                            <details>
+                                <summary><?= I18N::translate('Show') ?></summary>
+                                <pre class="bg-light p-2 rounded mt-2 mb-0" style="max-height: 300px; overflow: auto;"><?= e((string) $run->output) ?></pre>
+                            </details>
+                        <?php else: ?>
+                            —
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <?php
+        $pages = (int) ceil($total / $per_page);
+        ?>
+        <?php if ($pages > 1): ?>
+            <nav>
+                <ul class="pagination">
+                    <?php for ($p = 1; $p <= $pages; $p++): ?>
+                        <li class="page-item <?= $p === $page ? 'active' : '' ?>">
+                            <a class="page-link" href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobHistory', 'job' => (int) $job->id, 'page' => $p])) ?>"><?= $p ?></a>
+                        </li>
+                    <?php endfor; ?>
+                </ul>
+            </nav>
+        <?php endif; ?>
+    <?php endif; ?>
+<?php endif; ?>
