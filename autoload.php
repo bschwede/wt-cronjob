@@ -6,7 +6,7 @@ declare(strict_types=1);
  *
  * Zwei Präfixe:
  *   Schwendinger\Webtrees\Module\Cronjob\  →  src/
- *   Cron\                                  →  vendor/dragonmantank/cron-expression/src/
+ *   Cron\                                  →  vendor/dragonmantank/cron-expression/src/Cron/
  *
  * Die Cron-Lib wird bewusst NICHT über einen Composer-Autoloader geladen:
  * die Zielmaschine hat keinen Composer/keine Internetverbindung, die Lib ist
@@ -16,7 +16,7 @@ declare(strict_types=1);
 spl_autoload_register(static function (string $class): void {
     $prefixes = [
         'Schwendinger\\Webtrees\\Module\\Cronjob\\' => __DIR__ . '/src/',
-        'Cron\\' => __DIR__ . '/vendor/dragonmantank/cron-expression/src/',
+        'Cron\\' => __DIR__ . '/vendor/dragonmantank/cron-expression/src/Cron/',
     ];
 
     foreach ($prefixes as $prefix => $base_dir) {
