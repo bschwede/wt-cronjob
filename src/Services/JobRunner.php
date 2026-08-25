@@ -147,6 +147,22 @@ final class JobRunner {
     }
 
     /**
+     * Working directory for the child process.
+     *
+     * Module scripts run from the webtrees root (their documented
+     * invocation). Core CLI commands run from data/ - the core writes
+     * relative to the CWD (e.g. tree-export: <tree>.ged), and data/ is
+     * the designated place for generated files, not the web root.
+     *
+     * @param array<string, mixed> $job
+     */
+    public static function cwdFor(array $job, string $root_dir): string {
+        return ((string) ($job['command_type'] ?? '') === 'core')
+            ? $root_dir . 'data/'
+            : $root_dir;
+    }
+
+    /**
      * Execute argv synchronously with a hard timeout.
      *
      * The child runs with the given working directory (the webtrees root,

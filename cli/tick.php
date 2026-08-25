@@ -27,7 +27,11 @@ declare(strict_types=1);
 // The once-a-minute trigger of the cronjob module.
 //
 // Run (from the webtrees root, with the same PHP version as the instance):
-//   php modules_v4/cronjob/cli/tick.php [--dry-run] [--job=<name>] [--strict]
+//   php modules_v4/cronjob/cli/tick.php [--dry-run] [--job=<name>] [--strict] [--full-output]
+//
+// Note: stdout carries summary lines only by default. Add --full-output for
+// debugging when you are sure the log destination is not world-readable -
+// job output may contain personal data (user-list) or site settings.
 //
 // What it does:
 //   - skips entirely while the site is offline (data/offline.txt) - e.g.

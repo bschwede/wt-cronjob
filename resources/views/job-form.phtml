@@ -118,6 +118,10 @@ if ($is_edit) {
             <input type="number" class="form-control" id="cj_timeout" name="timeout" min="<?= $module::TIMEOUT_MIN ?>" max="<?= $module::TIMEOUT_MAX ?>" step="5"
                    value="<?= $is_edit ? (int) $job->timeout_sec : $module::TIMEOUT_STD ?>">
         </div>
+
+        <div class="alert alert-warning mb-0">
+            <?= I18N::translate('Note on sensitive output: %1$s writes the complete tree as %2$s into data/ (full personal data!), %3$s lists all user e-mail addresses, %4$s lists all site settings. This output is stored in the run history (admin-only).', '<code>tree-export</code>', '<code>&lt;tree&gt;.ged</code>', '<code>user-list</code>', '<code>site-setting --list</code>') ?>
+        </div>
     </fieldset>
 
     <div class="btn-group mb-3">

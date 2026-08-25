@@ -30,6 +30,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
 use Fisharebest\Webtrees\DB;
+use InvalidArgumentException;
 use RuntimeException;
 
 use function class_exists;
@@ -78,13 +79,22 @@ final class ScheduleService {
     /**
      * Parse a cron expression (throws on invalid input).
      *
+     * The library (v3.6.0) throws InvalidArgumentException for invalid
+     * expressions - normalized to DomainException here so all callers
+     * share one catch type. The timezone is NOT a factory parameter in
+     * this version; it is passed explicitly to getNextRunDate() below.
+     *
      * @throws DomainException|RuntimeException
      */
     public static function parse(string $cron): CronExpression {
         if (!self::hasCronLibrary()) {
             throw new RuntimeException(self::cronLibraryMissingMessage());
         }
-        return new CronExpression($cron);
+        try {
+            return CronExpression::factory($cron);
+        } catch (InvalidArgumentException $exception) {
+            throw new DomainException($exception->getMessage(), 0, $exception);
+        }
     }
 
     /**
@@ -103,7 +113,7 @@ final class ScheduleService {
      */
     public static function nextRun(string $cron, string $from): string {
         $dt = self::parse($cron)
-            ->getNextRunDate(new DateTimeImmutable($from, new DateTimeZone(self::TIMEZONE)));
+            ->getNextRunDate(new DateTimeImmutable($from, new DateTimeZone(self::TIMEZONE)), 0, false, self::TIMEZONE);
 
         return $dt->setTimezone(new DateTimeZone(self::TIMEZONE))->format('Y-m-d H:i:s');
     }
@@ -121,7 +131,7 @@ final class ScheduleService {
         $cron   = self::parse($cron);
 
         for ($i = 0; $i < max(1, $count); $i++) {
-            $cursor = $cron->getNextRunDate($cursor);
+            $cursor = $cron->getNextRunDate($cursor, 0, false, self::TIMEZONE);
             $runs[] = $cursor->setTimezone(new DateTimeZone(self::TIMEZONE))->format('Y-m-d H:i:s');
         }
 

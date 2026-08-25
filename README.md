@@ -20,39 +20,40 @@ has to call one small script once per minute.
 ## Installation
 
 1. Copy the module folder to `modules_v4/cronjob/` (ZIP install works too).
-2. **Fetch the bundled dependency** (see below) - once.
-3. Open webtrees once (any page as an admin) so the module's `boot()` creates its tables.
-4. Install the trigger (classic cron **or** systemd timer) - the module's admin page
+   The cron library ships inside the module - nothing to fetch.
+2. Open webtrees once (any page as an admin) so the module's `boot()` creates its tables.
+3. Install the trigger (classic cron **or** systemd timer) - the module's admin page
    (`Control panel → Cron Job Scheduler`) generates both with the paths of *this*
    installation already filled in.
-5. Create your first job in the admin UI.
+4. Create your first job in the admin UI.
 
 ### Bundled dependency
 
 The module bundles exactly one external library:
-[`dragonmantank/cron-expression`](https://github.com/dragonmantank/cron-expression) v3
-(cron parsing, zero dependencies of its own). The target box typically has **no
-internet access**, so the library is fetched manually on any machine that does:
+[`dragonmantank/cron-expression`](https://github.com/dragonmantank/cron-expression)
+**v3.6.0** (cron parsing, zero dependencies of its own) - it ships in
+`vendor/dragonmantank/cron-expression/`, pinned by `composer.lock`. No
+fetch step is required; a target box without internet works out of the box.
+
+The runtime loader is the hand-written `modules_v4/cronjob/autoload.php`
+(a small PSR-4 mapper for the `Cron\` prefix) - no second Composer runtime is
+involved. If the vendor folder is ever missing (partial install), the admin UI
+shows a warning and the tick skips cron evaluation (everything else still works).
+
+> **Prefix note:** the loader maps the `Cron\` namespace to this module's vendor
+> folder. If webtrees (core) ever vendors the same library, the core autoloader is
+> registered first and wins silently - the APIs are identical (same library), so
+> this is harmless. The same applies to a second custom module bundling `Cron\`.
+
+To update the library later (on a machine with internet + composer):
 
 ```bash
-# on a machine with internet + composer, inside the module folder:
 cd modules_v4/cronjob
 composer update --no-dev
 ```
 
-Then bundle and ship with the module:
-
-- `composer.json`
-- `composer.lock`  *(pinning the exact resolved version)*
-- `vendor/dragonmantank/cron-expression/`  *(only `src/` plus its own `composer.json`)*
-
-The runtime loader is the hand-written `modules_v4/cronjob/autoload.php`
-(a small PSR-4 mapper for the `Cron\` prefix) - no second Composer runtime is
-involved. Until the vendor folder is in place, the admin UI shows a warning and
-the tick skips cron evaluation (everything else still works).
-
-To update the library later: repeat the fetch on the internet machine, re-bundle,
-copy over. `composer.lock` is part of the module so the version is reproducible.
+then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
+(`src/` plus its own `composer.json`) into the module.
 
 ## Usage
 
@@ -124,10 +125,17 @@ php modules_v4/cronjob/cli/tick.php              # run all due jobs
 php modules_v4/cronjob/cli/tick.php --dry-run    # show what would run
 php modules_v4/cronjob/cli/tick.php --job=<name> # run one specific job now
 php modules_v4/cronjob/cli/tick.php --strict     # exit 1 if any job failed (monitoring)
+php modules_v4/cronjob/cli/tick.php --full-output # echo full job output to stdout (debugging!)
 ```
 
 Exit codes: `0` = tick ran (job failures are recorded in the DB), `1` = environment
 problem or (with `--strict`) at least one job failed.
+
+**Log hygiene:** stdout carries summary lines only (`job <name>: ok (exit 0, 123 ms)`).
+Full job output lives in the run history (admin-only). Job output can contain
+personal data (`user-list`) or all site settings (`site-setting --list`) - only use
+`--full-output` for interactive debugging, and never redirect it into a
+world-readable location (e.g. `data/`, which is inside the web root by default).
 
 ### Acceptance test
 
@@ -148,6 +156,12 @@ wait a minute - the history page should show a green `ok` row.
   (`tree-export`, `tree-list`, `user-list`, `site-setting --list`).
 - **Argument validation.** Every argument token must be a plain option or value -
   no shell metacharacters, no spaces inside tokens, max 10 tokens.
+- **Working directories.** Module scripts run from the webtrees root; core commands
+  run from `data/`, because the core CLI writes relative to the CWD
+  (`tree-export` produces `<tree>.ged`) - generated files must not end up in the
+  web root.
+- **No sensitive data in stdout.** The tick echoes summary lines only (see "Log
+  hygiene" above); the full output stays in the admin-only run history.
 - **UI actions** are all named `*Admin*` (admin-only, CSRF-protected like every
   webtrees form).
 - **Kill switch:** disable the module in the module list - the tick then does nothing.
@@ -175,8 +189,8 @@ New job scripts in other modules must follow these conventions (linkenhancer's
 | Job | Command | Cron (UTC) |
 | :--- | :--- | :--- |
 | Linkenhancer link-index update | `modules_v4/linkenhancer/cli/build-link-index.php --limit=5000` | `*/30 * * * *` |
-| GEDCOM backup (tree export) | `tree-export <tree_id> data/backups/<tree>.zip` | `0 3 * * 0` |
-| Config backup | `site-setting --list > ...` (or a small module script) | `0 3 * * 0` |
+| GEDCOM backup (tree export) | `tree-export <tree_name>` — writes `data/<tree_name>.ged`, **full personal data**; plan retention/cleanup of `data/*.ged` | `0 3 * * 0` |
+| Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | `0 3 * * 0` |
 | Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | `0 4 * * *` |
 
 ## Roadmap (phase 2, not implemented)
@@ -188,6 +202,10 @@ New job scripts in other modules must follow these conventions (linkenhancer's
 - **Job self-registration**: modules advertise their CLI scripts via a module
   interface, so the form can offer typed jobs
 - **Human-readable schedule display** ("every 30 minutes") as a UI add-on
+- **Watch process + page-load watchdog**: an admin-started resident scheduler for
+  hosting without cron/systemd access, with a heartbeat, a stop flag and a
+  self-healing watchdog on page load. See the module plan, section 6.5, for the
+  full design and the hard limits (no supervisor on reboot, spawn rate-limited)
 
 ## Tests
 

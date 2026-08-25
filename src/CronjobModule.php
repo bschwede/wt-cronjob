@@ -49,8 +49,10 @@ use function dirname;
 use function fclose;
 use function fopen;
 use function is_readable;
+use function mb_strlen;
 use function preg_match;
 use function str_ends_with;
+use function strlen;
 use function trim;
 
 /**
@@ -227,6 +229,16 @@ class CronjobModule extends AbstractModule
             ScheduleService::validateCron($cron);
         } catch (DomainException | RuntimeException $exception) {
             $errors[] = I18N::translate('Invalid cron expression "%1$s": %2$s', $cron, $exception->getMessage());
+        }
+        // DB column widths (Migration0): title 128, cron 64, args 255.
+        if (mb_strlen($title) > 128) {
+            $errors[] = I18N::translate('Job title must be at most %d characters.', 128);
+        }
+        if (strlen($cron) > 64) {
+            $errors[] = I18N::translate('Cron expression must be at most %d characters.', 64);
+        }
+        if (strlen($args) > 255) {
+            $errors[] = I18N::translate('Arguments must be at most %d characters.', 255);
         }
 
         $command_type = CronjobUtils::detectCommandType($command);

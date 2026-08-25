@@ -61,13 +61,15 @@ final class TickCommand extends Command {
             ->setDescription('Run the due jobs of the webtrees cronjob module')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show due jobs and their argv without executing')
             ->addOption('job', null, InputOption::VALUE_REQUIRED, 'Run a specific job by name, immediately (manual trigger)')
-            ->addOption('strict', null, InputOption::VALUE_NONE, 'Exit with code 1 if any job failed');
+            ->addOption('strict', null, InputOption::VALUE_NONE, 'Exit with code 1 if any job failed')
+            ->addOption('full-output', null, InputOption::VALUE_NONE, 'Echo the full job output to stdout (default: summary lines only - job output may contain personal data and must not leak into world-readable log files)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int {
-        $dry_run  = (bool) $input->getOption('dry-run');
-        $job_name = $input->getOption('job');
-        $strict   = (bool) $input->getOption('strict');
+        $dry_run      = (bool) $input->getOption('dry-run');
+        $job_name     = $input->getOption('job');
+        $strict       = (bool) $input->getOption('strict');
+        $full_output  = (bool) $input->getOption('full-output');
 
         // proc_open may be disabled (shared hosting) - fail clearly.
         $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
@@ -146,7 +148,7 @@ final class TickCommand extends Command {
                 $run_id      = ScheduleService::startRun((int) $job->id, $trigger, $started_at);
                 $start_micro = microtime(true);
 
-                $result = JobRunner::run($built['argv'], (int) $job->timeout_sec, Webtrees::ROOT_DIR);
+                $result = JobRunner::run($built['argv'], (int) $job->timeout_sec, JobRunner::cwdFor((array) $job, Webtrees::ROOT_DIR));
 
                 $duration_ms = (int) round((microtime(true) - $start_micro) * 1000);
                 $status      = $result['timed_out']
@@ -157,7 +159,7 @@ final class TickCommand extends Command {
                 ScheduleService::finishRun($run_id, $status, $result['exit'], $duration_ms, $result['output'], $done);
                 ScheduleService::updateJobAfterRun($job, $done, $status, $result['exit']);
 
-                if ($result['output'] !== '') {
+                if ($full_output && $result['output'] !== '') {
                     foreach (explode("\n", trim($result['output'])) as $line) {
                         $output->writeln('    ' . $line);
                     }

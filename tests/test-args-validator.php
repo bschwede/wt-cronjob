@@ -118,6 +118,12 @@ check('empty command rejected', $built['error'] !== '');
 $built = build(['command_type' => 'shell', 'command' => '/bin/ls', 'args' => ''], $root);
 check('unknown command type rejected', $built['error'] !== '');
 
+// 16. cwd: core commands run from data/ (core CLI writes relative to CWD,
+//     e.g. tree-export -> <tree>.ged must not land in the web root)
+check('cwd core -> data/', JobRunner::cwdFor(['command_type' => 'core'], $root) === $root . 'data/');
+check('cwd module -> root', JobRunner::cwdFor(['command_type' => 'module'], $root) === $root);
+check('cwd unknown type -> root (safe default)', JobRunner::cwdFor(['command_type' => 'x'], $root) === $root);
+
 // Cleanup
 @unlink($root . '/modules_v4/fakemod/cli/real-job.php');
 @unlink($root . '/modules_v4/fakemod2/not-cli.php');
