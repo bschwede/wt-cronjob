@@ -84,7 +84,7 @@ final class ScheduleService {
         if (!self::hasCronLibrary()) {
             throw new RuntimeException(self::cronLibraryMissingMessage());
         }
-        return CronExpression::factory($cron, self::TIMEZONE);
+        return new CronExpression($cron);
     }
 
     /**
@@ -245,6 +245,6 @@ final class ScheduleService {
      * The current time in the storage basis (UTC).
      */
     public static function now(): string {
-        return date('Y-m-d H:i:s', null, new DateTimeZone(self::TIMEZONE));
+        return (new \DateTime("now", new DateTimeZone(self::TIMEZONE)))->format('Y-m-d H:i:s');
     }
 }
