@@ -29,6 +29,10 @@ use Fisharebest\Webtrees\Webtrees;
 use Throwable;
 
 use function array_map;
+use function array_merge;
+use function array_unique;
+use function array_values;
+use function basename;
 use function date;
 use function dirname;
 use function explode;
@@ -39,21 +43,27 @@ use function file_put_contents;
 use function fopen;
 use function flock;
 use function function_exists;
-use function fwrite;
+use function getenv;
 use function getmypid;
 use function implode;
 use function in_array;
 use function ini_get;
+use function is_dir;
+use function is_executable;
 use function is_file;
 use function is_resource;
 use function max;
 use function microtime;
 use function min;
+use function preg_match;
 use function proc_close;
 use function proc_open;
 use function rename;
+use function rtrim;
 use function sleep;
 use function sprintf;
+use function str_contains;
+use function str_starts_with;
 use function time;
 use function touch;
 use function unlink;
@@ -162,9 +172,14 @@ final class WatchService {
             return true;
         }
 
+        $binary = self::phpBinary();
+        if ($binary === '') {
+            return false;
+        }
+
         @touch(self::path(self::SPAWN_FILE));
         $proc = @proc_open(
-            [PHP_BINARY, self::cliScript('watch.php')],
+            [$binary, self::cliScript('watch.php')],
             [
                 0 => ['file', '/dev/null', 'r'],
                 1 => ['file', '/dev/null', 'w'],
@@ -179,6 +194,53 @@ final class WatchService {
         proc_close($proc);
 
         return true;
+    }
+
+    /**
+     * A usable PHP *CLI* interpreter path.
+     *
+     * Under php-fpm / mod_php (i.e. from the browser "Start watch" and the
+     * page-load watchdog) PHP_BINARY is empty or the server binary, which
+     * cannot run scripts - so the CLI interpreter is resolved explicitly. In
+     * a CLI context PHP_BINARY is already correct and is used as-is.
+     */
+    public static function phpBinary(): string {
+        if (self::isCliPhp(PHP_BINARY)) {
+            return PHP_BINARY;
+        }
+
+        $dirs = array_values(array_unique(array_merge([PHP_BINDIR], explode(':', (string) getenv('PATH')))));
+
+        $names = ['php'];
+        if (preg_match('/^(\d+)\.(\d+)/', PHP_VERSION, $m) === 1) {
+            $names = ['php', 'php' . $m[1] . $m[2], 'php' . $m[1] . '.' . $m[2]];
+        }
+        foreach ($dirs as $dir) {
+            if ($dir === '' || !is_dir($dir)) {
+                continue;
+            }
+            $dir = rtrim($dir, '/');
+            foreach ($names as $name) {
+                $candidate = $dir . '/' . $name;
+                if (self::isCliPhp($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Is $path an executable PHP CLI interpreter (not the php-fpm daemon)?
+     */
+    private static function isCliPhp(string $path): bool {
+        if ($path === '' || !is_file($path) || !is_executable($path)) {
+            return false;
+        }
+        $base = basename($path);
+
+        return str_starts_with($base, 'php') && !str_contains($base, 'fpm');
     }
 
     /**

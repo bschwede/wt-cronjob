@@ -104,10 +104,38 @@ namespace {
     WatchService::disable();
     check('disabled after disable()', WatchService::featureEnabled() === false);
 
+    // 7. PHP-CLI resolution - the browser "Start watch" / watchdog path runs
+    //    under php-fpm where PHP_BINARY is empty or the server binary.
+    $rm_is   = new \ReflectionMethod(WatchService::class, 'isCliPhp');
+    $fakes   = $base . '/fakes';
+    @mkdir($fakes . '/noexec', 0777, true);
+    file_put_contents($fakes . '/php', "#!/bin/sh\n");
+    chmod($fakes . '/php', 0755);
+    file_put_contents($fakes . '/php-fpm8.3', "#!/bin/sh\n");
+    chmod($fakes . '/php-fpm8.3', 0755);
+    file_put_contents($fakes . '/noexec/php', "#!/bin/sh\n");
+    chmod($fakes . '/noexec/php', 0644);
+
+    check('isCliPhp: executable php accepted', $rm_is->invoke(null, $fakes . '/php') === true);
+    check('isCliPhp: php-fpm binary rejected', $rm_is->invoke(null, $fakes . '/php-fpm8.3') === false);
+    check('isCliPhp: non-executable rejected', $rm_is->invoke(null, $fakes . '/noexec/php') === false);
+    check('isCliPhp: nonexistent rejected', $rm_is->invoke(null, $fakes . '/nope') === false);
+    check('isCliPhp: empty rejected', $rm_is->invoke(null, '') === false);
+
+    $binary = WatchService::phpBinary();
+    check('phpBinary() resolves a non-empty path', is_string($binary) && $binary !== '');
+    check('phpBinary() result is a usable CLI php', $rm_is->invoke(null, $binary) === true);
+
     // Cleanup
     foreach (glob($data . 'cronjob-watch*') ?: [] as $file) {
         @unlink($file);
     }
+    foreach (glob($fakes . '/*') ?: [] as $file) {
+        @unlink($file);
+    }
+    @unlink($fakes . '/noexec/php');
+    @rmdir($fakes . '/noexec');
+    @rmdir($fakes);
     @rmdir($data);
     @rmdir($base);
 

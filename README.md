@@ -139,6 +139,9 @@ no systemd access.
   otherwise it ticks every 60 s. All state lives in `data/cronjob-watch.*`.
 - **Self-update:** if the module is re-deployed the daemon detects the changed
   files and exits, so a fresh daemon picks up the new code.
+- **Works under php-fpm / mod_php:** the daemon is spawned with a resolved PHP
+  *CLI* interpreter (under the web SAPI `PHP_BINARY` is empty or the server
+  binary, which cannot run scripts), so *Start watch* from the browser works.
 - **Hard limits (honest):** without `posix_setsid`/`pcntl_fork` the daemon stays
   in the web server's process group - a full web server / FPM **master** restart
   kills it, and the watchdog brings it back on the next page load (self-healing).
