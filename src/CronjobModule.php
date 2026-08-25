@@ -35,6 +35,7 @@ use Fisharebest\Webtrees\Module\ModuleConfigTrait;
 use Fisharebest\Webtrees\Module\ModuleCustomInterface;
 use Fisharebest\Webtrees\Module\ModuleCustomTrait;
 use Fisharebest\Webtrees\Validator;
+use Fisharebest\Webtrees\View;
 use Fisharebest\Webtrees\Webtrees;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -69,6 +70,10 @@ class CronjobModule extends AbstractModule
 
     public const SCHEMA_TARGET_VERSION = 1;
 
+    public const TIMEOUT_MIN = 30;
+    public const TIMEOUT_MAX = 3600;
+    public const TIMEOUT_STD = 300;
+
     // =========================================================================
     // ModuleInterface
     // =========================================================================
@@ -86,7 +91,7 @@ class CronjobModule extends AbstractModule
     // =========================================================================
 
     public function boot(): void {
-        \Fisharebest\Webtrees\View::registerNamespace('cronjob', $this->resourcesFolder() . 'views/');
+        View::registerNamespace($this->name(), $this->resourcesFolder() . 'views/');
 
         CronjobUtils::updateSchema($this, self::SCHEMA_TARGET_VERSION);
     }
@@ -158,7 +163,7 @@ class CronjobModule extends AbstractModule
     public function getAdminAction(ServerRequestInterface $request): ResponseInterface {
         $this->layout = 'layouts/administration';
 
-        return $this->viewResponse('cronjob::admin', [
+        return $this->viewResponse($this->name() . '::admin', [
             'title'     => $this->title(),
             'module'    => $this,
             'jobs'      => CronjobUtils::listJobs(),
@@ -187,7 +192,7 @@ class CronjobModule extends AbstractModule
             }
         }
 
-        return $this->viewResponse('cronjob::job-form', [
+        return $this->viewResponse($this->name() . '::job-form', [
             'title'      => I18N::translate('Cron Job Scheduler'),
             'module'     => $this,
             'job'        => $job,
@@ -207,13 +212,13 @@ class CronjobModule extends AbstractModule
         $cron      = trim($data->string('cron', ''));
         $command   = trim($data->string('command', ''));
         $args      = trim($data->string('args', ''));
-        $timeout   = $data->integer('timeout', 300);
+        $timeout   = $data->integer('timeout', self::TIMEOUT_STD);
         $enabled   = $data->boolean('enabled', false);
         $job_id    = $data->integer('job_id', 0);
 
         $errors = [];
         if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) !== 1) {
-            $errors[] = I18N::translate('Job name must be a slug: a-z, 0-9, "_" or "-", max 64 characters.');
+            $errors[] = I18N::translate('Job name must be a slug: %1$s, max %2$s characters.', 'a-z, 0-9, "_", "-"', '64');
         }
         if ($title === '') {
             $errors[] = I18N::translate('Job title must not be empty.');
@@ -226,7 +231,7 @@ class CronjobModule extends AbstractModule
 
         $command_type = CronjobUtils::detectCommandType($command);
         if ($command_type === '') {
-            $errors[] = I18N::translate('Command must be a modules_v4/<module>/cli/<script>.php path or an allowlisted core command.');
+            $errors[] = I18N::translate('Command must be a %1$s path or an allowlisted core command.', 'modules_v4/<module>/cli/<script>.php');
         } else {
             $built = JobRunner::buildArgv([
                 'command_type' => $command_type,
@@ -262,7 +267,7 @@ class CronjobModule extends AbstractModule
             'command_type' => $command_type,
             'command'      => $command,
             'args'         => $args,
-            'timeout_sec'  => max(30, min(3600, $timeout)),
+            'timeout_sec'  => max(self::TIMEOUT_MIN, min(self::TIMEOUT_MAX, $timeout)),
             'enabled'      => $enabled,
             'created_at'   => $existing?->created_at ?? $now,
         ], $now, (int) ($existing?->id ?? 0));
@@ -296,7 +301,7 @@ class CronjobModule extends AbstractModule
                 ->all();
         }
 
-        return $this->viewResponse('cronjob::job-history', [
+        return $this->viewResponse($this->name() . '::job-history', [
             'title'    => I18N::translate('Run History'),
             'module'   => $this,
             'job'      => $job,
@@ -345,7 +350,7 @@ class CronjobModule extends AbstractModule
                 'updated_at' => $now,
             ]);
             FlashMessages::addMessage(
-                I18N::translate($enabled ? 'Job enabled.' : 'Job disabled.'),
+                $enabled ? I18N::translate('Job enabled.') : I18N::translate('Job disabled.'),
                 'success'
             );
         } else {

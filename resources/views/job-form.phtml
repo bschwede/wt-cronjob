@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
+use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
+use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 
 /**
  * @var string $title
@@ -18,7 +20,7 @@ $is_edit  = $job !== null;
 $job_id   = $is_edit ? (int) $job->id : 0;
 
 $crumbs = [
-    route(\Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel::class) => I18N::translate('Control panel'),
+    route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
     $back_url => $module->title(),
 ];
 if ($is_edit) {
@@ -38,7 +40,7 @@ if ($is_edit) {
     <input type="hidden" name="job_id" value="<?= $job_id ?>">
 
     <fieldset class="border rounded p-3 mb-3">
-        <legend><?= I18N::translate('General') ?></legend>
+        <legend><?= /*I18N: webtrees.pot */ I18N::translate('General') ?></legend>
 
         <div class="mb-3">
             <label for="cj_name" class="form-label"><?= I18N::translate('Name (slug)') ?></label>
@@ -46,11 +48,11 @@ if ($is_edit) {
                    pattern="[a-z0-9][a-z0-9_\-]{0,63}"
                    value="<?= $is_edit ? e($job->name) : '' ?>"
                    placeholder="linkenhancer-index">
-            <div class="form-text"><?= I18N::translate('a-z, 0-9, "_" or "-". Used as identifier, not shown to users.') ?></div>
+            <div class="form-text"><code>a-z, 0-9, "_", "-"</code> <?= I18N::translate('Used as identifier, not shown to users.') ?></div>
         </div>
 
         <div class="mb-3">
-            <label for="cj_title" class="form-label"><?= I18N::translate('Title') ?></label>
+            <label for="cj_title" class="form-label"><?= /*I18N: webtrees.pot */ I18N::translate('Title') ?></label>
             <input type="text" class="form-control" id="cj_title" name="title" required
                    maxlength="128"
                    value="<?= $is_edit ? e($job->title) : '' ?>"
@@ -100,7 +102,7 @@ if ($is_edit) {
                     <option value="<?= e($candidate) ?>"></option>
                 <?php endforeach; ?>
             </datalist>
-            <div class="form-text"><?= I18N::translate('A modules_v4/&lt;module&gt;/cli/&lt;script&gt;.php path or an allowlisted core command (tree-export, tree-list, user-list, site-setting).') ?></div>
+            <div class="form-text"><?= I18N::translate('A %1s path or an allowlisted core command (%2$s).', '<code>modules_v4/&lt;module&gt;/cli/&lt;script&gt;.php</code>', '<code>' . implode(', ', JobRunner::ALLOWED_CORE_COMMANDS) . '</code>') ?></div>
         </div>
 
         <div class="mb-3">
@@ -108,18 +110,18 @@ if ($is_edit) {
             <input type="text" class="form-control" id="cj_args" name="args"
                    placeholder="--limit=5000"
                    value="<?= $is_edit ? e($job->args) : '' ?>">
-            <div class="form-text"><?= I18N::translate('Plain options/values only, no shell metacharacters, max 10 tokens.') ?></div>
+            <div class="form-text"><?= I18N::translate('Plain options/values only, no shell metacharacters, max %1$s tokens.', '10') ?></div>
         </div>
 
         <div class="mb-3">
-            <label for="cj_timeout" class="form-label"><?= I18N::translate('Timeout (seconds, 30 - 3600)') ?></label>
-            <input type="number" class="form-control" id="cj_timeout" name="timeout" min="30" max="3600" step="5"
-                   value="<?= $is_edit ? (int) $job->timeout_sec : 300 ?>">
+            <label for="cj_timeout" class="form-label"><?= I18N::translate('Timeout (seconds, %1$s - %2$s)', (string) $module::TIMEOUT_MIN, (string) $module::TIMEOUT_MAX) ?></label>
+            <input type="number" class="form-control" id="cj_timeout" name="timeout" min="<?= $module::TIMEOUT_MIN ?>" max="<?= $module::TIMEOUT_MAX ?>" step="5"
+                   value="<?= $is_edit ? (int) $job->timeout_sec : $module::TIMEOUT_STD ?>">
         </div>
     </fieldset>
 
     <div class="btn-group mb-3">
         <button type="submit" class="btn btn-primary"><?= I18N::translate('Save Job') ?></button>
-        <a href="<?= e($back_url) ?>" class="btn btn-secondary"><?= I18N::translate('Cancel') ?></a>
+        <a href="<?= e($back_url) ?>" class="btn btn-secondary"><?= /*I18N: webtrees.pot */ I18N::translate('Cancel') ?></a>
     </div>
 </form>

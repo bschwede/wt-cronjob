@@ -216,13 +216,13 @@ final class CronjobUtils {
      * @return array<string, string>
      */
     public static function triggerInstallBlocks(): array {
-        $root = rtrim(str_replace('\\', '/', Webtrees::ROOT_DIR), '/');
+        $root = realpath(rtrim(str_replace('\\', '/', Webtrees::ROOT_DIR), '/'));
         $php  = str_replace('\\', '/', PHP_BINARY);
         $tick = 'modules_v4/cronjob/cli/tick.php';
         $log  = $root . '/data/cronjob-tick.log';
 
         return [
-            'cron_line'   => '* * * * * cd ' . $root . ' && ' . $php . ' ' . $tick . ' >> ' . $log . ' 2>&1',
+            'cron_line'   => '* * * * * cd ' . $root . ' && ' . $php . ' ' . $tick . ' cron:tick >> ' . $log . ' 2>&1',
             'service_unit' => implode("\n", [
                 '[Unit]',
                 'Description=webtrees cronjob module tick (runs due maintenance jobs)',
@@ -231,7 +231,7 @@ final class CronjobUtils {
                 'Type=oneshot',
                 'User=' . get_current_user(),
                 'WorkingDirectory=' . $root,
-                'ExecStart=' . $php . ' ' . $tick,
+                'ExecStart=' . $php . ' ' . $tick . ' cron:tick',
             ]),
             'timer_unit' => implode("\n", [
                 '[Unit]',
@@ -247,9 +247,9 @@ final class CronjobUtils {
             ]),
             'install_commands' => implode("\n", [
                 '# as root, once:',
-                'sudo cp cronjob-tick.service cronjob-tick.timer /etc/systemd/system/',
+                'sudo cp wt-cronjob-tick.service wt-cronjob-tick.timer /etc/systemd/system/',
                 'sudo systemctl daemon-reload',
-                'sudo systemctl enable --now cronjob-tick.timer',
+                'sudo systemctl enable --now wt-cronjob-tick.timer',
             ]),
         ];
     }

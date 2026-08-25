@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
+use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
 
 /**
  * @var string $title
@@ -19,7 +20,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 ?>
 <?= view('components/breadcrumbs', [
     'links' => [
-        route(\Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel::class) => I18N::translate('Control panel'),
+        route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
         $admin_url => $module->title(),
     ]
 ]) ?>
@@ -104,8 +105,8 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobToggle'])) ?>" class="d-inline">
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
-                        <button type="submit" class="btn btn-sm <?= $enabled ? 'btn-secondary' : 'btn-outline-secondary' ?>">
-                            <?= $enabled ? I18N::translate('on') : I18N::translate('off') ?>
+                        <button type="submit" class="btn btn-sm <?= $enabled ? 'btn-success' : 'btn-warning' ?>" title="<?= $enabled ? I18N::translate('on') : I18N::translate('off') ?>">
+                            <strong><?= $enabled ? "✓" : "✗" ?></strong>
                         </button>
                     </form>
                 </td>
@@ -122,7 +123,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                         <button type="submit" class="btn btn-sm btn-danger">
-                            <?= I18N::translate('Delete') ?>
+                            <?= /*I18N: webtrees.pot */ I18N::translate('Delete') ?>
                         </button>
                     </form>
                 </td>
@@ -138,11 +139,19 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
         <?= I18N::translate('The module itself does not start. One OS timer (classic cron or systemd) must call the tick once per minute. Pick one of the two options below - the paths are already filled in for this installation.') ?>
     </p>
 
-    <h6><?= I18N::translate('Option A: classic cron (every minute)') ?></h6>
-    <pre class="bg-light p-2 rounded"><?= e($install['cron_line']) ?></pre>
-
-    <h6><?= I18N::translate('Option B: systemd timer (save both files as cronjob-tick.service / cronjob-tick.timer)') ?></h6>
-    <pre class="bg-light p-2 rounded"><?= e($install['service_unit']) ?></pre>
-    <pre class="bg-light p-2 rounded"><?= e($install['timer_unit']) ?></pre>
-    <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
+    <details>
+        <summary><?= /*I18N: webtrees.pot */ I18N::translate('Details'); ?></summary>
+        <div class="bg-light p-2 rounded mt-2 mb-0">
+            <h6><?= I18N::translate('Option A: classic cron (every minute)') ?>
+            </h6>
+            <pre class="bg-light p-2 rounded"><?= e($install['cron_line']) ?></pre>
+            
+            <h6>
+                <?= I18N::translate('Option B: systemd timer (save both files as wt-cronjob-tick.service / wt-cronjob-tick.timer)') ?>
+            </h6>
+            <pre class="bg-light p-2 rounded"><?= e($install['service_unit']) ?></pre>
+            <pre class="bg-light p-2 rounded"><?= e($install['timer_unit']) ?></pre>
+            <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
+        </div>
+    </details>
 </fieldset>
