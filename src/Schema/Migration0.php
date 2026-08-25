@@ -76,7 +76,7 @@ class Migration0 implements MigrationInterface
         if (!DB::schema()->hasTable('cj_run')) {
             DB::schema()->create('cj_run', function (Blueprint $table): void {
                 $table->bigInteger('id', true);
-                $table->unsignedInteger('job_id');
+                $table->integer('job_id');
                 // schedule | manual (phase 2: event)
                 $table->string('trigger', 16)->default('schedule');
                 $table->timestamp('started_at', 0);
