@@ -43,11 +43,13 @@ use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
 use function array_merge;
 use function dirname;
 use function fclose;
 use function fopen;
+use function function_exists;
 use function is_readable;
 use function mb_strlen;
 use function preg_match;
@@ -96,6 +98,10 @@ class CronjobModule extends AbstractModule
         View::registerNamespace($this->name(), $this->resourcesFolder() . 'views/');
 
         CronjobUtils::updateSchema($this, self::SCHEMA_TARGET_VERSION);
+
+        // Page-load watchdog for the optional resident watch daemon. Costs a
+        // single file_exists() when the watch is not enabled; never throws.
+        WatchService::maybeSpawn();
     }
 
     // =========================================================================
@@ -173,6 +179,7 @@ class CronjobModule extends AbstractModule
             'cron_lib'  => ScheduleService::hasCronLibrary(),
             'cron_now'  => ScheduleService::now(),
             'install'   => CronjobUtils::triggerInstallBlocks(),
+            'watch'     => WatchService::status(),
         ]);
     }
 
@@ -385,6 +392,38 @@ class CronjobModule extends AbstractModule
         } else {
             FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
         }
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Start the resident watch daemon (opt-in). It then ticks on its own and
+     * the page-load watchdog keeps it alive.
+     */
+    public function postAdminWatchStartAction(ServerRequestInterface $request): ResponseInterface {
+        if (!function_exists('proc_open')) {
+            FlashMessages::addMessage(I18N::translate('The watch daemon needs proc_open(), which is disabled on this server. Use an OS cron or systemd timer instead.'), 'danger');
+
+            return redirect($this->getConfigLink());
+        }
+
+        WatchService::enable();
+        if (WatchService::spawn()) {
+            FlashMessages::addMessage(I18N::translate('Watch daemon started.'), 'success');
+        } else {
+            FlashMessages::addMessage(I18N::translate('The watch daemon could not be started (proc_open is disabled or it is already running).'), 'warning');
+        }
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Stop the resident watch daemon. It exits within about a minute and the
+     * watchdog will not respawn it.
+     */
+    public function postAdminWatchStopAction(ServerRequestInterface $request): ResponseInterface {
+        WatchService::disable();
+        FlashMessages::addMessage(I18N::translate('Watch daemon stopped - it exits within about a minute and will not restart.'), 'success');
 
         return redirect($this->getConfigLink());
     }

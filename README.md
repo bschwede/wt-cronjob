@@ -15,7 +15,8 @@ has to call one small script once per minute.
 
 - webtrees 2.2.x (PHP 8.3+)
 - PHP CLI with `proc_open` available (standard)
-- A system timer that can run once per minute (classic cron or systemd)
+- A trigger: classic cron, a systemd timer, **or** the built-in watch daemon
+  (no OS timer needed - see "Trigger installation")
 
 ## Installation
 
@@ -76,7 +77,8 @@ last 25 runs per job (plus a 30-day global retention window).
 
 ### Trigger installation (once)
 
-Pick **one** of the two options shown in the module's admin page:
+Pick **one** of the options shown in the module's admin page (classic cron, a
+systemd timer, or the built-in watch daemon):
 
 **Option A - classic cron** (one line in the web server user's crontab, runs every
 minute):
@@ -118,6 +120,35 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now cronjob-tick.timer
 ```
 
+**Option C - watch daemon** (no OS timer at all): click *Start watch* on the
+admin page. A resident process then runs the tick every 60 seconds, and a
+page-load watchdog respawns it if it dies. Use it when the host has no cron and
+no systemd access.
+
+<details>
+<summary>How the watch daemon works</summary>
+
+- **Opt-in:** nothing runs until you click *Start watch*; *Stop watch* removes it
+  (the daemon exits within about a minute and is not respawned).
+- **Liveness:** the daemon holds `data/cronjob-watch.lock` for its whole life.
+  The watchdog (in the module's `boot()`, on every page load) respawns it only
+  when that lock is free, the watch is enabled, the site is online, and at
+  least 5 minutes have passed since the last spawn attempt. With the watch
+  disabled the watchdog costs a single `file_exists()` per page load.
+- **Idle & offline:** while the site is offline it stays idle (no tick);
+  otherwise it ticks every 60 s. All state lives in `data/cronjob-watch.*`.
+- **Self-update:** if the module is re-deployed the daemon detects the changed
+  files and exits, so a fresh daemon picks up the new code.
+- **Hard limits (honest):** without `posix_setsid`/`pcntl_fork` the daemon stays
+  in the web server's process group - a full web server / FPM **master** restart
+  kills it, and the watchdog brings it back on the next page load (self-healing).
+  A plain FPM **worker** recycle does not kill it. Disabling the *module* does
+  not stop the daemon (use *Stop watch*); the ticks simply no-op.
+- It is one resident PHP process that sleeps between ticks (negligible CPU).
+  Use this **or** the OS trigger, not both.
+
+</details>
+
 ### CLI
 
 ```bash
@@ -126,6 +157,7 @@ php modules_v4/cronjob/cli/tick.php --dry-run    # show what would run
 php modules_v4/cronjob/cli/tick.php --job=<name> # run one specific job now
 php modules_v4/cronjob/cli/tick.php --strict     # exit 1 if any job failed (monitoring)
 php modules_v4/cronjob/cli/tick.php --full-output # echo full job output to stdout (debugging!)
+php modules_v4/cronjob/cli/watch.php             # run the resident watch daemon (normally started via "Start watch")
 ```
 
 Exit codes: `0` = tick ran (job failures are recorded in the DB), `1` = environment
@@ -202,16 +234,13 @@ New job scripts in other modules must follow these conventions (linkenhancer's
 - **Job self-registration**: modules advertise their CLI scripts via a module
   interface, so the form can offer typed jobs
 - **Human-readable schedule display** ("every 30 minutes") as a UI add-on
-- **Watch process + page-load watchdog**: an admin-started resident scheduler for
-  hosting without cron/systemd access, with a heartbeat, a stop flag and a
-  self-healing watchdog on page load. See the module plan, section 6.5, for the
-  full design and the hard limits (no supervisor on reboot, spawn rate-limited)
 
 ## Tests
 
 ```bash
 php modules_v4/cronjob/tests/test-args-validator.php  # command whitelist + arg validation (standalone)
 php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cleanly without the bundled vendor)
+php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
 ```
 
 ## License

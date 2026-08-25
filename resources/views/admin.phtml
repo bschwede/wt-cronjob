@@ -13,6 +13,7 @@ use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
  * @var bool $cron_lib
  * @var string $cron_now
  * @var array<string, string> $install
+ * @var array{enabled: bool, running: bool, last_tick: int} $watch
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -132,6 +133,39 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
         </tbody>
     </table>
 <?php endif; ?>
+
+<?php
+$watch_enabled = (bool) ($watch['enabled'] ?? false);
+$watch_running = (bool) ($watch['running'] ?? false);
+$watch_last    = (int) ($watch['last_tick'] ?? 0);
+?>
+<fieldset class="border rounded p-3 mt-4">
+    <legend><?= I18N::translate('Watch daemon (no OS cron needed)') ?></legend>
+    <p class="text-muted">
+        <?= I18N::translate('Runs the tick from a resident process instead of an OS cron / systemd timer - for hosts without cron. A watchdog restarts it automatically if it dies. Use this OR the OS trigger below, not both.') ?>
+    </p>
+    <p>
+        <?php if ($watch_running): ?>
+            <span class="badge bg-success"><?= I18N::translate('running') ?></span>
+        <?php else: ?>
+            <span class="badge bg-secondary"><?= I18N::translate('stopped') ?></span>
+        <?php endif; ?>
+        <?php if ($watch_last > 0): ?>
+            <span class="text-muted"><?= I18N::translate('Last activity (UTC): %s', date('Y-m-d H:i:s', $watch_last)) ?></span>
+        <?php endif; ?>
+    </p>
+    <?php if ($watch_enabled): ?>
+        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStop'])) ?>" class="d-inline">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn btn-sm btn-warning"><?= I18N::translate('Stop watch') ?></button>
+        </form>
+    <?php else: ?>
+        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStart'])) ?>" class="d-inline">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn btn-sm btn-primary"><?= I18N::translate('Start watch') ?></button>
+        </form>
+    <?php endif; ?>
+</fieldset>
 
 <fieldset class="border rounded p-3 mt-4">
     <legend><?= I18N::translate('Trigger Installation') ?></legend>
