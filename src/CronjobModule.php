@@ -579,7 +579,7 @@ class CronjobModule extends AbstractModule
         // Throttle first (before any per-request work), to blunt token guessing.
         /** @var RateLimitService $rate_limit */
         $rate_limit = Registry::container()->get(RateLimitService::class);
-        $rate_limit->limitRateForSite(30, 60, 'cronjob_event_limit');
+        $rate_limit->limitRateForSite(20, 60, 'cronjob_event_limit');
 
         $expected = $this->getPreference(self::PREF_EVENT_TOKEN);
         $provided = $request->getHeaderLine('X-Cronjob-Token');
