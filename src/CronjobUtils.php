@@ -30,6 +30,7 @@ use Fisharebest\Webtrees\Module\AbstractModule;
 use Fisharebest\Webtrees\Webtrees;
 use PDOException;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
+use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
 use function basename;
 use function get_current_user;
@@ -217,7 +218,7 @@ final class CronjobUtils {
      */
     public static function triggerInstallBlocks(): array {
         $root = realpath(rtrim(str_replace('\\', '/', Webtrees::ROOT_DIR), '/'));
-        $php  = str_replace('\\', '/', PHP_BINARY);
+        $php  = str_replace('\\', '/', WatchService::phpBinary());
         $tick = 'modules_v4/cronjob/cli/tick.php';
         $log  = $root . '/data/cronjob-tick.log';
 
@@ -231,7 +232,7 @@ final class CronjobUtils {
                 'Type=oneshot',
                 'User=' . get_current_user(),
                 'WorkingDirectory=' . $root,
-                'ExecStart=' . $php . ' ' . $tick . ' cron:tick',
+                'ExecStart=' . $php . ' ./' . $tick . ' cron:tick',
             ]),
             'timer_unit' => implode("\n", [
                 '[Unit]',
@@ -239,7 +240,7 @@ final class CronjobUtils {
                 '',
                 '[Timer]',
                 'OnBootSec=1min',
-                'OnUnitActiveSec=1min',
+                'OnCalendar=*:*:00',
                 'Persistent=true',
                 '',
                 '[Install]',

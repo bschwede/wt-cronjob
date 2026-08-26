@@ -98,7 +98,7 @@ Description=webtrees cronjob module tick (runs due maintenance jobs)
 Type=oneshot
 User=<webserver-user>
 WorkingDirectory=/path/to/webtrees
-ExecStart=/usr/bin/php modules_v4/cronjob/cli/tick.php
+ExecStart=/usr/bin/php modules_v4/cronjob/cli/tick.php cron:tick
 ```
 
 ```ini
@@ -108,7 +108,7 @@ Description=Run the webtrees cronjob tick every minute
 
 [Timer]
 OnBootSec=1min
-OnUnitActiveSec=1min
+OnCalendar=*:*:00
 Persistent=true
 
 [Install]
