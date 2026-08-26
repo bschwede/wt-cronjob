@@ -174,6 +174,28 @@ check('manifest: non-array returns []', CronjobUtils::loadManifestFile($root . '
 check('manifest: throwing returns []', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/cron-jobs.php') === []);
 check('manifest: missing file returns []', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/nope.php') === []);
 
+// --- findOfferedSpec -----------------------------------------------------------
+$offered = [
+    ['module' => '_fakemod_', 'spec' => ['name' => 'demo', 'title' => 'Demo', 'trigger_type' => 'time', 'cron' => '*/30 * * * *']],
+    ['module' => 'fakemod2', 'spec' => ['name' => 'other', 'title' => 'Other', 'trigger_type' => 'time', 'cron' => '0 3 * * *']],
+];
+$spec = ScheduleService::findOfferedSpec('fakemod:demo', $offered);
+check('findOfferedSpec: key match returns spec', $spec !== null && $spec['title'] === 'Demo');
+check('findOfferedSpec: module part trimmed of underscores', $spec !== null && $spec['cron'] === '*/30 * * * *');
+check('findOfferedSpec: unknown key -> null', ScheduleService::findOfferedSpec('fakemod:nope', $offered) === null);
+check('findOfferedSpec: same name other module -> null', ScheduleService::findOfferedSpec('fakemod2:demo', $offered) === null);
+check('findOfferedSpec: colon-less name -> null', ScheduleService::findOfferedSpec('demo', $offered) === null);
+
+// --- uniqueCopySlug -------------------------------------------------------------
+$slug = CronjobUtils::uniqueCopySlug('base', static fn (string $s): bool => $s === 'base-copy');
+check('copySlug: -copy taken -> -copy2', $slug === 'base-copy2');
+$slug = CronjobUtils::uniqueCopySlug('base', static fn (string $s): bool => false);
+check('copySlug: -copy free -> -copy', $slug === 'base-copy');
+$slug = CronjobUtils::uniqueCopySlug('base', static fn (string $s): bool => in_array($s, ['base-copy', 'base-copy2', 'base-copy3'], true));
+check('copySlug: sequential until free', $slug === 'base-copy4');
+$slug = CronjobUtils::uniqueCopySlug(str_repeat('a', 80), static fn (string $s): bool => false);
+check('copySlug: long base truncated to fit 64 chars', strlen($slug) === 64 && str_ends_with($slug, '-copy'));
+
 // --- resolvePayloadPath ------------------------------------------------------
 $modules = $root . '/modules_v4';
 check('payload: valid sibling resolved',

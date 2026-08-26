@@ -596,6 +596,28 @@ final class ScheduleService {
     }
 
     /**
+     * The spec currently offered for an already-adopted job (name =
+     * <module>:<name>), or null if no enabled module offers it any more.
+     * Backs the admin "reset to module defaults" action.
+     *
+     * @param list<array{module: string, spec: array<string, mixed>}>|null $offered
+     *                                                                       discovery result (injected for tests)
+     * @return array<string, mixed>|null normalized spec
+     */
+    public static function findOfferedSpec(string $job_name, ?array $offered = null): ?array {
+        $offered ??= self::discoverExternalJobs();
+
+        foreach ($offered as $entry) {
+            $key = trim((string) $entry['module'], '_') . ':' . (string) ($entry['spec']['name'] ?? '');
+            if ($key === $job_name) {
+                return $entry['spec'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Ensure a discovered job exists in cj_job, keyed as <module>:<name>.
      *
      * Insert-if-missing: once created the row is admin-owned and is never

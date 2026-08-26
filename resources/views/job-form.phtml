@@ -16,8 +16,10 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
  * @var string $trigger_type
  * @var string $event_name
  * @var bool $notify
+ * @var string|null $copy_of
  */
 
+$copy_of  = $copy_of ?? null;
 $back_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
 $is_edit  = $job !== null;
 $job_id   = $is_edit ? (int) $job->id : 0;
@@ -26,7 +28,9 @@ $crumbs = [
     route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
     $back_url => $module->title(),
 ];
-if ($is_edit) {
+if ($copy_of !== null) {
+    $crumbs[0] = I18N::translate('New Job (copy of %s)', $copy_of);
+} elseif ($is_edit) {
     $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = $job->title;
     $crumbs[0] = I18N::translate('Edit Job');
 } else {
@@ -36,7 +40,7 @@ if ($is_edit) {
 ?>
 <?= view('components/breadcrumbs', ['links' => $crumbs]) ?>
 
-<h1><?= $is_edit ? I18N::translate('Edit Job') : I18N::translate('New Job') ?></h1>
+<h1><?= $copy_of !== null ? I18N::translate('New Job (copy of %s)', $copy_of) : ($is_edit ? I18N::translate('Edit Job') : I18N::translate('New Job')) ?></h1>
 
 <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobSave'])) ?>" class="needs-validation" novalidate>
     <?= csrf_field() ?>

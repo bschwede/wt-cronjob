@@ -81,6 +81,12 @@ The **Run now** button queues the job for the next tick (≤ 60 s). The **Histor
 page shows status, exit code, duration and the captured output (last 64 KB) of the
 last 25 runs per job (plus a 30-day global retention window).
 
+The job table is a **client-side DataTable** (search box, sortable columns, paging,
+state saved in the browser) - no extra setup needed. Per row there are additional
+actions: **Duplicate** opens the create form prefilled with a copy of the job
+(new `-copy` slug, starts disabled), and **Reset** (only for jobs offered by a
+module manifest) restores the module's currently-offered defaults.
+
 ### Trigger installation (once)
 
 Pick **one** of the options shown in the module's admin page (classic cron, a
@@ -282,6 +288,12 @@ overwrite it, so edits to cron, arguments or the enabled flag are safe. (A spec
 *added* to the manifest appears on the next tick; a *removed* spec leaves the
 already-created job in place.)
 
+In the admin table, every job that is **currently offered by a module** carries a
+"from module …" badge. Its **Reset** button restores the defaults currently in the
+manifest (title, trigger, cron, command, args, timeout, enabled state); the slug,
+the notify setting and the run history are kept. If the module is removed or no
+longer offers the spec, the badge and the reset button disappear.
+
 ## Using the W1 wrapper (cronjob's bootstrap for other modules' scripts)
 
 A job script that needs webtrees + the database must bootstrap them itself. A module
@@ -374,9 +386,12 @@ beyond the text. A notification problem never breaks the tick.
 
 Implemented so far: **job self-registration** (manifest / marker method), the
 **W1 wrapper**, **event-driven jobs** (webhook + `cj_event` queue + `EventQueue::push()`),
-**failure notification** to the administrator accounts, and a **human-readable
+**failure notification** to the administrator accounts, a **human-readable
 schedule** shown next to each cron expression in the admin table (translatable via
-`I18N`; the exact cron string is always shown too). See the sections above.
+`I18N`; the exact cron string is always shown too), the **provenance badge + reset
+to module defaults** for offered jobs, **duplicate a job** via the create form, and
+the **client-side DataTable** (filter/sort/paging) for the job table. See the
+sections above.
 
 Still open:
 

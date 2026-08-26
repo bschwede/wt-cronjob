@@ -43,6 +43,7 @@ use function preg_match;
 use function rtrim;
 use function str_starts_with;
 use function str_replace;
+use function substr;
 
 /**
  * Module-level helpers: schema migration, job registry access,
@@ -176,6 +177,27 @@ final class CronjobUtils {
      */
     public static function deleteJob(int $id): void {
         DB::table('cj_job')->where('id', '=', $id)->delete();
+    }
+
+    /**
+     * Next free slug for a duplicated job: <base>-copy, <base>-copy2, …
+     * The base is truncated to 59 chars so the suffix still fits into the
+     * 64-char cj_job.name column.
+     *
+     * @param (callable(string): bool)|null $exists returns true if $slug is taken (default: cj_job DB check)
+     */
+    public static function uniqueCopySlug(string $base, ?callable $exists = null): string {
+        $exists ??= static fn (string $slug): bool => DB::table('cj_job')->where('name', '=', $slug)->exists();
+
+        $base = substr($base, 0, 59);
+        $n    = 1;
+
+        do {
+            $slug = $n === 1 ? $base . '-copy' : $base . '-copy' . (string) $n;
+            $n++;
+        } while ($exists($slug) && $n < 1000);
+
+        return $slug;
     }
 
     /**

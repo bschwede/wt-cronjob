@@ -204,6 +204,16 @@ class CronjobModule extends AbstractModule
             $this->setPreference(self::PREF_EVENT_TOKEN, self::generateEventToken());
         }
 
+        // Jobs currently offered by other modules, keyed as <module>:<name>.
+        // The admin view uses this for the provenance badge and the
+        // "reset to module defaults" button. discoverExternalJobs() is
+        // exception-safe (malformed sources are skipped).
+        $offered = [];
+        foreach (ScheduleService::discoverExternalJobs() as $entry) {
+            $short   = trim((string) $entry['module'], '_');
+            $offered[$short . ':' . (string) $entry['spec']['name']] = $short;
+        }
+
         return $this->viewResponse($this->name() . '::admin', [
             'title'       => $this->title(),
             'module'      => $this,
@@ -214,17 +224,32 @@ class CronjobModule extends AbstractModule
             'install'     => CronjobUtils::triggerInstallBlocks(),
             'watch'       => WatchService::status(),
             'event_token' => $this->getPreference(self::PREF_EVENT_TOKEN),
+            'offered'     => $offered,
         ]);
     }
 
     /**
-     * Job create/edit form (?job=<id> to edit).
+     * Job create/edit form (?job=<id> to edit, ?duplicate=<id> to open the
+     * form prefilled with a copy of that job: new -copy slug, disabled).
      */
     public function getAdminJobFormAction(ServerRequestInterface $request): ResponseInterface {
         $this->layout = 'layouts/administration';
 
-        $job_id = Validator::queryParams($request)->integer('job', 0);
-        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job_id    = Validator::queryParams($request)->integer('job', 0);
+        $duplicate = Validator::queryParams($request)->integer('duplicate', 0);
+        $job       = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $copy_of   = null;
+
+        if ($job === null && $duplicate > 0) {
+            $source = CronjobUtils::findJob($duplicate);
+            if ($source !== null) {
+                $job          = clone $source;
+                $job->id      = 0;
+                $job->enabled = 0;
+                $job->name    = CronjobUtils::uniqueCopySlug((string) $source->name);
+                $copy_of      = (string) $source->title;
+            }
+        }
 
         $trigger_type = $job !== null ? ((string) $job->trigger_type === 'event' ? 'event' : 'time') : 'time';
         $event_name   = $job !== null ? (string) ($job->event_name ?? '') : '';
@@ -243,6 +268,7 @@ class CronjobModule extends AbstractModule
             'title'        => I18N::translate('Cron Job Scheduler'),
             'module'       => $this,
             'job'          => $job,
+            'copy_of'      => $copy_of,
             'candidates'   => array_merge(CronjobUtils::jobScriptCandidates(), JobRunner::ALLOWED_CORE_COMMANDS),
             'preview'      => $preview,
             'cron_now'     => ScheduleService::now(),
@@ -428,6 +454,49 @@ class CronjobModule extends AbstractModule
         } else {
             FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
         }
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Reset a job to the defaults currently offered by its module
+     * (manifest / getCronJobs): title, trigger, cron, command, args and
+     * enabled are restored. The slug, the notify setting and the run
+     * history are kept. Jobs without a current offer cannot be reset.
+     */
+    public function postAdminJobResetAction(ServerRequestInterface $request): ResponseInterface {
+        $job_id = Validator::parsedBody($request)->integer('job_id', 0);
+        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+
+        if ($job === null) {
+            FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
+
+            return redirect($this->getConfigLink());
+        }
+
+        $spec = ScheduleService::findOfferedSpec((string) $job->name);
+        if ($spec === null) {
+            FlashMessages::addMessage(I18N::translate('This job is not (any longer) offered by a module - reset is not possible.'), 'danger');
+
+            return redirect($this->getConfigLink());
+        }
+
+        CronjobUtils::saveJob([
+            'name'         => (string) $job->name,
+            'title'        => (string) $spec['title'],
+            'trigger_type' => (string) $spec['trigger_type'],
+            'event_name'   => (string) ($spec['event_name'] ?? ''),
+            'cron'         => (string) $spec['cron'],
+            'command_type' => (string) $spec['command_type'],
+            'command'      => (string) $spec['command'],
+            'args'         => (string) $spec['args'],
+            'timeout_sec'  => (int) $spec['timeout_sec'],
+            'enabled'      => (bool) $spec['enabled'],
+            'notify'       => (int) $job->notify === 1,
+            'created_at'   => (string) $job->created_at,
+        ], ScheduleService::now(), (int) $job->id);
+
+        FlashMessages::addMessage(I18N::translate('Job reset to the module defaults.'), 'success');
 
         return redirect($this->getConfigLink());
     }

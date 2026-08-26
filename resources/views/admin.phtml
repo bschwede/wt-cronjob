@@ -16,6 +16,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var array<string, string> $install
  * @var array{enabled: bool, running: bool, last_tick: int} $watch
  * @var string $event_token
+ * @var array<string, string> $offered
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -55,7 +56,12 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 <?php if ($jobs === []): ?>
     <p><?= I18N::translate('No jobs yet. Create the first one (e.g. the linkenhancer link-index update).') ?></p>
 <?php else: ?>
-    <table class="table table-sm table-striped">
+    <table id="wt-cronjob-jobs"
+           class="table table-sm table-striped datatables d-none"
+           <?= view('lists/datatables-attributes') ?>
+           data-auto-width="false"
+           data-sorting='[[0,"asc"]]'
+           data-columns='[{},{},{},{"dataSort":6},{"dataSort":7},{"sortable":false,"searchable":false},{"visible":false},{"visible":false}]'>
         <thead>
             <tr>
                 <th><?= I18N::translate('Job') ?></th>
@@ -64,6 +70,8 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                 <th><?= I18N::translate('Last Run') ?></th>
                 <th><?= I18N::translate('Enabled') ?></th>
                 <th></th>
+                <th><!-- last run timestamp --></th>
+                <th><!-- enabled flag --></th>
             </tr>
         </thead>
         <tbody>
@@ -78,6 +86,14 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         <strong><?= e($job->title) ?></strong>
                     </a>
                     <div class="text-muted"><?= e($job->name) ?></div>
+                    <?php if (isset($offered[$job->name])): ?>
+                        <div>
+                            <span class="badge bg-secondary"
+                                  title="<?= e(I18N::translate('Seeded automatically from the %s manifest (cron-jobs.php / getCronJobs()). The "Reset" button restores the module defaults.', $offered[$job->name])) ?>">
+                                <?= e(I18N::translate('from module %s', $offered[$job->name])) ?>
+                            </span>
+                        </div>
+                    <?php endif; ?>
                 </td>
                 <td>
                     <?php if ((string) $job->trigger_type === 'event'): ?>
@@ -134,6 +150,22 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                             <?= I18N::translate('Run now') ?>
                         </button>
                     </form>
+                    <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'duplicate' => (int) $job->id])) ?>"
+                       class="btn btn-sm btn-secondary"
+                       title="<?= e(I18N::translate('Open the form prefilled with a copy of this job (new -copy slug, starts disabled)')) ?>">
+                        <?= I18N::translate('Duplicate') ?>
+                    </a>
+                    <?php if (isset($offered[$job->name])): ?>
+                        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobReset'])) ?>" class="d-inline"
+                              onsubmit="return confirm('<?= e(I18N::translate('Reset this job to the module defaults? Your changes (title, schedule, command, arguments, enabled state) will be lost; the notification setting is kept.')) ?>');">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
+                            <button type="submit" class="btn btn-sm btn-warning"
+                                    title="<?= e(I18N::translate('Restore the settings currently offered by the module manifest')) ?>">
+                                <?= I18N::translate('Reset') ?>
+                            </button>
+                        </form>
+                    <?php endif; ?>
                     <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobDelete'])) ?>" class="d-inline"
                           onsubmit="return confirm('<?= e(I18N::translate('Delete this job and its run history?')) ?>');">
                         <?= csrf_field() ?>
@@ -143,6 +175,8 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         </button>
                     </form>
                 </td>
+                <td><?= $last !== null ? e((string) $last->started_at) : '' ?></td>
+                <td><?= (int) $job->enabled ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
