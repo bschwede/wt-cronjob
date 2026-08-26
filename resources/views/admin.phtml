@@ -14,6 +14,7 @@ use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
  * @var string $cron_now
  * @var array<string, string> $install
  * @var array{enabled: bool, running: bool, last_tick: int} $watch
+ * @var string $event_token
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -77,7 +78,14 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     </a>
                     <div class="text-muted"><?= e($job->name) ?></div>
                 </td>
-                <td><code><?= e($job->cron) ?></code></td>
+                <td>
+                    <?php if ((string) $job->trigger_type === 'event'): ?>
+                        <span class="badge bg-info"><?= I18N::translate('event') ?></span>
+                        <code><?= e((string) $job->event_name) ?></code>
+                    <?php else: ?>
+                        <code><?= e($job->cron) ?></code>
+                    <?php endif; ?>
+                </td>
                 <td><?= $job->next_run_at !== null ? e((string) $job->next_run_at) : '—' ?></td>
                 <td>
                     <?php if ($last === null): ?>
@@ -191,4 +199,25 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
             <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
         </div>
     </details>
+</fieldset>
+
+<fieldset class="border rounded p-3 mt-4">
+    <legend><?= I18N::translate('Event webhook (external trigger)') ?></legend>
+    <p class="text-muted">
+        <?= I18N::translate('External systems can queue an event by GETting the endpoint below. Each queued event runs its matching event-triggered job(s) at the next tick. The token is required (send it in the X-Cronjob-Token header, not in the URL) and the endpoint is rate-limited.') ?>
+    </p>
+    <div class="mb-2">
+        <label class="form-label" for="cj_webhook_url"><?= I18N::translate('Endpoint') ?></label>
+        <input type="text" class="form-control" id="cj_webhook_url" readonly
+               value="<?= e(route('module', ['module' => $module->name(), 'action' => 'Event'])) ?>">
+        <div class="form-text"><?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header (or, less secure, as ?token=…).') ?></div>
+    </div>
+    <div class="mb-2">
+        <label class="form-label" for="cj_event_token"><?= I18N::translate('Token') ?></label>
+        <input type="text" class="form-control font-monospace" id="cj_event_token" readonly value="<?= e($event_token) ?>">
+    </div>
+    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminEventToken'])) ?>" class="d-inline">
+        <?= csrf_field() ?>
+        <button type="submit" class="btn btn-sm btn-secondary"><?= I18N::translate('Regenerate token') ?></button>
+    </form>
 </fieldset>

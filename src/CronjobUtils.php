@@ -136,16 +136,26 @@ final class CronjobUtils {
      * next_run_at is (re)computed from $now.
      */
     public static function saveJob(array $data, string $now, int $id = 0): void {
+        $trigger    = (($data['trigger_type'] ?? 'time') === 'event') ? 'event' : 'time';
+        $event_name = $trigger === 'event' ? ($data['event_name'] ?? null) : null;
+
+        $next = null;
+        if ($trigger === 'time') {
+            $next = Services\ScheduleService::nextRun($data['cron'], $now);
+        }
+
         $values = [
             'title'        => $data['title'],
-            'trigger_type' => 'time',
-            'cron'         => $data['cron'],
+            'trigger_type' => $trigger,
+            'event_name'   => $event_name,
+            'cron'         => $trigger === 'time' ? $data['cron'] : '',
             'command_type' => $data['command_type'],
             'command'      => $data['command'],
             'args'         => $data['args'],
             'enabled'      => $data['enabled'] ? 1 : 0,
+            'notify'       => (!empty($data['notify'])) ? 1 : 0,
             'timeout_sec'  => $data['timeout_sec'],
-            'next_run_at'  => Services\ScheduleService::nextRun($data['cron'], $now),
+            'next_run_at'  => $next,
             'updated_at'   => $now,
         ];
 

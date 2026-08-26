@@ -34,6 +34,8 @@ use Fisharebest\Webtrees\Module\ModuleConfigInterface;
 use Fisharebest\Webtrees\Module\ModuleConfigTrait;
 use Fisharebest\Webtrees\Module\ModuleCustomInterface;
 use Fisharebest\Webtrees\Module\ModuleCustomTrait;
+use Fisharebest\Webtrees\Registry;
+use Fisharebest\Webtrees\Services\RateLimitService;
 use Fisharebest\Webtrees\Validator;
 use Fisharebest\Webtrees\View;
 use Fisharebest\Webtrees\Webtrees;
@@ -43,18 +45,24 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
 use function array_merge;
+use function bin2hex;
 use function dirname;
 use function fclose;
 use function fopen;
 use function function_exists;
+use function hash_equals;
+use function is_array;
 use function is_readable;
+use function json_decode;
 use function mb_strlen;
 use function preg_match;
+use function random_bytes;
 use function str_ends_with;
 use function strlen;
 use function trim;
@@ -75,7 +83,10 @@ class CronjobModule extends AbstractModule
     use ModuleConfigTrait;
     use ModuleCustomTrait;
 
-    public const SCHEMA_TARGET_VERSION = 1;
+    public const SCHEMA_TARGET_VERSION = 2;
+
+    /** Module preference key holding the webhook token (§6.1). */
+    public const PREF_EVENT_TOKEN = 'event_token';
 
     // Single source of truth lives in ScheduleService (shared with the
     // external-job spec validator).
@@ -188,15 +199,21 @@ class CronjobModule extends AbstractModule
     public function getAdminAction(ServerRequestInterface $request): ResponseInterface {
         $this->layout = 'layouts/administration';
 
+        // Ensure a webhook token exists (generated once, lazily).
+        if ($this->getPreference(self::PREF_EVENT_TOKEN) === '') {
+            $this->setPreference(self::PREF_EVENT_TOKEN, self::generateEventToken());
+        }
+
         return $this->viewResponse($this->name() . '::admin', [
-            'title'     => $this->title(),
-            'module'    => $this,
-            'jobs'      => CronjobUtils::listJobs(),
-            'offline'   => CliBootstrap::siteIsOffline(),
-            'cron_lib'  => ScheduleService::hasCronLibrary(),
-            'cron_now'  => ScheduleService::now(),
-            'install'   => CronjobUtils::triggerInstallBlocks(),
-            'watch'     => WatchService::status(),
+            'title'       => $this->title(),
+            'module'      => $this,
+            'jobs'        => CronjobUtils::listJobs(),
+            'offline'     => CliBootstrap::siteIsOffline(),
+            'cron_lib'    => ScheduleService::hasCronLibrary(),
+            'cron_now'    => ScheduleService::now(),
+            'install'     => CronjobUtils::triggerInstallBlocks(),
+            'watch'       => WatchService::status(),
+            'event_token' => $this->getPreference(self::PREF_EVENT_TOKEN),
         ]);
     }
 
@@ -209,8 +226,12 @@ class CronjobModule extends AbstractModule
         $job_id = Validator::queryParams($request)->integer('job', 0);
         $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
 
+        $trigger_type = $job !== null ? ((string) $job->trigger_type === 'event' ? 'event' : 'time') : 'time';
+        $event_name   = $job !== null ? (string) ($job->event_name ?? '') : '';
+        $notify       = $job !== null ? ((int) $job->notify === 1) : false;
+
         $preview = null;
-        if ($job !== null && ScheduleService::hasCronLibrary()) {
+        if ($job !== null && $trigger_type === 'time' && ScheduleService::hasCronLibrary()) {
             try {
                 $preview = ScheduleService::upcomingRuns((string) $job->cron, 5, ScheduleService::now());
             } catch (DomainException | RuntimeException) {
@@ -219,12 +240,15 @@ class CronjobModule extends AbstractModule
         }
 
         return $this->viewResponse($this->name() . '::job-form', [
-            'title'      => I18N::translate('Cron Job Scheduler'),
-            'module'     => $this,
-            'job'        => $job,
-            'candidates' => array_merge(CronjobUtils::jobScriptCandidates(), JobRunner::ALLOWED_CORE_COMMANDS),
-            'preview'    => $preview,
-            'cron_now'   => ScheduleService::now(),
+            'title'        => I18N::translate('Cron Job Scheduler'),
+            'module'       => $this,
+            'job'          => $job,
+            'candidates'   => array_merge(CronjobUtils::jobScriptCandidates(), JobRunner::ALLOWED_CORE_COMMANDS),
+            'preview'      => $preview,
+            'cron_now'     => ScheduleService::now(),
+            'trigger_type' => $trigger_type,
+            'event_name'   => $event_name,
+            'notify'       => $notify,
         ]);
     }
 
@@ -232,15 +256,18 @@ class CronjobModule extends AbstractModule
      * Save a job (create or update).
      */
     public function postAdminJobSaveAction(ServerRequestInterface $request): ResponseInterface {
-        $data      = Validator::parsedBody($request);
-        $name      = trim($data->string('name', ''));
-        $title     = trim($data->string('title', ''));
-        $cron      = trim($data->string('cron', ''));
-        $command   = trim($data->string('command', ''));
-        $args      = trim($data->string('args', ''));
-        $timeout   = $data->integer('timeout', self::TIMEOUT_STD);
-        $enabled   = $data->boolean('enabled', false);
-        $job_id    = $data->integer('job_id', 0);
+        $data         = Validator::parsedBody($request);
+        $name         = trim($data->string('name', ''));
+        $title        = trim($data->string('title', ''));
+        $cron         = trim($data->string('cron', ''));
+        $command      = trim($data->string('command', ''));
+        $args         = trim($data->string('args', ''));
+        $timeout      = $data->integer('timeout', self::TIMEOUT_STD);
+        $enabled      = $data->boolean('enabled', false);
+        $notify       = $data->boolean('notify', false);
+        $trigger_type = $data->string('trigger_type', 'time') === 'event' ? 'event' : 'time';
+        $event_name   = trim($data->string('event_name', ''));
+        $job_id       = $data->integer('job_id', 0);
 
         $errors = [];
         if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) !== 1) {
@@ -249,17 +276,23 @@ class CronjobModule extends AbstractModule
         if ($title === '') {
             $errors[] = I18N::translate('Job title must not be empty.');
         }
-        try {
-            ScheduleService::validateCron($cron);
-        } catch (DomainException | RuntimeException $exception) {
-            $errors[] = I18N::translate('Invalid cron expression "%1$s": %2$s', $cron, $exception->getMessage());
+        if ($trigger_type === 'event') {
+            if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $event_name) !== 1) {
+                $errors[] = I18N::translate('Event name must be a slug: %1$s, max %2$s characters.', 'a-z, 0-9, "_", "-"', '64');
+            }
+        } else {
+            try {
+                ScheduleService::validateCron($cron);
+            } catch (DomainException | RuntimeException $exception) {
+                $errors[] = I18N::translate('Invalid cron expression "%1$s": %2$s', $cron, $exception->getMessage());
+            }
+            if (strlen($cron) > 64) {
+                $errors[] = I18N::translate('Cron expression must be at most %d characters.', 64);
+            }
         }
-        // DB column widths (Migration0): title 128, cron 64, args 255.
+        // DB column widths (Migration0/1): title 128, cron 64, args 255.
         if (mb_strlen($title) > 128) {
             $errors[] = I18N::translate('Job title must be at most %d characters.', 128);
-        }
-        if (strlen($cron) > 64) {
-            $errors[] = I18N::translate('Cron expression must be at most %d characters.', 64);
         }
         if (strlen($args) > 255) {
             $errors[] = I18N::translate('Arguments must be at most %d characters.', 255);
@@ -299,12 +332,15 @@ class CronjobModule extends AbstractModule
         CronjobUtils::saveJob([
             'name'         => $name,
             'title'        => $title,
-            'cron'         => $cron,
+            'trigger_type' => $trigger_type,
+            'event_name'   => $trigger_type === 'event' ? $event_name : '',
+            'cron'         => $trigger_type === 'time' ? $cron : '',
             'command_type' => $command_type,
             'command'      => $command,
             'args'         => $args,
             'timeout_sec'  => max(self::TIMEOUT_MIN, min(self::TIMEOUT_MAX, $timeout)),
             'enabled'      => $enabled,
+            'notify'       => $notify,
             'created_at'   => $existing?->created_at ?? $now,
         ], $now, (int) ($existing?->id ?? 0));
 
@@ -443,5 +479,82 @@ class CronjobModule extends AbstractModule
         FlashMessages::addMessage(I18N::translate('Watch daemon stopped - it exits within about a minute and will not restart.'), 'success');
 
         return redirect($this->getConfigLink());
+    }
+
+    // =========================================================================
+    // Webhook: event trigger (§6.1). NOT admin-only (the name has no "admin"),
+    // so ModuleAction allows non-logged-in callers; the shared token + a
+    // site-wide rate limit are the access controls instead.
+    //
+    // It is a GET (not a POST): webtrees' CheckCsrf middleware rejects every
+    // POST without a session CSRF token, which an external system cannot send.
+    // The token is the access control and should be sent as the
+    // X-Cronjob-Token header (not the query string) so it is not written to
+    // access logs.
+    // =========================================================================
+
+    /**
+     * GET /module/_cronjob_/Event?event=<name>&data=<json>
+     * (token in the X-Cronjob-Token header, or as ?token=<token>).
+     *
+     * Queues an event for the tick to dispatch to matching event-triggered
+     * jobs. Fails closed: a missing/empty token is always rejected.
+     */
+    public function getEventAction(ServerRequestInterface $request): ResponseInterface {
+        $factory = Registry::responseFactory();
+
+        if (DB::table('module')->where('module_name', '=', $this->name())->value('status') !== 'enabled') {
+            return $factory->response(['ok' => false, 'error' => 'module disabled'], 503);
+        }
+
+        // Throttle first (before any per-request work), to blunt token guessing.
+        /** @var RateLimitService $rate_limit */
+        $rate_limit = Registry::container()->get(RateLimitService::class);
+        $rate_limit->limitRateForSite(30, 60, 'cronjob_event_limit');
+
+        $expected = $this->getPreference(self::PREF_EVENT_TOKEN);
+        $provided = $request->getHeaderLine('X-Cronjob-Token');
+        if ($provided === '') {
+            $provided = Validator::queryParams($request)->string('token', '');
+        }
+        if ($expected === '' || !hash_equals($expected, $provided)) {
+            return $factory->response(['ok' => false, 'error' => 'unauthorized'], 401);
+        }
+
+        $event = trim(Validator::queryParams($request)->string('event', ''));
+        if (preg_match(EventQueue::NAME_PATTERN, $event) !== 1) {
+            return $factory->response(['ok' => false, 'error' => 'invalid event'], 400);
+        }
+
+        $data_raw = trim(Validator::queryParams($request)->string('data', ''));
+        $data     = [];
+        if ($data_raw !== '') {
+            $decoded = json_decode($data_raw, true);
+            if (!is_array($decoded)) {
+                return $factory->response(['ok' => false, 'error' => 'data must be a JSON object/array'], 400);
+            }
+            $data = $decoded;
+        }
+
+        EventQueue::push($event, $data);
+
+        return $factory->response(['ok' => true, 'queued' => 1], 200);
+    }
+
+    /**
+     * Regenerate the webhook token (admin).
+     */
+    public function postAdminEventTokenAction(ServerRequestInterface $request): ResponseInterface {
+        $this->setPreference(self::PREF_EVENT_TOKEN, self::generateEventToken());
+        FlashMessages::addMessage(I18N::translate('Webhook token regenerated - update any external sender.'), 'success');
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Generate a fresh webhook token (32 hex characters).
+     */
+    public static function generateEventToken(): string {
+        return bin2hex(random_bytes(16));
     }
 }

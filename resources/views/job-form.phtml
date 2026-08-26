@@ -13,6 +13,9 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
  * @var array<int, string> $candidates
  * @var array<int, string>|null $preview
  * @var string $cron_now
+ * @var string $trigger_type
+ * @var string $event_name
+ * @var bool $notify
  */
 
 $back_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -64,29 +67,57 @@ if ($is_edit) {
                    <?= $is_edit ? ((int) $job->enabled === 1 ? 'checked' : '') : 'checked' ?>>
             <label class="form-check-label" for="cj_enabled"><?= I18N::translate('Enabled') ?></label>
         </div>
+
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="cj_notify" name="notify" value="1"
+                   <?= $notify ? 'checked' : '' ?>>
+            <label class="form-check-label" for="cj_notify"><?= I18N::translate('Notify administrators on failure') ?></label>
+            <div class="form-text"><?= I18N::translate('On failure, message the site’s administrator accounts (e-mail and/or internal message, per each admin’s own contact preference).') ?></div>
+        </div>
     </fieldset>
 
     <fieldset class="border rounded p-3 mb-3">
-        <legend><?= I18N::translate('Schedule') ?></legend>
+        <legend><?= I18N::translate('Trigger / Schedule') ?></legend>
 
         <div class="mb-3">
-            <label for="cj_cron" class="form-label"><?= I18N::translate('Cron expression (5 fields, UTC)') ?></label>
-            <input type="text" class="form-control" id="cj_cron" name="cron" required
-                   placeholder="*/30 * * * *"
-                   value="<?= $is_edit ? e($job->cron) : '' ?>">
-            <div class="form-text"><?= I18N::translate('All times are UTC (webtrees server time). Current time (UTC): %s', $cron_now) ?></div>
+            <label for="cj_trigger_type" class="form-label"><?= I18N::translate('Trigger') ?></label>
+            <select class="form-select" id="cj_trigger_type" name="trigger_type">
+                <option value="time" <?= $trigger_type === 'time' ? 'selected' : '' ?>><?= I18N::translate('Time-based (cron schedule)') ?></option>
+                <option value="event" <?= $trigger_type === 'event' ? 'selected' : '' ?>><?= I18N::translate('Event (webhook or module push)') ?></option>
+            </select>
         </div>
 
-        <?php if ($preview !== null): ?>
+        <div id="cj_time_fields" <?= $trigger_type === 'event' ? 'hidden' : '' ?>>
             <div class="mb-3">
-                <span class="text-muted"><?= I18N::translate('Next runs (UTC):') ?></span>
-                <ul class="mb-0">
-                    <?php foreach ($preview as $run): ?>
-                        <li><code><?= e($run) ?></code></li>
-                    <?php endforeach; ?>
-                </ul>
+                <label for="cj_cron" class="form-label"><?= I18N::translate('Cron expression (5 fields, UTC)') ?></label>
+                <input type="text" class="form-control" id="cj_cron" name="cron"
+                       placeholder="*/30 * * * *"
+                       value="<?= $is_edit ? e($job->cron) : '' ?>">
+                <div class="form-text"><?= I18N::translate('All times are UTC (webtrees server time). Current time (UTC): %s', $cron_now) ?></div>
             </div>
-        <?php endif; ?>
+
+            <?php if ($preview !== null): ?>
+                <div class="mb-3">
+                    <span class="text-muted"><?= I18N::translate('Next runs (UTC):') ?></span>
+                    <ul class="mb-0">
+                        <?php foreach ($preview as $run): ?>
+                            <li><code><?= e($run) ?></code></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div id="cj_event_fields" <?= $trigger_type === 'time' ? 'hidden' : '' ?>>
+            <div class="mb-3">
+                <label for="cj_event_name" class="form-label"><?= I18N::translate('Event name') ?></label>
+                <input type="text" class="form-control" id="cj_event_name" name="event_name"
+                       pattern="[a-z0-9][a-z0-9_\-]{0,63}"
+                       placeholder="index-dirty"
+                       value="<?= e($event_name) ?>">
+                <div class="form-text"><?= I18N::translate('The job runs once for each queued event with this name (from the webhook or a module call).') ?></div>
+            </div>
+        </div>
     </fieldset>
 
     <fieldset class="border rounded p-3 mb-3">
@@ -129,3 +160,22 @@ if ($is_edit) {
         <a href="<?= e($back_url) ?>" class="btn btn-secondary"><?= /*I18N: webtrees.pot */ I18N::translate('Cancel') ?></a>
     </div>
 </form>
+
+<script>
+    (function () {
+        var sel = document.getElementById('cj_trigger_type');
+        var timeFields = document.getElementById('cj_time_fields');
+        var eventFields = document.getElementById('cj_event_fields');
+        var cron = document.getElementById('cj_cron');
+        var eventName = document.getElementById('cj_event_name');
+        function toggle() {
+            var isEvent = sel.value === 'event';
+            timeFields.hidden = isEvent;
+            eventFields.hidden = !isEvent;
+            cron.required = !isEvent;
+            eventName.required = isEvent;
+        }
+        sel.addEventListener('change', toggle);
+        toggle();
+    })();
+</script>

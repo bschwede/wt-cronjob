@@ -145,6 +145,28 @@ $r = ScheduleService::validateJobSpec([
 check('explicit title kept', $r['spec']['title'] === 'My Job');
 check('explicit enabled=true kept', $r['spec']['enabled'] === true);
 
+// event-triggered jobs (phase 2, §6.1)
+$r = ScheduleService::validateJobSpec([
+    'name' => 'on-dirty', 'trigger_type' => 'event', 'event_name' => 'index-dirty',
+    'command_type' => 'module', 'command' => $command,
+], $root);
+check('event job: no errors', $r['errors'] === []);
+check('event job: trigger_type normalized', $r['spec']['trigger_type'] === 'event');
+check('event job: event_name kept', $r['spec']['event_name'] === 'index-dirty');
+check('event job: cron cleared', $r['spec']['cron'] === '');
+
+$r = ScheduleService::validateJobSpec([
+    'name' => 'on-dirty', 'trigger_type' => 'event',
+    'command_type' => 'module', 'command' => $command,
+], $root);
+check('event job without event_name rejected', $r['errors'] !== []);
+
+$r = ScheduleService::validateJobSpec([
+    'name' => 'on-dirty', 'trigger_type' => 'event', 'event_name' => 'Bad Name!',
+    'command_type' => 'module', 'command' => $command,
+], $root);
+check('event job with bad event_name rejected', $r['errors'] !== []);
+
 // --- loadManifestFile --------------------------------------------------------
 $specs = CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod/cron-jobs.php');
 check('manifest: valid returns list', is_array($specs) && count($specs) === 1 && ($specs[0]['name'] ?? '') === 'demo');

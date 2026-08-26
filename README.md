@@ -9,6 +9,8 @@ has to call one small script once per minute.
 - **Admin UI** (control panel): job list, create/edit form, run history, run now, enable/disable, delete
 - **Isolated execution**: every job runs as a separate child PHP process (`proc_open`, no shell), with per-job timeout and captured output
 - **Self-registration**: other modules can advertise their jobs (a `cron-jobs.php` manifest or a `getCronJobs()` method); they appear here, created disabled and ready to enable
+- **Event-driven jobs**: jobs can fire on events instead of a schedule - queued by a token-protected **webhook** or by a direct `EventQueue::push()` call from other modules
+- **Failure notification**: per-job opt-in to alert the site's administrator accounts (internal message and/or e-mail, per each admin's own preference) when a job fails
 - **Offline awareness**: while `data/offline.txt` exists (e.g. during a webtrees update) the tick is skipped *before any database access* - no child process starts while migrations and code are in flux
 - **No core changes, no changes to other modules**
 
@@ -67,10 +69,13 @@ then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 | :--- | :--- |
 | **Name (slug)** | technical identifier, `a-z 0-9 _ -` |
 | **Title** | human readable name |
-| **Cron expression** | standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 5 runs. |
+| **Trigger** | **Time-based** (a cron schedule) or **Event** (runs when a named event is queued). See "Event-driven jobs". |
+| **Cron expression** | (time-based only) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 5 runs. |
+| **Event name** | (event only) the event this job reacts to, e.g. `index-dirty` |
 | **Command** | a `modules_v4/<module>/cli/<script>.php` path (discovered scripts are offered as suggestions) or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting` |
 | **Arguments** | plain options/values only (e.g. `--limit=5000`), max 10 tokens |
 | **Timeout** | 30 - 3600 s |
+| **Notify on failure** | opt-in: alert the administrator accounts when this job fails |
 
 The **Run now** button queues the job for the next tick (≤ 60 s). The **History**
 page shows status, exit code, duration and the captured output (last 64 KB) of the
@@ -311,27 +316,72 @@ job's working directory and arguments are unchanged too.
 - **Requires the cronjob module to be installed.** If a script must also run as a
   standalone tool (no cronjob), keep the module's own `CliBootstrap` copy instead.
 
+## Event-driven jobs (webhooks & event queue)
+
+Besides time-based schedules, a job can be triggered by an **event**. webtrees has no
+event system, so events are plain DB rows (a small `cj_event` queue) that the tick
+drains once a minute. An event-triggered job runs **once for each queued event** whose
+name matches its **Event name**.
+
+Queuing an event has two sources:
+
+1. **Webhook (external systems).** GET the endpoint shown in the admin page
+   (section "Event webhook"):
+   `GET /module/_cronjob_/Event?event=<name>&data=<json>` with the token in the
+   `X-Cronjob-Token` header (or, less securely, as `?token=<token>`). `data` is an
+   optional JSON object, stored with the event. The endpoint requires the token, is
+   rate-limited (30/min per site), and only accepts events while the module is enabled.
+   It is a **GET**, not a POST: webtrees rejects POSTs without a session CSRF token,
+   which an external caller cannot send.
+2. **Direct call (your own modules).** From PHP code in another module:
+   `\Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue::push('index-dirty', ['tree' => 'X']);`
+   - this requires the cronjob module to be installed; guard it with
+     `class_exists('Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue')`.
+
+The tick matches each pending event against enabled `trigger_type='event'` jobs, runs
+them, then marks the event handled (consumed once - even on failure, so a failing job
+does not re-run the same event forever). Handled events are purged after 7 days; events
+with no matching job are discarded so the queue does not grow.
+
+> Polling "pseudo-events" (detecting core changes such as a GEDCOM import by watching
+> file mtime / row counts) is a possible extension of the same queue but is not
+> implemented yet - see the roadmap.
+
+## Failure notification
+
+A job can be marked **Notify on failure**. When such a job fails (non-zero exit or
+timeout), the site's **administrator** accounts are alerted through webtrees' own
+`MessageService::deliverMessage()` - which delivers via the **internal message system**
+and/or **e-mail** according to *each recipient's own* contact-method preference. No
+addresses are stored in the module and no channel is hardcoded: the recipients are the
+admin user accounts, and how they are reached follows the site's messaging settings.
+
+The notification carries the job name, status, exit code, duration and a short tail of
+the captured output. It runs in the tick (no web request), so it carries no link
+beyond the text. A notification problem never breaks the tick.
+
 ## Job outlook (candidates for the first jobs)
 
-| Job | Command | Cron (UTC) |
+| Job | Command | Trigger |
 | :--- | :--- | :--- |
-| Linkenhancer link-index update | `modules_v4/linkenhancer/cli/build-link-index.php --limit=5000` | `*/30 * * * *` |
-| GEDCOM backup (tree export) | `tree-export <tree_name>` — writes `data/<tree_name>.ged`, **full personal data**; plan retention/cleanup of `data/*.ged` | `0 3 * * 0` |
-| Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | `0 3 * * 0` |
-| Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | `0 4 * * *` |
+| Linkenhancer link-index update | `modules_v4/linkenhancer/cli/build-link-index.php --limit=5000` | time `*/30 * * * *` |
+| GEDCOM backup (tree export) | `tree-export <tree_name>` — writes `data/<tree_name>.ged`, **full personal data**; plan retention/cleanup of `data/*.ged` | time `0 3 * * 0` |
+| Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | time `0 3 * * 0` |
+| Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | time `0 4 * * *` |
+| Re-index on change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `index-dirty` (queued by a webhook or a linkenhancer call) |
 
-## Roadmap (phase 2, remaining)
+## Roadmap (phase 2)
 
-Already implemented: **job self-registration** (manifest / marker method) and the
-**W1 wrapper** - see "Offering jobs to cronjob" and "Using the W1 wrapper" above.
+Implemented so far: **job self-registration** (manifest / marker method), the
+**W1 wrapper**, **event-driven jobs** (webhook + `cj_event` queue + `EventQueue::push()`),
+and **failure notification** to the administrator accounts. See the sections above.
 
 Still open:
 
-- **Event-driven jobs**: webhook receiver (token protected, HMAC), event queue with
-  retry/backoff, and polling pseudo-events (`tree_changed`, `media_added`, ...)
-  - the core has no event system, so this is a DB-queue, not core hooks
-- **E-Mail notifications** on job failure
-- **Human-readable schedule display** ("every 30 minutes") as a UI add-on
+- **Polling pseudo-events** — detect core changes (GEDCOM import, media added) by
+  watching file mtime / row counts and pushing them as events. The queue already
+  supports this; the polling heuristics are not implemented.
+- **Human-readable schedule display** ("every 30 minutes") as a UI add-on.
 
 ## Tests
 

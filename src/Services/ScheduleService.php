@@ -78,8 +78,9 @@ final class ScheduleService {
     /** A 'running' row older than this can no longer have a live process. */
     public const STUCK_AFTER_SECONDS   = 3660;
 
-    /** v1 only schedules time-based jobs (event = phase 2, §6.1). */
-    public const TRIGGER_TIME = 'time';
+    /** Trigger types for cj_job.trigger_type. */
+    public const TRIGGER_TIME  = 'time';
+    public const TRIGGER_EVENT = 'event';
 
     // Job-spec timeout bounds; single source of truth (CronjobModule's form
     // limits reference these). Kept here so validateJobSpec() stays free of a
@@ -174,6 +175,21 @@ final class ScheduleService {
             ->whereNotNull('next_run_at')
             ->where('next_run_at', '<=', $now)
             ->orderBy('next_run_at')
+            ->get()
+            ->all();
+    }
+
+    /**
+     * Enabled event-triggered jobs matching one event name (phase 2, §6.1).
+     *
+     * @return list<object>
+     */
+    public static function eventJobs(string $event_name): array {
+        return DB::table('cj_job')
+            ->where('enabled', 1)
+            ->where('trigger_type', '=', self::TRIGGER_EVENT)
+            ->where('event_name', '=', $event_name)
+            ->orderBy('id')
             ->get()
             ->all();
     }
@@ -319,18 +335,25 @@ final class ScheduleService {
         }
 
         $trigger_type = (string) ($spec['trigger_type'] ?? self::TRIGGER_TIME);
-        if ($trigger_type !== self::TRIGGER_TIME) {
-            $errors[] = "trigger_type '$trigger_type' is not supported (v1: 'time' only)";
+        if (!in_array($trigger_type, [self::TRIGGER_TIME, self::TRIGGER_EVENT], true)) {
+            $errors[] = "trigger_type '$trigger_type' is not supported ('time' or 'event')";
+        }
+
+        $event_name = trim((string) ($spec['event_name'] ?? ''));
+        if ($trigger_type === self::TRIGGER_EVENT && preg_match(EventQueue::NAME_PATTERN, $event_name) !== 1) {
+            $errors[] = 'event jobs require an event_name slug of [a-z0-9_-] (max 64)';
         }
 
         $cron = trim((string) ($spec['cron'] ?? ''));
-        if ($cron === '' || strlen($cron) > 64) {
-            $errors[] = 'cron must be a non-empty expression of at most 64 chars';
-        } else {
-            try {
-                self::parse($cron);
-            } catch (DomainException | RuntimeException $exception) {
-                $errors[] = 'invalid cron expression: ' . $exception->getMessage();
+        if ($trigger_type === self::TRIGGER_TIME) {
+            if ($cron === '' || strlen($cron) > 64) {
+                $errors[] = 'cron must be a non-empty expression of at most 64 chars';
+            } else {
+                try {
+                    self::parse($cron);
+                } catch (DomainException | RuntimeException $exception) {
+                    $errors[] = 'invalid cron expression: ' . $exception->getMessage();
+                }
             }
         }
 
@@ -357,14 +380,17 @@ final class ScheduleService {
             $timeout = self::TIMEOUT_STD;
         }
 
-        $enabled = (bool) ($spec['enabled'] ?? false);
+        $enabled    = (bool) ($spec['enabled'] ?? false);
+        $is_event   = $trigger_type === self::TRIGGER_EVENT;
+        $final_type = $is_event ? self::TRIGGER_EVENT : self::TRIGGER_TIME;
 
         return [
             'spec'   => [
                 'name'         => $name,
                 'title'        => $title,
-                'trigger_type' => self::TRIGGER_TIME,
-                'cron'         => $cron,
+                'trigger_type' => $final_type,
+                'event_name'   => $is_event ? $event_name : null,
+                'cron'         => $is_event ? '' : $cron,
                 'command_type' => $command_type,
                 'command'      => $command,
                 'args'         => $args,
@@ -447,17 +473,23 @@ final class ScheduleService {
             return;
         }
 
+        $trigger    = ((string) $spec['trigger_type']) === self::TRIGGER_EVENT ? self::TRIGGER_EVENT : self::TRIGGER_TIME;
+        $event_name = (string) ($spec['event_name'] ?? '');
+
         $next = null;
-        try {
-            $next = self::nextRun((string) $spec['cron'], $now);
-        } catch (DomainException | RuntimeException) {
-            $next = null; // validated already; defensive only
+        if ($trigger === self::TRIGGER_TIME) {
+            try {
+                $next = self::nextRun((string) $spec['cron'], $now);
+            } catch (DomainException | RuntimeException) {
+                $next = null; // validated already; defensive only
+            }
         }
 
         DB::table('cj_job')->insert([
             'name'         => $key,
             'title'        => (string) $spec['title'],
-            'trigger_type' => self::TRIGGER_TIME,
+            'trigger_type' => $trigger,
+            'event_name'   => $trigger === self::TRIGGER_EVENT ? $event_name : null,
             'cron'         => (string) $spec['cron'],
             'command_type' => (string) $spec['command_type'],
             'command'      => (string) $spec['command'],
