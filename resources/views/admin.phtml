@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
+use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 
 /**
  * @var string $title
@@ -84,6 +85,12 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         <code><?= e((string) $job->event_name) ?></code>
                     <?php else: ?>
                         <code><?= e($job->cron) ?></code>
+                        <?php
+                        $human = ScheduleService::humanizeCron((string) $job->cron);
+                        if ($human !== '' && $human !== (string) $job->cron):
+                        ?>
+                            <div class="text-muted"><?= e($human) ?></div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </td>
                 <td><?= $job->next_run_at !== null ? e((string) $job->next_run_at) : '—' ?></td>

@@ -374,20 +374,22 @@ beyond the text. A notification problem never breaks the tick.
 
 Implemented so far: **job self-registration** (manifest / marker method), the
 **W1 wrapper**, **event-driven jobs** (webhook + `cj_event` queue + `EventQueue::push()`),
-and **failure notification** to the administrator accounts. See the sections above.
+**failure notification** to the administrator accounts, and a **human-readable
+schedule** shown next to each cron expression in the admin table (translatable via
+`I18N`; the exact cron string is always shown too). See the sections above.
 
 Still open:
 
 - **Polling pseudo-events** — detect core changes (GEDCOM import, media added) by
   watching file mtime / row counts and pushing them as events. The queue already
   supports this; the polling heuristics are not implemented.
-- **Human-readable schedule display** ("every 30 minutes") as a UI add-on.
 
 ## Tests
 
 ```bash
 php modules_v4/cronjob/tests/test-args-validator.php  # command whitelist + arg validation (standalone)
 php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cleanly without the bundled vendor)
+php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron descriptions (standalone)
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
 php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: spec validator, manifest loading, W1 payload confinement (standalone)
 ```

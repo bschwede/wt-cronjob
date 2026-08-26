@@ -30,6 +30,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
 use Fisharebest\Webtrees\DB;
+use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Module\ModuleInterface;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Services\ModuleService;
@@ -41,17 +42,24 @@ use Throwable;
 
 use function array_merge;
 use function class_exists;
+use function count;
 use function date;
+use function explode;
 use function in_array;
 use function is_array;
 use function is_file;
 use function max;
 use function method_exists;
 use function preg_match;
+use function preg_split;
+use function str_pad;
+use function strpos;
 use function strlen;
 use function strtotime;
 use function substr;
 use function trim;
+
+use const STR_PAD_LEFT;
 
 /**
  * Schedule state machine for cj_job / cj_run.
@@ -162,6 +170,134 @@ final class ScheduleService {
         }
 
         return $runs;
+    }
+
+    /**
+     * A human-readable description of a common 5-field cron expression (UI add-on).
+     *
+     * Handles the patterns that maintenance jobs actually use; anything it cannot
+     * express confidently is returned unchanged (the raw cron), so the UI can show
+     * the human form only when it differs. All user-facing phrases go through
+     * I18N::translate(); it is standalone-testable with a trivial I18N shim that
+     * returns sprintf(original, ...args) - the same result webtrees yields when no
+     * translation is loaded. Always shown next to the exact cron string.
+     */
+    public static function humanizeCron(string $cron): string {
+        $cron = trim($cron);
+        if ($cron === '') {
+            return '';
+        }
+
+        // Standard macros (the same set the cron library accepts).
+        $macros = [
+            '@minutely'  => I18N::translate('every minute'),
+            '@minute'    => I18N::translate('every minute'),
+            '@hourly'    => I18N::translate('hourly'),
+            '@daily'     => I18N::translate('daily at 00:00'),
+            '@midnight'  => I18N::translate('daily at 00:00'),
+            '@weekly'    => I18N::translate('weekly on Sunday at 00:00'),
+            '@monthly'   => I18N::translate('monthly on day 1 at 00:00'),
+            '@yearly'    => I18N::translate('yearly on January 1 at 00:00'),
+            '@annually'  => I18N::translate('yearly on January 1 at 00:00'),
+        ];
+        if (isset($macros[$cron])) {
+            return $macros[$cron];
+        }
+
+        $fields = preg_split('/\s+/', $cron);
+        if (count($fields) !== 5) {
+            return $cron; // seconds field, 7-field, etc. - not handled
+        }
+        [$min, $hour, $dom, $mon, $dow] = $fields;
+
+        // "every minute"
+        if ($min === '*' && $hour === '*' && $dom === '*' && $mon === '*' && $dow === '*') {
+            return I18N::plural('every minute', 'every %1$d minutes', 1, 1);
+        }
+        // "every N minutes" (plural form chosen by the locale's CLDR rules)
+        if (preg_match('/^\*\/(\d+)$/', $min, $m) === 1 && $hour === '*' && $dom === '*' && $mon === '*' && $dow === '*') {
+            $n = (int) $m[1];
+
+            return I18N::plural('every minute', 'every %1$d minutes', $n, $n);
+        }
+        // "hourly" (minute 0, every hour) or "every hour at :MM"
+        if (self::isCronInt($min) && $hour === '*' && $dom === '*' && $mon === '*' && $dow === '*') {
+            $n = (int) $min;
+
+            return $n === 0 ? I18N::translate('hourly') : I18N::translate('every hour at minute %1$d', $n);
+        }
+        // "daily at HH:MM"
+        if (self::isCronInt($min) && self::isCronInt($hour) && $dom === '*' && $mon === '*' && $dow === '*') {
+            return I18N::translate('daily at %1$s', self::time2((int) $hour, (int) $min));
+        }
+        // "on <weekday> at HH:MM"
+        if (self::isCronInt($min) && self::isCronInt($hour) && $dom === '*' && $mon === '*' && self::isDow($dow)) {
+            return I18N::translate('on %1$s at %2$s', self::dowNames($dow), self::time2((int) $hour, (int) $min));
+        }
+        // "on day D of each month at HH:MM"
+        if (self::isCronInt($min) && self::isCronInt($hour) && self::isCronInt($dom) && $mon === '*' && $dow === '*') {
+            return I18N::translate('on day %1$d of each month at %2$s', (int) $dom, self::time2((int) $hour, (int) $min));
+        }
+
+        return $cron; // no confident human form - show the raw expression
+    }
+
+    /**
+     * A field is a single 0-59 / 0-23 style integer.
+     */
+    private static function isCronInt(string $field): bool {
+        return preg_match('/^\d{1,2}$/', $field) === 1;
+    }
+
+    /**
+     * A day-of-week field that is a number or a list/range of numbers.
+     */
+    private static function isDow(string $dow): bool {
+        if (in_array($dow, ['*'], true)) {
+            return false;
+        }
+
+        return preg_match('/^(\d{1,2})(-?\d{1,2})?(,(\d{1,2})(-?\d{1,2})?)*$/', $dow) === 1;
+    }
+
+    /**
+     * HH:MM, zero-padded.
+     */
+    private static function time2(int $hour, int $minute): string {
+        return str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . ':' . str_pad((string) $minute, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Human names for a day-of-week field: "1-5" -> "Monday to Friday",
+     * "0,6" -> "Sunday and Saturday", "1" -> "Monday" (all translatable).
+     */
+    private static function dowNames(string $dow): string {
+        $names = [
+            I18N::translate('Sunday'),
+            I18N::translate('Monday'),
+            I18N::translate('Tuesday'),
+            I18N::translate('Wednesday'),
+            I18N::translate('Thursday'),
+            I18N::translate('Friday'),
+            I18N::translate('Saturday'),
+        ];
+        $name  = fn (int $d): string => $names[(((int) $d) % 7 + 7) % 7];
+
+        $parts = [];
+        foreach (explode(',', $dow) as $chunk) {
+            if (strpos($chunk, '-') !== false) {
+                [$a, $b] = explode('-', $chunk, 2);
+                $parts[] = I18N::translate('%1$s to %2$s', $name((int) $a), $name((int) $b));
+            } else {
+                $parts[] = $name((int) $chunk);
+            }
+        }
+
+        if (count($parts) === 2) {
+            return I18N::translate('%1$s and %2$s', $parts[0], $parts[1]);
+        }
+
+        return implode(', ', $parts);
     }
 
     /**
