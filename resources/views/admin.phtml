@@ -181,10 +181,13 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
             <pre class="bg-light p-2 rounded"><?= e($install['cron_line']) ?></pre>
             
             <h6>
-                <?= I18N::translate('Option B: systemd timer (save both files as wt-cronjob-tick.service / wt-cronjob-tick.timer)') ?>
+                <?= I18N::translate('Option B: systemd timer') ?>
             </h6>
+            <h7>wt-cronjob-tick.service</h7>
             <pre class="bg-light p-2 rounded"><?= e($install['service_unit']) ?></pre>
+            <h7>wt-cronjob-tick.timer</h7>
             <pre class="bg-light p-2 rounded"><?= e($install['timer_unit']) ?></pre>
+            <h7><?= I18N::translate('Install commands') ?></h7>
             <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
         </div>
     </details>
