@@ -31,6 +31,7 @@ use Throwable;
 use function array_map;
 use function array_merge;
 use function array_unique;
+use function array_unshift;
 use function array_values;
 use function basename;
 use function date;
@@ -178,22 +179,48 @@ final class WatchService {
         }
 
         @touch(self::path(self::SPAWN_FILE));
+
+        $os = PHP_OS_FAMILY ?? (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'Windows' : 'Other');
+
+        $options = [];
+
+        $command = ['php', '-f', self::cliScript('watch.php')];
+        if ($os === 'Windows') {
+            array_unshift($command, 'cmd', '/c', 'start', '/B');
+        } else {
+            array_unshift($command, 'setsid');
+
+            if (function_exists('posix_setsid')) {
+                $options = ['create_new_console' => false];
+            }
+        }
+
         $proc = @proc_open(
-            [$binary, self::cliScript('watch.php')],
+            $command,
             [
                 0 => ['file', '/dev/null', 'r'],
                 1 => ['file', '/dev/null', 'w'],
                 2 => ['file', '/dev/null', 'w'],
             ],
             $pipes,
-            Webtrees::ROOT_DIR
+            Webtrees::ROOT_DIR,
+            null,
+            $options
         );
         if (!is_resource($proc)) {
             return false;
-        }
-        proc_close($proc);
+        }       
+        
+        $status = proc_get_status($proc);
+        $pid = $status['pid'] ?? null;
 
-        return true;
+        foreach ($pipes as $p) {
+            if (is_resource($p)) {
+                fclose($p);
+            }
+        }
+
+        return $pid !== null;        
     }
 
     /**
