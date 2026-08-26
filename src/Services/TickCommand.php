@@ -105,6 +105,13 @@ final class TickCommand extends Command {
             $now = ScheduleService::now();
             ScheduleService::markStuckRuns($now);
 
+            // Sync externally-offered jobs into cj_job (insert-if-missing,
+            // keyed <module>:<name>). Skipped under --dry-run so a dry run
+            // has no side effects on the registry.
+            if (!$dry_run) {
+                ScheduleService::syncDiscoveredJobs();
+            }
+
             if (is_string($job_name) && trim($job_name) !== '') {
                 $job    = ScheduleService::findJob(trim($job_name));
                 $jobs   = $job === null ? [] : [$job];

@@ -34,11 +34,15 @@ use function file_exists;
 use function fclose;
 use function fopen;
 use function flock;
+use function fwrite;
 use function is_dir;
 use function is_file;
 use function is_link;
 use function parse_ini_file;
-use function fwrite;
+use function preg_replace;
+use function realpath;
+use function str_contains;
+use function str_starts_with;
 
 /**
  * Shared bootstrap for this module's CLI scripts.
@@ -163,5 +167,32 @@ final class CliBootstrap {
         if ($lock !== null) {
             fclose($lock);
         }
+    }
+
+    /**
+     * Resolve the W1 payload for a given entry script, confined to
+     * <modules_dir>/<module>/cli/. The payload is the sibling file whose name is the
+     * entry's with the trailing '.php' swapped for '.logic.php' - DERIVED from
+     * the entry script, never taken from an argument (no attacker-controlled
+     * include path, which is the core W1 safety property).
+     *
+     * @return string|null the realpath'd payload, or null (fail closed)
+     */
+    public static function resolvePayloadPath(string $entry, string $modules_dir): ?string {
+        $logic = preg_replace('/\.php$/', '.logic.php', $entry) ?? $entry;
+        $real  = is_file($logic) ? realpath($logic) : false;
+        $base  = realpath($modules_dir);
+
+        if ($real === false || $base === false || !is_file($real)) {
+            return null;
+        }
+        if (!str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+        if (!str_contains($real, DIRECTORY_SEPARATOR . 'cli' . DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+
+        return $real;
     }
 }

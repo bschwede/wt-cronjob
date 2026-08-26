@@ -77,9 +77,11 @@ class CronjobModule extends AbstractModule
 
     public const SCHEMA_TARGET_VERSION = 1;
 
-    public const TIMEOUT_MIN = 30;
-    public const TIMEOUT_MAX = 3600;
-    public const TIMEOUT_STD = 300;
+    // Single source of truth lives in ScheduleService (shared with the
+    // external-job spec validator).
+    public const TIMEOUT_MIN = ScheduleService::TIMEOUT_MIN;
+    public const TIMEOUT_MAX = ScheduleService::TIMEOUT_MAX;
+    public const TIMEOUT_STD = ScheduleService::TIMEOUT_STD;
 
     // =========================================================================
     // ModuleInterface

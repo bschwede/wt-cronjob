@@ -8,6 +8,7 @@ has to call one small script once per minute.
 - **Job registry + run history** in two own tables (`cj_job`, `cj_run`)
 - **Admin UI** (control panel): job list, create/edit form, run history, run now, enable/disable, delete
 - **Isolated execution**: every job runs as a separate child PHP process (`proc_open`, no shell), with per-job timeout and captured output
+- **Self-registration**: other modules can advertise their jobs (a `cron-jobs.php` manifest or a `getCronJobs()` method); they appear here, created disabled and ready to enable
 - **Offline awareness**: while `data/offline.txt` exists (e.g. during a webtrees update) the tick is skipped *before any database access* - no child process starts while migrations and code are in flux
 - **No core changes, no changes to other modules**
 
@@ -213,11 +214,102 @@ New job scripts in other modules must follow these conventions (linkenhancer's
 - **Start with** `require autoload.php` (the module's own) **and**
   `CliBootstrap::guard()` (or the module's own equivalent) - scripts in `modules_v4/`
   are reachable by URL and would be a data leak without the CLI guard
+  - if the module already depends on cronjob, this bootstrap can instead be
+    delegated to the shared **W1 wrapper** (see "Using the W1 wrapper" below)
 - Idempotent and incremental (`--limit`, `--since`), batched, never full re-runs
   where a delta is possible
 - Exit code `0` on success (the tick records non-zero as `error`)
 - No interactive input; everything via CLI options
 - Template files are prefixed with `_` (excluded from job discovery)
+
+## Offering jobs to cronjob (self-registration)
+
+Other modules can *advertise* their scheduled jobs so they show up in this module's
+admin UI without anyone editing the registry by hand. There are two ways (a module
+may use both); both are discovered automatically on each tick, only for **enabled**
+modules:
+
+### 1. Manifest file (recommended)
+
+`modules_v4/<module>/cron-jobs.php` that **returns an array of job specs**:
+
+```php
+<?php
+// modules_v4/linkenhancer/cron-jobs.php
+declare(strict_types=1);
+
+return [
+    [
+        'name'         => 'link-index',
+        'title'        => 'Update the link index',
+        'cron'         => '*/30 * * * *',
+        'command_type' => 'module',
+        'command'      => 'modules_v4/linkenhancer/cli/build-link-index.php',
+        'args'         => '--limit=5000',
+        // 'enabled'      => false,  // default: created disabled (opt-in)
+        // 'timeout_sec'  => 300,    // default
+    ],
+];
+```
+
+### 2. Marker method
+
+`getCronJobs(): array` on the module's `module.php` class, returning the same shape.
+cronjob detects it with `method_exists()` - the module does **not** implement any
+cronjob interface (so an absent cronjob module is harmless).
+
+### Job spec fields
+
+| Key | Required | Meaning |
+| :--- | :--- | :--- |
+| `name` | yes | slug `a-z 0-9 _ -`, max 64; stored as `<module>:<name>` |
+| `title` | no | human name (defaults to `name`) |
+| `cron` | yes | 5-field cron expression |
+| `command_type` | yes | `module` (`modules_v4/.../cli/*.php`) or `core` (allowlisted) |
+| `command` | yes | the command - validated exactly like a hand-made job |
+| `args` | no | plain option/value tokens |
+| `enabled` | no | default `false` - discovered jobs are **created disabled** |
+| `timeout_sec` | no | default `300`, range 30 - 3600 |
+
+A malformed or misbehaving manifest is skipped silently - it can never break the
+tick. Once a discovered job is inserted it is **admin-owned**: later ticks never
+overwrite it, so edits to cron, arguments or the enabled flag are safe. (A spec
+*added* to the manifest appears on the next tick; a *removed* spec leaves the
+already-created job in place.)
+
+## Using the W1 wrapper (cronjob's bootstrap for other modules' scripts)
+
+A job script that needs webtrees + the database must bootstrap them itself. A module
+that already depends on cronjob can delegate that to a shared wrapper instead of
+copying the bootstrap:
+
+1. **Payload** `modules_v4/<module>/cli/<name>.logic.php` - the real logic; it reads
+   `$argv` like any CLI script. It keeps a 1-line SAPI guard (it is a `.php` file
+   inside `cli/`, hence URL-reachable).
+2. **Stub** `modules_v4/<module>/cli/<name>.php` - what the job row points to:
+
+   ```php
+   <?php
+   declare(strict_types=1);
+   $wrapper = __DIR__ . '/../../cronjob/cli/wrap.php';
+   if (is_file($wrapper)) {
+       require $wrapper;
+   } else {
+       fwrite(STDERR, "cronjob module required for this job\n");
+       exit(1);
+   }
+   ```
+
+`wrap.php` bootstraps webtrees + DB and then includes the payload - the *sibling* of
+the stub with the extension swapped from `.php` to `.logic.php`. That payload path is
+**derived from the entry script, never taken from an argument**, so there is no
+attacker-controlled include path (the confinement is enforced in
+`CliBootstrap::resolvePayloadPath()`). The job row stays `<name>.php`, unchanged; the
+job's working directory and arguments are unchanged too.
+
+- The wrapper is **never itself a job command** - only the stub is.
+- **Requires the cronjob module to be installed.** If a script must also run as a
+  standalone tool (no cronjob), keep the module's own `CliBootstrap` copy instead.
 
 ## Job outlook (candidates for the first jobs)
 
@@ -228,14 +320,17 @@ New job scripts in other modules must follow these conventions (linkenhancer's
 | Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | `0 3 * * 0` |
 | Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | `0 4 * * *` |
 
-## Roadmap (phase 2, not implemented)
+## Roadmap (phase 2, remaining)
+
+Already implemented: **job self-registration** (manifest / marker method) and the
+**W1 wrapper** - see "Offering jobs to cronjob" and "Using the W1 wrapper" above.
+
+Still open:
 
 - **Event-driven jobs**: webhook receiver (token protected, HMAC), event queue with
   retry/backoff, and polling pseudo-events (`tree_changed`, `media_added`, ...)
   - the core has no event system, so this is a DB-queue, not core hooks
 - **E-Mail notifications** on job failure
-- **Job self-registration**: modules advertise their CLI scripts via a module
-  interface, so the form can offer typed jobs
 - **Human-readable schedule display** ("every 30 minutes") as a UI add-on
 
 ## Tests
@@ -244,6 +339,7 @@ New job scripts in other modules must follow these conventions (linkenhancer's
 php modules_v4/cronjob/tests/test-args-validator.php  # command whitelist + arg validation (standalone)
 php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cleanly without the bundled vendor)
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
+php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: spec validator, manifest loading, W1 payload confinement (standalone)
 ```
 
 ## License

@@ -30,13 +30,28 @@ use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
 use Fisharebest\Webtrees\DB;
+use Fisharebest\Webtrees\Module\ModuleInterface;
+use Fisharebest\Webtrees\Registry;
+use Fisharebest\Webtrees\Services\ModuleService;
+use Fisharebest\Webtrees\Webtrees;
 use InvalidArgumentException;
 use RuntimeException;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Throwable;
 
+use function array_merge;
 use function class_exists;
 use function date;
+use function in_array;
+use function is_array;
+use function is_file;
 use function max;
+use function method_exists;
+use function preg_match;
+use function strlen;
 use function strtotime;
+use function substr;
+use function trim;
 
 /**
  * Schedule state machine for cj_job / cj_run.
@@ -62,6 +77,16 @@ final class ScheduleService {
     public const RUN_RETENTION_DAYS    = 30;
     /** A 'running' row older than this can no longer have a live process. */
     public const STUCK_AFTER_SECONDS   = 3660;
+
+    /** v1 only schedules time-based jobs (event = phase 2, §6.1). */
+    public const TRIGGER_TIME = 'time';
+
+    // Job-spec timeout bounds; single source of truth (CronjobModule's form
+    // limits reference these). Kept here so validateJobSpec() stays free of a
+    // CronjobModule dependency (standalone-testable without the webtrees core).
+    public const TIMEOUT_MIN = 30;
+    public const TIMEOUT_MAX = 3600;
+    public const TIMEOUT_STD = 300;
 
     /**
      * Is the bundled cron-expression library present (vendor fetched)?
@@ -256,5 +281,203 @@ final class ScheduleService {
      */
     public static function now(): string {
         return (new \DateTime("now", new DateTimeZone(self::TIMEZONE)))->format('Y-m-d H:i:s');
+    }
+
+    // =========================================================================
+    // External job self-registration (phase 2, §6.3)
+    // =========================================================================
+
+    /**
+     * Normalize + validate a job spec offered by an external module (a
+     * <module>/cron-jobs.php manifest or a getCronJobs() marker method).
+     *
+     * The spec is a plain array - deliberately NOT a shared class, so offering
+     * modules never reference the cronjob namespace. Returns the normalized
+     * spec plus any validation errors; when errors is empty the spec is ready
+     * to be upserted. W1: `command` is an ordinary module/core command (the
+     * W1 wrapper derives its payload from the entry script, so there is no
+     * `--logic` path to confine here).
+     *
+     * @param array<string, mixed>  $spec
+     * @return array{spec: array<string, mixed>, errors: list<string>}
+     */
+    public static function validateJobSpec(array $spec, ?string $root_dir = null): array {
+        $root_dir ??= Webtrees::ROOT_DIR;
+        $errors     = [];
+
+        $name = trim((string) ($spec['name'] ?? ''));
+        if ($name === '' || strlen($name) > 64 || preg_match('/^[a-z0-9_\-]+$/', $name) !== 1) {
+            $errors[] = 'name must be a non-empty slug of [a-z0-9_-], max 64 chars';
+        }
+
+        $title = trim((string) ($spec['title'] ?? ''));
+        if ($title === '') {
+            $title = $name;
+        }
+        if (strlen($title) > 128) {
+            $errors[] = 'title must be at most 128 chars';
+        }
+
+        $trigger_type = (string) ($spec['trigger_type'] ?? self::TRIGGER_TIME);
+        if ($trigger_type !== self::TRIGGER_TIME) {
+            $errors[] = "trigger_type '$trigger_type' is not supported (v1: 'time' only)";
+        }
+
+        $cron = trim((string) ($spec['cron'] ?? ''));
+        if ($cron === '' || strlen($cron) > 64) {
+            $errors[] = 'cron must be a non-empty expression of at most 64 chars';
+        } else {
+            try {
+                self::parse($cron);
+            } catch (DomainException | RuntimeException $exception) {
+                $errors[] = 'invalid cron expression: ' . $exception->getMessage();
+            }
+        }
+
+        $command_type = (string) ($spec['command_type'] ?? '');
+        if (!in_array($command_type, ['module', 'core'], true)) {
+            $errors[] = "command_type must be 'module' or 'core'";
+        }
+
+        $command = trim((string) ($spec['command'] ?? ''));
+        $args    = trim((string) ($spec['args'] ?? ''));
+        if (in_array($command_type, ['module', 'core'], true)) {
+            $built = JobRunner::buildArgv(
+                ['command_type' => $command_type, 'command' => $command, 'args' => $args],
+                $root_dir
+            );
+            if ($built['error'] !== '') {
+                $errors[] = $built['error'];
+            }
+        }
+
+        $timeout = (int) ($spec['timeout_sec'] ?? self::TIMEOUT_STD);
+        if ($timeout < self::TIMEOUT_MIN || $timeout > self::TIMEOUT_MAX) {
+            $errors[] = 'timeout_sec must be between ' . self::TIMEOUT_MIN . ' and ' . self::TIMEOUT_MAX;
+            $timeout = self::TIMEOUT_STD;
+        }
+
+        $enabled = (bool) ($spec['enabled'] ?? false);
+
+        return [
+            'spec'   => [
+                'name'         => $name,
+                'title'        => $title,
+                'trigger_type' => self::TRIGGER_TIME,
+                'cron'         => $cron,
+                'command_type' => $command_type,
+                'command'      => $command,
+                'args'         => $args,
+                'enabled'      => $enabled,
+                'timeout_sec'  => $timeout,
+            ],
+            'errors' => $errors,
+        ];
+    }
+
+    /**
+     * Discover jobs offered by other enabled modules: via a
+     * <module>/cron-jobs.php manifest file and/or a getCronJobs() marker
+     * method. Returns one entry per valid spec:
+     * `['module' => <short>, 'spec' => normalized]`. Malformed or throwing
+     * sources are skipped - they must never break the tick.
+     *
+     * @return list<array{module: string, spec: array<string, mixed>}>
+     */
+    public static function discoverExternalJobs(?string $root_dir = null): array {
+        $root_dir ??= Webtrees::ROOT_DIR;
+        $found    = [];
+
+        try {
+            $modules = Registry::container()->get(ModuleService::class)->all(false);
+        } catch (Throwable) {
+            return $found;
+        }
+
+        /** @var ModuleInterface $module */
+        foreach ($modules as $module) {
+            // MODULES_DIR is absolute with a trailing slash; a custom module's
+            // directory is exactly its name minus the surrounding underscores.
+            // Core modules have no modules_v4/<name>/ dir, so is_file() below
+            // filters them out naturally - no separate custom-module guard.
+            $short = trim($module->name(), '_');
+            $dir   = Webtrees::MODULES_DIR . $short . DIRECTORY_SEPARATOR;
+
+            $raw_specs = [];
+            $manifest  = $dir . 'cron-jobs.php';
+            if (is_file($manifest)) {
+                $raw_specs = array_merge($raw_specs, CronjobUtils::loadManifestFile($manifest));
+            }
+            if (method_exists($module, 'getCronJobs')) {
+                try {
+                    $offered = $module->getCronJobs();
+                } catch (Throwable) {
+                    $offered = [];
+                }
+                if (is_array($offered)) {
+                    $raw_specs = array_merge($raw_specs, array_values($offered));
+                }
+            }
+
+            foreach ($raw_specs as $raw) {
+                if (!is_array($raw)) {
+                    continue;
+                }
+                $result = self::validateJobSpec($raw, $root_dir);
+                if ($result['errors'] === []) {
+                    $found[] = ['module' => $short, 'spec' => $result['spec']];
+                }
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * Ensure a discovered job exists in cj_job, keyed as <module>:<name>.
+     *
+     * Insert-if-missing: once created the row is admin-owned and is never
+     * overwritten by the manifest, so admin edits to cron/args/enabled are
+     * safe across ticks. A key longer than cj_job.name (VARCHAR 64) is
+     * skipped rather than silently truncated (collision risk).
+     */
+    public static function upsertDiscoveredJob(string $module, array $spec, string $now): void {
+        $key = trim($module, '_') . ':' . (string) $spec['name'];
+        if (strlen($key) === 0 || strlen($key) > 64 || self::findJob($key) !== null) {
+            return;
+        }
+
+        $next = null;
+        try {
+            $next = self::nextRun((string) $spec['cron'], $now);
+        } catch (DomainException | RuntimeException) {
+            $next = null; // validated already; defensive only
+        }
+
+        DB::table('cj_job')->insert([
+            'name'         => $key,
+            'title'        => (string) $spec['title'],
+            'trigger_type' => self::TRIGGER_TIME,
+            'cron'         => (string) $spec['cron'],
+            'command_type' => (string) $spec['command_type'],
+            'command'      => (string) $spec['command'],
+            'args'         => (string) $spec['args'],
+            'enabled'      => ($spec['enabled'] ? 1 : 0),
+            'timeout_sec'  => (int) $spec['timeout_sec'],
+            'next_run_at'  => $next,
+            'created_at'   => $now,
+            'updated_at'   => $now,
+        ]);
+    }
+
+    /**
+     * Sync externally-offered jobs into cj_job (insert-if-missing). Called by
+     * the tick; cheap (a filesystem glob + a few inserts at most).
+     */
+    public static function syncDiscoveredJobs(): void {
+        $now = self::now();
+        foreach (self::discoverExternalJobs() as $entry) {
+            self::upsertDiscoveredJob($entry['module'], $entry['spec'], $now);
+        }
     }
 }

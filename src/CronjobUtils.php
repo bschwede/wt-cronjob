@@ -31,11 +31,14 @@ use Fisharebest\Webtrees\Webtrees;
 use PDOException;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
+use Throwable;
 
+use function array_values;
 use function basename;
 use function get_current_user;
 use function glob;
 use function in_array;
+use function is_array;
 use function preg_match;
 use function rtrim;
 use function str_starts_with;
@@ -191,6 +194,35 @@ final class CronjobUtils {
         sort($candidates);
 
         return $candidates;
+    }
+
+    /**
+     * Load a <module>/cron-jobs.php manifest in an isolated scope.
+     *
+     * Returns the list the file returns (normalized to a list), or [] on any
+     * error - a broken or misbehaving manifest must never break the tick.
+     * Same containment strategy as core's ModuleService::load() (include in a
+     * try/catch). The contract is "return an array of job specs"; a manifest
+     * that calls exit() cannot be contained (same limitation as module.php).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function loadManifestFile(string $path): array {
+        if (!is_file($path)) {
+            return [];
+        }
+
+        $loader = static function (string $p): array {
+            $result = include $p;
+
+            return is_array($result) ? array_values($result) : [];
+        };
+
+        try {
+            return $loader($path);
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /**
