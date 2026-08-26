@@ -39,6 +39,8 @@ use Fisharebest\Webtrees\View;
 use Fisharebest\Webtrees\Webtrees;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
@@ -67,7 +69,8 @@ use function trim;
 class CronjobModule extends AbstractModule
     implements
         ModuleConfigInterface,
-        ModuleCustomInterface
+        ModuleCustomInterface,
+        MiddlewareInterface
 {
     use ModuleConfigTrait;
     use ModuleCustomTrait;
@@ -98,10 +101,22 @@ class CronjobModule extends AbstractModule
         View::registerNamespace($this->name(), $this->resourcesFolder() . 'views/');
 
         CronjobUtils::updateSchema($this, self::SCHEMA_TARGET_VERSION);
+    }
 
-        // Page-load watchdog for the optional resident watch daemon. Costs a
-        // single file_exists() when the watch is not enabled; never throws.
+    // =========================================================================
+    // MiddlewareInterface (page-load watchdog for the watch daemon)
+    // =========================================================================
+
+    /**
+     * Runs on every request (webtrees auto-registers module middlewares via
+     * Router.php). Respawn the resident watch daemon when the admin has enabled
+     * it and it died. Cheap (one file_exists) when the watch is off; never
+     * throws and never blocks the request.
+     */
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
         WatchService::maybeSpawn();
+
+        return $handler->handle($request);
     }
 
     // =========================================================================

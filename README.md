@@ -131,7 +131,7 @@ no systemd access.
 - **Opt-in:** nothing runs until you click *Start watch*; *Stop watch* removes it
   (the daemon exits within about a minute and is not respawned).
 - **Liveness:** the daemon holds `data/cronjob-watch.lock` for its whole life.
-  The watchdog (in the module's `boot()`, on every page load) respawns it only
+  The watchdog (a per-request module middleware, on every page load) respawns it only
   when that lock is free, the watch is enabled, the site is online, and at
   least 5 minutes have passed since the last spawn attempt. With the watch
   disabled the watchdog costs a single `file_exists()` per page load.
@@ -142,11 +142,11 @@ no systemd access.
 - **Works under php-fpm / mod_php:** the daemon is spawned with a resolved PHP
   *CLI* interpreter (under the web SAPI `PHP_BINARY` is empty or the server
   binary, which cannot run scripts), so *Start watch* from the browser works.
-- **Hard limits (honest):** without `posix_setsid`/`pcntl_fork` the daemon stays
-  in the web server's process group - a full web server / FPM **master** restart
-  kills it, and the watchdog brings it back on the next page load (self-healing).
-  A plain FPM **worker** recycle does not kill it. Disabling the *module* does
-  not stop the daemon (use *Stop watch*); the ticks simply no-op.
+- **Detached:** the daemon is spawned with `setsid` into its own session, so it
+  survives an FPM **worker** recycle and even an FPM **master** restart; only
+  stopping the whole web service / container, or *Stop watch*, ends it (the
+  watchdog otherwise self-heals on the next page load). Disabling the *module*
+  does not stop the daemon (use *Stop watch*); the ticks simply no-op.
 - It is one resident PHP process that sleeps between ticks (negligible CPU).
   Use this **or** the OS trigger, not both.
 

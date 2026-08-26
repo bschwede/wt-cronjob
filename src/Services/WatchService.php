@@ -180,32 +180,21 @@ final class WatchService {
 
         @touch(self::path(self::SPAWN_FILE));
 
-        $os = PHP_OS_FAMILY ?? (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'Windows' : 'Other');
-
-        $options = [];
-
-        $command = ['php', '-f', self::cliScript('watch.php')];
-        if ($os === 'Windows') {
-            array_unshift($command, 'cmd', '/c', 'start', '/B');
-        } else {
-            array_unshift($command, 'setsid');
-
-            if (function_exists('posix_setsid')) {
-                $options = ['create_new_console' => false];
-            }
-        }
+        $is_windows = (PHP_OS_FAMILY ?? 'unixoid') === 'Windows';
+        $null       = $is_windows ? 'NUL' : '/dev/null';
+        $command    = $is_windows
+            ? ['cmd', '/c', 'start', '/B', $binary, '-f', self::cliScript('watch.php')]
+            : ['setsid', $binary, '-f', self::cliScript('watch.php')];
 
         $proc = @proc_open(
             $command,
             [
-                0 => ['file', '/dev/null', 'r'],
-                1 => ['file', '/dev/null', 'w'],
-                2 => ['file', '/dev/null', 'w'],
+                0 => ['file', $null, 'r'],
+                1 => ['file', $null, 'w'],
+                2 => ['file', $null, 'w'],
             ],
             $pipes,
-            Webtrees::ROOT_DIR,
-            null,
-            $options
+            Webtrees::ROOT_DIR
         );
         if (!is_resource($proc)) {
             return false;
@@ -214,11 +203,9 @@ final class WatchService {
         $status = proc_get_status($proc);
         $pid = $status['pid'] ?? null;
 
-        foreach ($pipes as $p) {
-            if (is_resource($p)) {
-                fclose($p);
-            }
-        }
+        // No proc_close(): it would waitpid() on the direct child, which can be
+        // the long-lived daemon itself (setsid may exec it in place). The daemon
+        // is detached into its own session; init / the FPM worker recycle reaps it.
 
         return $pid !== null;        
     }
