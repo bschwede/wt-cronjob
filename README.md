@@ -9,7 +9,7 @@ has to call one small script once per minute.
 - **Admin UI** (control panel): job list, create/edit form, run history, run now, enable/disable, delete
 - **Isolated execution**: every job runs as a separate child PHP process (`proc_open`, no shell), with per-job timeout and captured output
 - **Self-registration**: other modules can advertise their jobs (a `cron-jobs.php` manifest or a `getCronJobs()` method); they appear here, created disabled and ready to enable
-- **Event-driven jobs**: jobs can fire on events instead of a schedule - queued by a token-protected **webhook** or by a direct `EventQueue::push()` call from other modules
+- **Event-driven jobs**: jobs can fire on events instead of a schedule - queued by a token-protected **webhook**, by a direct `EventQueue::push()` call from other modules, or by the built-in **pseudo-event** pollers (GEDCOM change, new media, new user)
 - **Failure notification**: per-job opt-in to alert the site's administrator accounts (internal message and/or e-mail, per each admin's own preference) when a job fails
 - **Offline awareness**: while `data/offline.txt` exists (e.g. during a webtrees update) the tick is skipped *before any database access* - no child process starts while migrations and code are in flux
 - **No core changes, no changes to other modules**
@@ -291,6 +291,14 @@ overwrite it, so edits to cron, arguments or the enabled flag are safe. (A spec
 *added* to the manifest appears on the next tick; a *removed* spec leaves the
 already-created job in place.)
 
+**Exception - the module's own manifest.** cronjob also ships a
+`modules_v4/cronjob/cron-jobs.php` that offers its own `cronjob:pseudo-events`
+job. Unlike external jobs, this one is **force-synced to the manifest on every
+tick**: if a module update changes the spec (cron, timeout, command, …), the
+stored job is re-synced to the new values within one tick. The admin's `enabled`
+state, the notify flag, the slug and the run history are preserved, and the next
+run is only rescheduled when the cron expression itself changed.
+
 In the admin table, every job that is **currently offered by a module** carries a
 "from module …" badge. Its **Reset** button restores the defaults currently in the
 manifest (title, trigger, cron, command, args, timeout, enabled state); the slug,
@@ -358,9 +366,52 @@ them, then marks the event handled (consumed once - even on failure, so a failin
 does not re-run the same event forever). Handled events are purged after 7 days; events
 with no matching job are discarded so the queue does not grow.
 
-> Polling "pseudo-events" (detecting core changes such as a GEDCOM import by watching
-> file mtime / row counts) is a possible extension of the same queue but is not
-> implemented yet - see the roadmap.
+3. **Pseudo-events (built-in pollers).** webtrees core actions (a GEDCOM import,
+   new media, a new user) cannot be hooked without a core change, so they are
+   *observed by polling*. Enable the offered `cronjob:pseudo-events` job and the
+   module checks the state below at most every 5 minutes, queueing an event on each
+   transition. See "Pseudo-events (state polling)".
+
+## Pseudo-events (state polling)
+
+webtrees has no event bus, so core actions you cannot hook into (a standard GEDCOM
+import, media being added, a user registering) are detected by **polling state** and
+firing an event when the state transitions. It is **off by default**: nothing runs
+until you enable the offered `cronjob:pseudo-events` job.
+
+**Built-in detectors** (each emits a matching event for an event-triggered job):
+
+| Event | Fires when | State polled |
+| :--- | :--- | :--- |
+| `gedcom-changed` | a GEDCOM file in `data/` changed (mtime or size) — i.e. a standard import/export re-wrote it | per-tree file mtime + size |
+| `media-added` | the `media_file` row count increased | `COUNT(media_file)` |
+| `user-registered` | `MAX(user_id)` grew (a new user signed up) | `MAX(user.user_id)` |
+
+**How it runs**
+
+- **One trigger, one cooldown.** Detection runs only from the offered
+  `cronjob:pseudo-events` job (`*/5 * * * *` by default), in the tick's child process
+  — isolated from any web request and bounded by the job's timeout, so a heavy
+  detector can never block or slow down a page load. A 5-minute cooldown (a `data/`
+  mtime marker) plus a lock keep repeated runs cheap and idempotent; the cooldown
+  also caps a more frequent job cron.
+- **Enabled by the job.** Enabling the `cronjob:pseudo-events` job is what turns
+  detection on (there is no separate switch — the tick only runs enabled jobs).
+  Detection additionally no-ops while no enabled event-triggered job is listening,
+  so it never polls for nothing.
+- **Baseline on first run.** The first detection only records the current state and
+  fires nothing, so enabling the job does not retroactively fire on existing data.
+- **Offline-safe & isolated.** Skipped while `data/offline.txt` exists; a broken
+  detector never breaks the others; detection is serialized (flock) and state is
+  persisted atomically to `data/cronjob-pseudo-events.json`.
+
+Detected events go into the same `cj_event` queue as webhooks and are consumed by the
+tick's normal event drain. To act on one, create an event-triggered job whose
+**Event name** matches (e.g. re-run the linkenhancer index on `gedcom-changed`).
+
+> The GEDCOM detector watches the file in `data/`, so it reflects imports/exports that
+> rewrite that file. It is a polling heuristic (~5 min latency), not a true hook — a
+> hook would require a core change (out of scope).
 
 ## Failure notification
 
@@ -384,23 +435,26 @@ beyond the text. A notification problem never breaks the tick.
 | Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | time `0 3 * * 0` |
 | Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | time `0 4 * * *` |
 | Re-index on change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `index-dirty` (queued by a webhook or a linkenhancer call) |
+| Pseudo-events poll (offered job) | `modules_v4/cronjob/cli/pseudo-events.php` | time `*/5 * * * *` (fires `gedcom-changed` / `media-added` / `user-registered`) |
 
 ## Roadmap (phase 2)
 
 Implemented so far: **job self-registration** (manifest / marker method), the
 **W1 wrapper**, **event-driven jobs** (webhook + `cj_event` queue + `EventQueue::push()`),
-**failure notification** to the administrator accounts, a **human-readable
-schedule** shown next to each cron expression in the admin table (translatable via
-`I18N`; the exact cron string is always shown too), the **provenance badge + reset
-to module defaults** for offered jobs, **duplicate a job** via the create form, and
-the **client-side DataTable** (filter/sort/paging) for the job table. See the
-sections above.
+    **pseudo-events** (state pollers: `gedcom-changed` / `media-added` /
+    `user-registered`, driven by the offered `cronjob:pseudo-events` job), **forced re-sync of the module's own manifest job**
+on update, **failure notification** to the administrator accounts, a
+**human-readable schedule** shown next to each cron expression in the admin table
+(translatable via `I18N`; the exact cron string is always shown too), the
+**provenance badge + reset to module defaults** for offered jobs, **duplicate a
+job** via the create form, and the **client-side DataTable** (filter/sort/paging)
+for the job table. See the sections above.
 
 Still open:
 
-- **Polling pseudo-events** — detect core changes (GEDCOM import, media added) by
-  watching file mtime / row counts and pushing them as events. The queue already
-  supports this; the polling heuristics are not implemented.
+- **Linkenhancer side of self-registration** — the linkenhancer manifest (L1) and
+  the W1 migration of `build-link-index.php` (L2) live in that module and are done
+  in a separate session (module boundaries).
 
 ## Tests
 
@@ -410,6 +464,7 @@ php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cl
 php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron descriptions (standalone)
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
 php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: spec validator, manifest loading, W1 payload confinement (standalone)
+php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
 ```
 
 ## License

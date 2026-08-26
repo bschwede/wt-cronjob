@@ -17,6 +17,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var array{enabled: bool, running: bool, last_tick: int} $watch
  * @var string $event_token
  * @var array<string, string> $offered
+ * @var array<int, \Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventDetectorInterface> $detectors
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -261,4 +262,22 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
         <?= csrf_field() ?>
         <button type="submit" class="btn btn-sm btn-secondary"><?= I18N::translate('Regenerate token') ?></button>
     </form>
+</fieldset>
+
+<fieldset class="border rounded p-3 mt-4">
+    <legend><?= I18N::translate('Pseudo-Events (state polling)') ?></legend>
+    <p class="text-muted">
+        <?= I18N::translate('webtrees has no event bus, so core actions are observed by polling. The module checks the states below at most every 5 minutes and queues an event when something changes; an event-triggered job then acts on it. The first run only records a baseline and does not fire.') ?>
+    </p>
+    <ul class="mb-2">
+        <?php foreach ($detectors as $detector): ?>
+            <li>
+                <code><?= e($detector->eventName()) ?></code>
+                <span class="text-muted"><?= e(I18N::translate($detector->label())) ?></span>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+    <p class="text-muted">
+        <?= I18N::translate('To activate, enable the "cronjob:pseudo-events" job in the table above. It runs in the tick child process - isolated from any web request and bounded by its timeout.') ?>
+    </p>
 </fieldset>

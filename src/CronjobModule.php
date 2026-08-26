@@ -47,6 +47,7 @@ use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
+use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
@@ -123,8 +124,9 @@ class CronjobModule extends AbstractModule
     /**
      * Runs on every request (webtrees auto-registers module middlewares via
      * Router.php). Respawn the resident watch daemon when the admin has enabled
-     * it and it died. Cheap (one file_exists) when the watch is off; never
-     * throws and never blocks the request.
+     * it and it died. Cheap (one file check) in steady state; never throws and
+     * never blocks the request. (Pseudo-event detection runs in the tick's
+     * child process, not here - see the offered `cronjob:pseudo-events` job.)
      */
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
         WatchService::maybeSpawn();
@@ -222,9 +224,10 @@ class CronjobModule extends AbstractModule
             'cron_lib'    => ScheduleService::hasCronLibrary(),
             'cron_now'    => ScheduleService::now(),
             'install'     => CronjobUtils::triggerInstallBlocks(),
-            'watch'       => WatchService::status(),
-            'event_token' => $this->getPreference(self::PREF_EVENT_TOKEN),
-            'offered'     => $offered,
+            'watch'         => WatchService::status(),
+            'event_token'   => $this->getPreference(self::PREF_EVENT_TOKEN),
+            'offered'       => $offered,
+            'detectors'     => PseudoEventService::detectors(),
         ]);
     }
 

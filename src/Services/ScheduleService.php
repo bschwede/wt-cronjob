@@ -40,6 +40,8 @@ use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Throwable;
 
+use function array_flip;
+use function array_intersect_key;
 use function array_merge;
 use function class_exists;
 use function count;
@@ -661,13 +663,123 @@ final class ScheduleService {
     }
 
     /**
-     * Sync externally-offered jobs into cj_job (insert-if-missing). Called by
-     * the tick; cheap (a filesystem glob + a few inserts at most).
+     * Sync externally-offered jobs into cj_job. Called by the tick; cheap (a
+     * filesystem glob + a few inserts/updates at most).
+     *
+     * Jobs offered by OTHER modules are insert-if-missing (admin-owned once
+     * created). cronjob's OWN job is force-synced to its manifest every tick,
+     * so a module update (manifest change) converges within one tick.
      */
     public static function syncDiscoveredJobs(): void {
         $now = self::now();
         foreach (self::discoverExternalJobs() as $entry) {
-            self::upsertDiscoveredJob($entry['module'], $entry['spec'], $now);
+            if (trim((string) $entry['module'], '_') === trim(CronjobUtils::MODULE_NAME, '_')) {
+                self::syncOwnOfferedJob($entry['spec'], $now);
+            } else {
+                self::upsertDiscoveredJob($entry['module'], $entry['spec'], $now);
+            }
         }
+    }
+
+    /**
+     * The cj_job columns a manifest controls, normalized to DB-ready values.
+     * The admin keeps ownership of name/enabled/notify/created_at and the run
+     * history - those are never force-synced.
+     *
+     * @param array<string, mixed> $spec
+     *
+     * @return array<string, mixed>
+     */
+    private static function mirrorValues(array $spec): array {
+        $is_event = ((string) ($spec['trigger_type'] ?? self::TRIGGER_TIME)) === self::TRIGGER_EVENT;
+
+        return [
+            'title'        => (string) ($spec['title'] ?? ''),
+            'trigger_type' => $is_event ? self::TRIGGER_EVENT : self::TRIGGER_TIME,
+            'event_name'   => $is_event ? (string) ($spec['event_name'] ?? '') : null,
+            'cron'         => (string) ($spec['cron'] ?? ''),
+            'command_type' => (string) ($spec['command_type'] ?? ''),
+            'command'      => (string) ($spec['command'] ?? ''),
+            'args'         => (string) ($spec['args'] ?? ''),
+            'timeout_sec'  => (int) ($spec['timeout_sec'] ?? self::TIMEOUT_STD),
+        ];
+    }
+
+    /**
+     * The mirrored fields (see mirrorValues()) whose stored value differs from
+     * the offered spec. Pure and side-effect free (standalone-testable).
+     *
+     * @param array<string, mixed> $row  current cj_job values (the mirrored fields)
+     * @param array<string, mixed> $spec normalized offered spec
+     *
+     * @return list<string> field names that differ
+     */
+    public static function specDiff(array $row, array $spec): array {
+        $want = self::mirrorValues($spec);
+        $diff = [];
+        foreach ($want as $field => $value) {
+            $have = $row[$field] ?? null;
+            $have = ($field === 'timeout_sec') ? (int) $have : (string) $have;
+            $ref  = ($field === 'timeout_sec') ? (int) $value : (string) $value;
+            if ($have !== $ref) {
+                $diff[] = $field;
+            }
+        }
+
+        return $diff;
+    }
+
+    /**
+     * Re-sync cronjob's OWN offered job (keyed <selfmodule>:<name>) to the
+     * current manifest. Insert-if-missing; when the row exists, update only
+     * the manifest-mirrored fields that changed - the admin's name/enabled/
+     * notify/created_at and the run history are preserved, and next_run_at is
+     * only rescheduled when the cron expression itself changed.
+     *
+     * @param array<string, mixed> $spec normalized offered spec
+     */
+    public static function syncOwnOfferedJob(array $spec, string $now): void {
+        $key = trim(CronjobUtils::MODULE_NAME, '_') . ':' . (string) ($spec['name'] ?? '');
+        if ($key === '' || strlen($key) > 64) {
+            return;
+        }
+
+        $job = self::findJob($key);
+        if ($job === null) {
+            self::upsertDiscoveredJob(CronjobUtils::MODULE_NAME, $spec, $now);
+
+            return;
+        }
+
+        $row  = [
+            'title'        => (string) $job->title,
+            'trigger_type' => (string) $job->trigger_type,
+            'event_name'   => (string) ($job->event_name ?? ''),
+            'cron'         => (string) $job->cron,
+            'command_type' => (string) $job->command_type,
+            'command'      => (string) $job->command,
+            'args'         => (string) $job->args,
+            'timeout_sec'  => (int) $job->timeout_sec,
+        ];
+        $diff = self::specDiff($row, $spec);
+        if ($diff === []) {
+            return;
+        }
+
+        $values         = array_intersect_key(self::mirrorValues($spec), array_flip($diff));
+        $values['updated_at'] = $now;
+
+        // Reschedule only when the schedule itself changed.
+        if (in_array('cron', $diff, true) || in_array('trigger_type', $diff, true)) {
+            if ((string) $spec['trigger_type'] === self::TRIGGER_TIME) {
+                try {
+                    $values['next_run_at'] = self::nextRun((string) $spec['cron'], $now);
+                } catch (DomainException | RuntimeException) {
+                    $values['next_run_at'] = null;
+                }
+            }
+        }
+
+        DB::table('cj_job')->where('id', '=', (int) $job->id)->update($values);
     }
 }
