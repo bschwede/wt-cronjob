@@ -84,8 +84,11 @@ last 25 runs per job (plus a 30-day global retention window).
 The job table is a **client-side DataTable** (search box, sortable columns, paging,
 state saved in the browser) - no extra setup needed. Per row there are additional
 actions: **Duplicate** opens the create form prefilled with a copy of the job
-(new `-copy` slug, starts disabled), and **Reset** (only for jobs offered by a
-module manifest) restores the module's currently-offered defaults.
+(new `-copy` slug, starts disabled; for module-offered jobs the `<module>:` name
+prefix is removed, since the colon cannot be entered in the form), and **Reset**
+(only for jobs offered by a module manifest) restores the module's currently-offered
+defaults. If a save fails validation, the form is re-rendered with all entered
+values kept (plus the error messages) - nothing you typed is lost.
 
 ### Trigger installation (once)
 

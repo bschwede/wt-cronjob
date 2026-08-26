@@ -195,6 +195,12 @@ $slug = CronjobUtils::uniqueCopySlug('base', static fn (string $s): bool => in_a
 check('copySlug: sequential until free', $slug === 'base-copy4');
 $slug = CronjobUtils::uniqueCopySlug(str_repeat('a', 80), static fn (string $s): bool => false);
 check('copySlug: long base truncated to fit 64 chars', strlen($slug) === 64 && str_ends_with($slug, '-copy'));
+check('copySlugBase: module prefix stripped', CronjobUtils::copySlugBase('linkenhancer:link-index') === 'link-index');
+check('copySlugBase: plain name unchanged', CronjobUtils::copySlugBase('link-index') === 'link-index');
+check('copySlugBase: no chars before colon -> unchanged', CronjobUtils::copySlugBase(':link-index') === ':link-index');
+check('copySlugBase: only first prefix stripped', CronjobUtils::copySlugBase('a:b:c') === 'b:c');
+$slug = CronjobUtils::uniqueCopySlug(CronjobUtils::copySlugBase('linkenhancer:link-index'), static fn (string $s): bool => false);
+check('copySlug: module job duplicate -> prefix-free slug', $slug === 'link-index-copy');
 
 // --- resolvePayloadPath ------------------------------------------------------
 $modules = $root . '/modules_v4';

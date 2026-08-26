@@ -43,6 +43,7 @@ use function preg_match;
 use function rtrim;
 use function str_starts_with;
 use function str_replace;
+use function strpos;
 use function substr;
 
 /**
@@ -198,6 +199,20 @@ final class CronjobUtils {
         } while ($exists($slug) && $n < 1000);
 
         return $slug;
+    }
+
+    /**
+     * Name base for a duplicated job: module-offered jobs are keyed
+     * <module>:<name>, but the colon cannot be entered in the form (slug
+     * pattern), so the prefix is stripped for the copy. Anything else is
+     * returned unchanged.
+     */
+    public static function copySlugBase(string $name): string {
+        if (preg_match('/^[a-z0-9_\-]+:/', $name) === 1) {
+            return substr($name, strpos($name, ':') + 1);
+        }
+
+        return $name;
     }
 
     /**

@@ -246,7 +246,10 @@ class CronjobModule extends AbstractModule
                 $job          = clone $source;
                 $job->id      = 0;
                 $job->enabled = 0;
-                $job->name    = CronjobUtils::uniqueCopySlug((string) $source->name);
+                // Module-offered jobs are keyed <module>:<name>; the colon
+                // cannot be saved via the form, so the copy's base name
+                // strips the prefix.
+                $job->name    = CronjobUtils::uniqueCopySlug(CronjobUtils::copySlugBase((string) $source->name));
                 $copy_of      = (string) $source->title;
             }
         }
@@ -255,10 +258,21 @@ class CronjobModule extends AbstractModule
         $event_name   = $job !== null ? (string) ($job->event_name ?? '') : '';
         $notify       = $job !== null ? ((int) $job->notify === 1) : false;
 
+        return $this->jobFormView($job, $copy_of, $trigger_type, $event_name, $notify, null);
+    }
+
+    /**
+     * Render the job create/edit form. $form_values (submitted field values)
+     * are restored when a save failed validation, so no input is lost.
+     *
+     * @param array<string, mixed>|null $form_values
+     */
+    private function jobFormView(?object $job, ?string $copy_of, string $trigger_type, string $event_name, bool $notify, ?array $form_values): ResponseInterface {
         $preview = null;
-        if ($job !== null && $trigger_type === 'time' && ScheduleService::hasCronLibrary()) {
+        $cron    = (string) ($form_values['cron'] ?? ($job !== null ? $job->cron : ''));
+        if ($trigger_type === 'time' && $cron !== '' && ScheduleService::hasCronLibrary()) {
             try {
-                $preview = ScheduleService::upcomingRuns((string) $job->cron, 5, ScheduleService::now());
+                $preview = ScheduleService::upcomingRuns($cron, 5, ScheduleService::now());
             } catch (DomainException | RuntimeException) {
                 $preview = null;
             }
@@ -269,6 +283,7 @@ class CronjobModule extends AbstractModule
             'module'       => $this,
             'job'          => $job,
             'copy_of'      => $copy_of,
+            'form_values'  => $form_values,
             'candidates'   => array_merge(CronjobUtils::jobScriptCandidates(), JobRunner::ALLOWED_CORE_COMMANDS),
             'preview'      => $preview,
             'cron_now'     => ScheduleService::now(),
@@ -294,6 +309,20 @@ class CronjobModule extends AbstractModule
         $trigger_type = $data->string('trigger_type', 'time') === 'event' ? 'event' : 'time';
         $event_name   = trim($data->string('event_name', ''));
         $job_id       = $data->integer('job_id', 0);
+        $copy_of      = $data->string('copy_of', '') !== '' ? $data->string('copy_of') : null;
+
+        $existing = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+
+        // Submitted values, restored when the save fails (form re-render).
+        $form_values = [
+            'name'    => $name,
+            'title'   => $title,
+            'cron'    => $cron,
+            'command' => $command,
+            'args'    => $args,
+            'timeout' => $timeout,
+            'enabled' => $enabled,
+        ];
 
         $errors = [];
         if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) !== 1) {
@@ -342,16 +371,21 @@ class CronjobModule extends AbstractModule
             foreach ($errors as $error) {
                 FlashMessages::addMessage($error, 'danger');
             }
-            return redirect(route('module', ['module' => $this->name(), 'action' => 'AdminJobForm', 'job' => $job_id]));
-        }
+            // Re-render the form with the submitted values (no redirect, so
+            // nothing the user entered is lost and the duplicate context
+            // survives); the layout shows the flash messages.
+            $this->layout = 'layouts/administration';
 
-        $existing = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+            return $this->jobFormView($existing, $copy_of, $trigger_type, $event_name, $notify, $form_values);
+        }
 
         // Renaming onto another job's slug would overwrite that job.
         $foreign = DB::table('cj_job')->where('name', '=', $name)->first();
         if ($foreign !== null && ($existing === null || (int) $foreign->id !== (int) $existing->id)) {
             FlashMessages::addMessage(I18N::translate('A job with this name already exists.'), 'danger');
-            return redirect(route('module', ['module' => $this->name(), 'action' => 'AdminJobForm', 'job' => $job_id]));
+            $this->layout = 'layouts/administration';
+
+            return $this->jobFormView($existing, $copy_of, $trigger_type, $event_name, $notify, $form_values);
         }
 
         $now = ScheduleService::now();
