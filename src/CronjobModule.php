@@ -246,10 +246,8 @@ class CronjobModule extends AbstractModule
             'watch'         => WatchService::status(),
             'event_token'   => $this->getPreference(self::PREF_EVENT_TOKEN),
             'offered'       => $offered,
-            'detectors'     => PseudoEventService::detectors(),
             'route_events'  => $this->getPreference(RouteEventService::SETTING, '') === '1',
             'event_catalog' => EventCatalogService::listCatalog(),
-            'route_offered' => implode(', ', array_column(RouteEventService::map(), 'event')),
         ]);
     }
 
