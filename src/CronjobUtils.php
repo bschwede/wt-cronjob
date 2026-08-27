@@ -41,6 +41,7 @@ use function in_array;
 use function is_array;
 use function preg_match;
 use function rtrim;
+use function strlen;
 use function str_starts_with;
 use function str_replace;
 use function strpos;
@@ -213,6 +214,25 @@ final class CronjobUtils {
         }
 
         return $name;
+    }
+
+    /**
+     * Whether a job name (slug) is valid.
+     *
+     * A plain slug is always valid. A module-offered key (`<module>:<slug>`) is
+     * accepted only when $allow_module_key is set - callers pass it true solely to
+     * preserve an existing offered name on update, never to create or retarget one.
+     * The whole name (colon included) must fit the 64-char cj_job.name column, so
+     * the two parts are not each allowed up to 64 characters.
+     */
+    public static function isValidJobName(string $name, bool $allow_module_key = false): bool {
+        if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1) {
+            return true;
+        }
+
+        return $allow_module_key
+            && strlen($name) <= 64
+            && preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}:[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1;
     }
 
     /**

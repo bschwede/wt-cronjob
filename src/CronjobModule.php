@@ -293,6 +293,7 @@ class CronjobModule extends AbstractModule
             'trigger_type' => $trigger_type,
             'event_name'   => $event_name,
             'notify'       => $notify,
+            'pseudo_events' => PseudoEventService::detectors(),
         ]);
     }
 
@@ -328,7 +329,12 @@ class CronjobModule extends AbstractModule
         ];
 
         $errors = [];
-        if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) !== 1) {
+        // A module-offered job keeps its <module>:<name> key (the form renders the
+        // field read-only). The key is accepted only when it is the unchanged
+        // existing name, so a <module>: key can be preserved but not invented or
+        // retargeted (that would silently detach the job from its module).
+        $allow_key = $existing !== null && $name === (string) $existing->name;
+        if (!CronjobUtils::isValidJobName($name, $allow_key)) {
             $errors[] = I18N::translate('Job name must be a slug: %1$s, max %2$s characters.', 'a-z, 0-9, "_", "-"', '64');
         }
         if ($title === '') {
@@ -486,6 +492,31 @@ class CronjobModule extends AbstractModule
             ]);
             FlashMessages::addMessage(
                 $enabled ? I18N::translate('Job enabled.') : I18N::translate('Job disabled.'),
+                'success'
+            );
+        } else {
+            FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
+        }
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Enable/disable failure notification for a job (admin).
+     */
+    public function postAdminJobNotifyToggleAction(ServerRequestInterface $request): ResponseInterface {
+        $job_id = Validator::parsedBody($request)->integer('job_id', 0);
+        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+
+        if ($job !== null) {
+            $now    = ScheduleService::now();
+            $notify = (int) $job->notify === 0 ? 1 : 0;
+            DB::table('cj_job')->where('id', '=', $job_id)->update([
+                'notify'     => $notify,
+                'updated_at' => $now,
+            ]);
+            FlashMessages::addMessage(
+                $notify ? I18N::translate('Failure notification enabled.') : I18N::translate('Failure notification disabled.'),
                 'success'
             );
         } else {

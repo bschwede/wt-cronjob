@@ -202,6 +202,20 @@ check('copySlugBase: only first prefix stripped', CronjobUtils::copySlugBase('a:
 $slug = CronjobUtils::uniqueCopySlug(CronjobUtils::copySlugBase('linkenhancer:link-index'), static fn (string $s): bool => false);
 check('copySlug: module job duplicate -> prefix-free slug', $slug === 'link-index-copy');
 
+// --- isValidJobName ----------------------------------------------------------
+check('jobName: plain slug valid', CronjobUtils::isValidJobName('link-index') === true);
+check('jobName: digits/underscore/dash valid', CronjobUtils::isValidJobName('a0_b-9') === true);
+check('jobName: leading dash rejected', CronjobUtils::isValidJobName('-bad') === false);
+check('jobName: uppercase rejected', CronjobUtils::isValidJobName('BadName') === false);
+check('jobName: 64 chars valid', CronjobUtils::isValidJobName(str_repeat('a', 64)) === true);
+check('jobName: 65 chars rejected', CronjobUtils::isValidJobName(str_repeat('a', 65)) === false);
+check('jobName: module key rejected by default', CronjobUtils::isValidJobName('cronjob:pseudo-events') === false);
+check('jobName: module key allowed when permitted', CronjobUtils::isValidJobName('cronjob:pseudo-events', true) === true);
+check('jobName: malformed module key rejected even when permitted', CronjobUtils::isValidJobName('cronjob:', true) === false);
+check('jobName: module key with bad prefix rejected', CronjobUtils::isValidJobName(':pseudo-events', true) === false);
+check('jobName: module key at 64 chars incl. colon allowed', CronjobUtils::isValidJobName(str_repeat('a', 31) . ':' . str_repeat('b', 32), true) === true);
+check('jobName: module key over 64 chars rejected', CronjobUtils::isValidJobName(str_repeat('a', 32) . ':' . str_repeat('b', 32), true) === false);
+
 // --- resolvePayloadPath ------------------------------------------------------
 $modules = $root . '/modules_v4';
 check('payload: valid sibling resolved',

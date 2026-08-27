@@ -67,11 +67,11 @@ then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 
 | Field | Meaning |
 | :--- | :--- |
-| **Name (slug)** | technical identifier, `a-z 0-9 _ -` |
+| **Name (slug)** | technical identifier, `a-z 0-9 _ -`. **Read-only for module-offered jobs** (their `<module>:<name>` key is fixed and cannot be retargeted); editable for jobs you create yourself. |
 | **Title** | human readable name |
 | **Trigger** | **Time-based** (a cron schedule) or **Event** (runs when a named event is queued). See "Event-driven jobs". |
 | **Cron expression** | (time-based only) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 5 runs. |
-| **Event name** | (event only) the event this job reacts to, e.g. `index-dirty` |
+| **Event name** | (event only) the event this job reacts to, e.g. `index-dirty`. The built-in pseudo-events (`gedcom-changed`, `media-added`, `user-registered`) are offered as suggestions; any custom name (webhook / direct module push) works too. |
 | **Command** | a `modules_v4/<module>/cli/<script>.php` path (discovered scripts are offered as suggestions) or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting` |
 | **Arguments** | plain options/values only (e.g. `--limit=5000`), max 10 tokens |
 | **Timeout** | 30 - 3600 s |
@@ -82,7 +82,9 @@ page shows status, exit code, duration and the captured output (last 64 KB) of t
 last 25 runs per job (plus a 30-day global retention window).
 
 The job table is a **client-side DataTable** (search box, sortable columns, paging,
-state saved in the browser) - no extra setup needed. Per row there are additional
+state saved in the browser) - no extra setup needed. The **Enabled** and **Notify**
+columns can be toggled in place (click the ✓/✗ button) without opening the form, and
+the **Timeout** column shows each job's per-run timeout in seconds. Per row there are additional
 actions: **Duplicate** opens the create form prefilled with a copy of the job
 (new `-copy` slug, starts disabled; for module-offered jobs the `<module>:` name
 prefix is removed, since the colon cannot be entered in the form), and **Reset**

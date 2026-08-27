@@ -18,6 +18,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
  * @var bool $notify
  * @var string|null $copy_of
  * @var array<string, mixed>|null $form_values
+ * @var array<int, \Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventDetectorInterface> $pseudo_events
  */
 
 $copy_of  = $copy_of ?? null;
@@ -25,6 +26,14 @@ $fv       = $form_values ?? [];
 $back_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
 $is_edit  = $job !== null;
 $job_id   = $is_edit ? (int) $job->id : 0;
+$pseudo_events = $pseudo_events ?? [];
+
+// A module-offered job keeps its <module>:<name> key; the name field is then
+// read-only and its pattern also accepts the module prefix.
+$is_offered   = $is_edit && str_contains((string) $job->name, ':');
+$name_pattern = $is_offered
+    ? '[a-z0-9][a-z0-9_\-]{0,63}(:[a-z0-9][a-z0-9_\-]{0,63})?'
+    : '[a-z0-9][a-z0-9_\-]{0,63}';
 
 // On a failed save the form is re-rendered with the submitted values.
 $name_v    = $fv['name'] ?? ($is_edit ? (string) $job->name : '');
@@ -64,10 +73,15 @@ if ($copy_of !== null) {
         <div class="mb-3">
             <label for="cj_name" class="form-label"><?= I18N::translate('Name (slug)') ?></label>
             <input type="text" class="form-control" id="cj_name" name="name" required
-                   pattern="[a-z0-9][a-z0-9_\-]{0,63}"
+                   pattern="<?= e($name_pattern) ?>"
+                   <?= $is_offered ? 'readonly' : '' ?>
                    value="<?= e($name_v) ?>"
                    placeholder="linkenhancer-index">
-            <div class="form-text"><code>a-z, 0-9, "_", "-"</code> <?= I18N::translate('Used as identifier, not shown to users.') ?></div>
+            <?php if ($is_offered): ?>
+                <div class="form-text"><?= I18N::translate('This job is offered by a module, so its name is fixed.') ?></div>
+            <?php else: ?>
+                <div class="form-text"><code>a-z, 0-9, "_", "-"</code> <?= I18N::translate('Used as identifier, not shown to users.') ?></div>
+            <?php endif; ?>
         </div>
 
         <div class="mb-3">
@@ -129,9 +143,22 @@ if ($copy_of !== null) {
                 <label for="cj_event_name" class="form-label"><?= I18N::translate('Event name') ?></label>
                 <input type="text" class="form-control" id="cj_event_name" name="event_name"
                        pattern="[a-z0-9][a-z0-9_\-]{0,63}"
+                       list="cj_event_names"
                        placeholder="index-dirty"
                        value="<?= e($event_name) ?>">
-                <div class="form-text"><?= I18N::translate('The job runs once for each queued event with this name (from the webhook or a module call).') ?></div>
+                <datalist id="cj_event_names">
+                    <?php foreach ($pseudo_events as $detector): ?>
+                        <option value="<?= e($detector->eventName()) ?>"><?= e(I18N::translate($detector->label())) ?></option>
+                    <?php endforeach; ?>
+                </datalist>
+                <div class="form-text"><?= I18N::translate('The job runs once for each queued event with this name (from the webhook, a module call, or a built-in pseudo-event poller).') ?></div>
+                <?php
+                $pseudo_names = [];
+                foreach ($pseudo_events as $detector) {
+                    $pseudo_names[] = $detector->eventName();
+                }
+                ?>
+                <div class="form-text"><?= I18N::translate('Built-in pseudo-events: %s. Custom names work too.', implode(', ', $pseudo_names)) ?></div>
             </div>
         </div>
     </fieldset>

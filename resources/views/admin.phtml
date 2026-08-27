@@ -62,7 +62,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
            <?= view('lists/datatables-attributes') ?>
            data-auto-width="false"
            data-sorting='[[0,"asc"]]'
-           data-columns='[{},{},{},{"dataSort":6},{"dataSort":7},{"sortable":false,"searchable":false},{"visible":false},{"visible":false}]'>
+           data-columns='[{},{},{},{"dataSort":8},{"dataSort":9},{"dataSort":10},{"dataSort":11},{"sortable":false,"searchable":false},{"visible":false},{"visible":false},{"visible":false},{"visible":false}]'>
         <thead>
             <tr>
                 <th><?= I18N::translate('Job') ?></th>
@@ -70,9 +70,13 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                 <th><?= I18N::translate('Next Run (UTC)') ?></th>
                 <th><?= I18N::translate('Last Run') ?></th>
                 <th><?= I18N::translate('Enabled') ?></th>
+                <th><?= I18N::translate('Notify') ?></th>
+                <th><?= I18N::translate('Timeout') ?></th>
                 <th></th>
                 <th><!-- last run timestamp --></th>
                 <th><!-- enabled flag --></th>
+                <th><!-- notify flag --></th>
+                <th><!-- timeout --></th>
             </tr>
         </thead>
         <tbody>
@@ -80,6 +84,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
             <?php
             $last    = $job->last_run;
             $enabled = (int) $job->enabled === 1;
+            $notify  = (int) $job->notify === 1;
             ?>
             <tr>
                 <td>
@@ -143,6 +148,19 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         </button>
                     </form>
                 </td>
+                <td>
+                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobNotifyToggle'])) ?>" class="d-inline">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
+                        <button type="submit" class="btn btn-sm <?= $notify ? 'btn-success' : 'btn-secondary' ?>"
+                                title="<?= $notify ? I18N::translate('notify on failure: on') : I18N::translate('notify on failure: off') ?>">
+                            <strong><?= $notify ? "✓" : "✗" ?></strong>
+                        </button>
+                    </form>
+                </td>
+                <td>
+                    <code><?= (int) $job->timeout_sec ?></code> <span class="text-muted"><?= I18N::translate('s') ?></span>
+                </td>
                 <td class="text-end">
                     <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobRunNow'])) ?>" class="d-inline">
                         <?= csrf_field() ?>
@@ -178,6 +196,8 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                 </td>
                 <td><?= $last !== null ? e((string) $last->started_at) : '' ?></td>
                 <td><?= (int) $job->enabled ?></td>
+                <td><?= (int) $job->notify ?></td>
+                <td><?= (int) $job->timeout_sec ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>
