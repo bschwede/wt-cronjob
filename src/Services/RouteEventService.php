@@ -163,7 +163,7 @@ final class RouteEventService {
      */
     public static function maybeFire(ServerRequestInterface $request, ResponseInterface $response): void {
         $route = $request->getAttribute('route');
-        if (!is_object($route) || !isset($route->handler)) {
+        if (!is_object($route) || !$route->handler) {
             return;
         }
 
