@@ -91,7 +91,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         <div>
                             <span class="badge bg-secondary"
                                   title="<?= e(I18N::translate('Seeded automatically from the %s manifest (cron-jobs.php / getCronJobs()). The "Reset" button restores the module defaults.', $offered[$job->name])) ?>">
-                                <?= e(I18N::translate('from module %s', $offered[$job->name])) ?>
+                                <?= e($offered[$job->name]) ?>
                             </span>
                         </div>
                     <?php endif; ?>
@@ -189,95 +189,120 @@ $watch_enabled = (bool) ($watch['enabled'] ?? false);
 $watch_running = (bool) ($watch['running'] ?? false);
 $watch_last    = (int) ($watch['last_tick'] ?? 0);
 ?>
-<fieldset class="border rounded p-3 mt-4">
-    <legend><?= I18N::translate('Watch daemon (no OS cron needed)') ?></legend>
-    <p class="text-muted">
-        <?= I18N::translate('Runs the tick from a resident process instead of an OS cron / systemd timer - for hosts without cron. A watchdog restarts it automatically if it dies. Use this OR the OS trigger below, not both.') ?>
-    </p>
-    <p>
-        <?php if ($watch_running): ?>
-            <span class="badge bg-success"><?= I18N::translate('running') ?></span>
-        <?php else: ?>
-            <span class="badge bg-secondary"><?= I18N::translate('stopped') ?></span>
-        <?php endif; ?>
-        <?php if ($watch_last > 0): ?>
-            <span class="text-muted"><?= I18N::translate('Last activity (UTC): %s', date('Y-m-d H:i:s', $watch_last)) ?></span>
-        <?php endif; ?>
-    </p>
-    <?php if ($watch_enabled): ?>
-        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStop'])) ?>" class="d-inline">
-            <?= csrf_field() ?>
-            <button type="submit" class="btn btn-sm btn-warning"><?= I18N::translate('Stop watch') ?></button>
-        </form>
-    <?php else: ?>
-        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStart'])) ?>" class="d-inline">
-            <?= csrf_field() ?>
-            <button type="submit" class="btn btn-sm btn-primary"><?= I18N::translate('Start watch') ?></button>
-        </form>
-    <?php endif; ?>
-</fieldset>
 
-<fieldset class="border rounded p-3 mt-4">
-    <legend><?= I18N::translate('Trigger Installation') ?></legend>
-    <p class="text-muted">
-        <?= I18N::translate('The module itself does not start. One OS timer (classic cron or systemd) must call the tick once per minute. Pick one of the two options below - the paths are already filled in for this installation.') ?>
-    </p>
+<div class="accordion mt-5 mb-5" id="accordion">
+  <div class="accordion-item">
+    <h2 class="accordion-header" id="acc-install-head">
+      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#acc-install" aria-expanded="true" aria-controls="acc-install">
+        <strong><?= I18N::translate('Installation') ?></strong>
+      </button>
+    </h2>
+    <div id="acc-install" class="accordion-collapse collapse show" aria-labelledby="acc-install-head">
+      <div class="accordion-body">
+        <fieldset class="border rounded p-3 mt-2">
+            <legend><?= I18N::translate('Watch daemon (no OS cron needed)') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('Runs the tick from a resident process instead of an OS cron / systemd timer - for hosts without cron. A watchdog restarts it automatically if it dies. Use this OR the OS trigger below, not both.') ?>
+            </p>
+            <p>
+                <?php if ($watch_running): ?>
+                    <span class="badge bg-success"><?= I18N::translate('running') ?></span>
+                <?php else: ?>
+                    <span class="badge bg-secondary"><?= I18N::translate('stopped') ?></span>
+                <?php endif; ?>
+                <?php if ($watch_last > 0): ?>
+                    <span class="text-muted"><?= I18N::translate('Last activity (UTC): %s', date('Y-m-d H:i:s', $watch_last)) ?></span>
+                <?php endif; ?>
+            </p>
+            <?php if ($watch_enabled): ?>
+                <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStop'])) ?>" class="d-inline">
+                    <?= csrf_field() ?>
+                    <button type="submit" class="btn btn-sm btn-warning"><?= I18N::translate('Stop watch') ?></button>
+                </form>
+            <?php else: ?>
+                <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStart'])) ?>" class="d-inline">
+                    <?= csrf_field() ?>
+                    <button type="submit" class="btn btn-sm btn-primary"><?= I18N::translate('Start watch') ?></button>
+                </form>
+            <?php endif; ?>
+        </fieldset>
 
-    <details>
-        <summary><?= /*I18N: webtrees.pot */ I18N::translate('Details'); ?></summary>
-        <div class="bg-light p-2 rounded mt-2 mb-0">
-            <h6><?= I18N::translate('Option A: classic cron (every minute)') ?>
-            </h6>
-            <pre class="bg-light p-2 rounded"><?= e($install['cron_line']) ?></pre>
-            
-            <h6>
-                <?= I18N::translate('Option B: systemd timer') ?>
-            </h6>
-            <h7>wt-cronjob-tick.service</h7>
-            <pre class="bg-light p-2 rounded"><?= e($install['service_unit']) ?></pre>
-            <h7>wt-cronjob-tick.timer</h7>
-            <pre class="bg-light p-2 rounded"><?= e($install['timer_unit']) ?></pre>
-            <h7><?= I18N::translate('Install commands') ?></h7>
-            <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
-        </div>
-    </details>
-</fieldset>
+        <fieldset class="border rounded p-3 mt-4">
+            <legend><?= I18N::translate('Trigger Installation') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('The module itself does not start. One OS timer (classic cron or systemd) must call the tick once per minute. Pick one of the two options below - the paths are already filled in for this installation.') ?>
+            </p>
 
-<fieldset class="border rounded p-3 mt-4">
-    <legend><?= I18N::translate('Event webhook (external trigger)') ?></legend>
-    <p class="text-muted">
-        <?= I18N::translate('External systems can queue an event by GETting the endpoint below. Each queued event runs its matching event-triggered job(s) at the next tick. The token is required (send it in the X-Cronjob-Token header, not in the URL) and the endpoint is rate-limited.') ?>
-    </p>
-    <div class="mb-2">
-        <label class="form-label" for="cj_webhook_url"><?= I18N::translate('Endpoint') ?></label>
-        <input type="text" class="form-control" id="cj_webhook_url" readonly
-               value="<?= e(route('module', ['module' => $module->name(), 'action' => 'Event'])) ?>">
-        <div class="form-text"><?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header (or, less secure, as ?token=…).') ?></div>
+            <details>
+                <summary><?= /*I18N: webtrees.pot */ I18N::translate('Details'); ?></summary>
+                <div class="bg-light p-2 rounded mt-2 mb-0">
+                    <h6><?= I18N::translate('Option A: classic cron (every minute)') ?>
+                    </h6>
+                    <pre class="bg-light p-2 rounded"><?= e($install['cron_line']) ?></pre>
+                    
+                    <h6>
+                        <?= I18N::translate('Option B: systemd timer') ?>
+                    </h6>
+                    <h7>wt-cronjob-tick.service</h7>
+                    <pre class="bg-light p-2 rounded"><?= e($install['service_unit']) ?></pre>
+                    <h7>wt-cronjob-tick.timer</h7>
+                    <pre class="bg-light p-2 rounded"><?= e($install['timer_unit']) ?></pre>
+                    <h7><?= I18N::translate('Install commands') ?></h7>
+                    <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
+                </div>
+            </details>
+        </fieldset>
+      </div>
     </div>
-    <div class="mb-2">
-        <label class="form-label" for="cj_event_token"><?= I18N::translate('Token') ?></label>
-        <input type="text" class="form-control font-monospace" id="cj_event_token" readonly value="<?= e($event_token) ?>">
-    </div>
-    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminEventToken'])) ?>" class="d-inline">
-        <?= csrf_field() ?>
-        <button type="submit" class="btn btn-sm btn-secondary"><?= I18N::translate('Regenerate token') ?></button>
-    </form>
-</fieldset>
+  </div>
+  <div class="accordion-item">
+    <h2 class="accordion-header" id="acc-event-head">
+      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#acc-event" aria-expanded="false" aria-controls="acc-event">
+        <strong><?= I18N::translate('Events') ?></strong>
+      </button>
+    </h2>
+    <div id="acc-event" class="accordion-collapse collapse" aria-labelledby="acc-event-head">
+      <div class="accordion-body">
+        <fieldset class="border rounded p-3 mt-1">
+            <legend><?= I18N::translate('Event webhook (external trigger)') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('External systems can queue an event by GETting the endpoint below. Each queued event runs its matching event-triggered job(s) at the next tick. The token is required (send it in the X-Cronjob-Token header, not in the URL) and the endpoint is rate-limited.') ?>
+            </p>
+            <div class="mb-2">
+                <label class="form-label" for="cj_webhook_url"><?= I18N::translate('Endpoint') ?></label>
+                <input type="text" class="form-control" id="cj_webhook_url" readonly
+                    value="<?= e(route('module', ['module' => $module->name(), 'action' => 'Event'])) ?>">
+                <div class="form-text"><?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header (or, less secure, as ?token=…).') ?></div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="cj_event_token"><?= I18N::translate('Token') ?></label>
+                <input type="text" class="form-control font-monospace" id="cj_event_token" readonly value="<?= e($event_token) ?>">
+            </div>
+            <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminEventToken'])) ?>" class="d-inline">
+                <?= csrf_field() ?>
+                <button type="submit" class="btn btn-sm btn-secondary"><?= I18N::translate('Regenerate token') ?></button>
+            </form>
+        </fieldset>
 
-<fieldset class="border rounded p-3 mt-4">
-    <legend><?= I18N::translate('Pseudo-Events (state polling)') ?></legend>
-    <p class="text-muted">
-        <?= I18N::translate('webtrees has no event bus, so core actions are observed by polling. The module checks the states below at most every 5 minutes and queues an event when something changes; an event-triggered job then acts on it. The first run only records a baseline and does not fire.') ?>
-    </p>
-    <ul class="mb-2">
-        <?php foreach ($detectors as $detector): ?>
-            <li>
-                <code><?= e($detector->eventName()) ?></code>
-                <span class="text-muted"><?= e(I18N::translate($detector->label())) ?></span>
-            </li>
-        <?php endforeach; ?>
-    </ul>
-    <p class="text-muted">
-        <?= I18N::translate('To activate, enable the "cronjob:pseudo-events" job in the table above. It runs in the tick child process - isolated from any web request and bounded by its timeout.') ?>
-    </p>
-</fieldset>
+        <fieldset class="border rounded p-3 mt-4">
+            <legend><?= I18N::translate('Pseudo-Events (state polling)') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('webtrees has no event bus, so core actions are observed by polling. The module checks the states below at most every 5 minutes and queues an event when something changes; an event-triggered job then acts on it. The first run only records a baseline and does not fire.') ?>
+            </p>
+            <ul class="mb-2">
+                <?php foreach ($detectors as $detector): ?>
+                    <li>
+                        <code><?= e($detector->eventName()) ?></code>
+                        <span class="text-muted"><?= e(I18N::translate($detector->label())) ?></span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+            <p class="text-muted">
+                <?= I18N::translate('To activate, enable the "cronjob:pseudo-events" job in the table above. It runs in the tick child process - isolated from any web request and bounded by its timeout.') ?>
+            </p>
+        </fieldset>
+      </div>
+    </div>
+  </div>
+
+</div>
