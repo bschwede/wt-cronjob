@@ -719,6 +719,145 @@ final class ScheduleService {
     }
 
     /**
+     * Normalize + validate a command spec announced by an external module
+     * (a <module>/cron-jobs.php 'commands' entry or a getModuleCommands()
+     * marker method). Mirrors validateEventSpec(): a plain array, deliberately
+     * NOT a shared class, so announcing modules never reference the cronjob
+     * namespace.
+     *
+     * Spec shape: ['command' => string, 'command_type' => ?'module'|'core',
+     * 'description' => ?string, 'params' => ?list<array{name: string,
+     * optional: ?bool, default: ?string, description: ?string}>]. When
+     * command_type is omitted it is derived from the command value
+     * (CronjobUtils::detectCommandType). `params` is the structured
+     * "available parameters" list shown in the job form.
+     *
+     * @param array<string, mixed> $spec
+     *
+     * @return array{spec: array{command: string, command_type: string, description: string, params: list<array<string, mixed>>}, errors: list<string>}
+     */
+    public static function validateCommandSpec(array $spec): array {
+        $errors = [];
+
+        $command = trim((string) ($spec['command'] ?? ''));
+        if ($command === '' || strlen($command) > 255) {
+            $errors[] = 'command must be a non-empty path/name of at most 255 chars';
+        }
+
+        $command_type = trim((string) ($spec['command_type'] ?? ''));
+        if ($command_type === '') {
+            $command_type = CronjobUtils::detectCommandType($command);
+        }
+        if (!in_array($command_type, ['module', 'core'], true)) {
+            $errors[] = "command_type must be 'module' or 'core' (derivable from the command value)";
+        }
+
+        $description = trim((string) ($spec['description'] ?? ''));
+        if (strlen($description) > 255) {
+            $errors[] = 'description must be at most 255 chars';
+        }
+
+        $raw_params = $spec['params'] ?? [];
+        if (!is_array($raw_params)) {
+            $errors[] = 'params must be a list of parameter descriptors';
+            $raw_params = [];
+        }
+        $params = [];
+        foreach (array_values($raw_params) as $param) {
+            if (!is_array($param)) {
+                continue;
+            }
+            $name = trim((string) ($param['name'] ?? ''));
+            if ($name === '' || strlen($name) > 64 || preg_match('/\s/', $name) === 1) {
+                continue; // malformed descriptor - drop it silently
+            }
+            $default = (isset($param['default']) && $param['default'] !== null) ? (string) $param['default'] : null;
+            if ($default !== null && strlen($default) > 128) {
+                $default = substr($default, 0, 128);
+            }
+            $params[] = [
+                'name'        => $name,
+                'optional'    => array_key_exists('optional', $param) ? (bool) $param['optional'] : true,
+                'default'     => $default,
+                'description' => trim((string) ($param['description'] ?? '')),
+            ];
+        }
+        if (count($params) > 8) {
+            $errors[] = 'params must list at most 8 parameter descriptors';
+        }
+
+        return [
+            'spec'   => [
+                'command'      => $command,
+                'command_type' => $command_type,
+                'description'  => $description,
+                'params'       => $params,
+            ],
+            'errors' => $errors,
+        ];
+    }
+
+    /**
+     * Discover commands announced by other enabled modules: via the 'commands'
+     * section of a <module>/cron-jobs.php manifest and/or a getModuleCommands()
+     * marker method. Exception-safe like discoverExternalEvents() - a broken
+     * or throwing source is skipped. Command values are used as-is (module
+     * script paths or core command names) - no namespacing.
+     *
+     * @return list<array{module: string, command: string, command_type: string, description: string, params: list<array<string, mixed>>}>
+     */
+    public static function discoverExternalCommands(): array {
+        $found = [];
+
+        try {
+            $modules = Registry::container()->get(ModuleService::class)->all(false);
+        } catch (Throwable) {
+            return $found;
+        }
+
+        /** @var ModuleInterface $module */
+        foreach ($modules as $module) {
+            $short = trim($module->name(), '_');
+            $dir   = Webtrees::MODULES_DIR . $short . DIRECTORY_SEPARATOR;
+
+            $raw_commands = [];
+            $manifest     = $dir . 'cron-jobs.php';
+            if (is_file($manifest)) {
+                $raw_commands = array_merge($raw_commands, CronjobUtils::loadManifestFile($manifest)['commands']);
+            }
+            if (method_exists($module, 'getModuleCommands')) {
+                try {
+                    $announced = $module->getModuleCommands();
+                } catch (Throwable) {
+                    $announced = [];
+                }
+                if (is_array($announced)) {
+                    $raw_commands = array_merge($raw_commands, array_values($announced));
+                }
+            }
+
+            foreach ($raw_commands as $raw) {
+                if (!is_array($raw)) {
+                    continue;
+                }
+                $result = self::validateCommandSpec($raw);
+                if ($result['errors'] !== []) {
+                    continue;
+                }
+                $found[] = [
+                    'module'       => $short,
+                    'command'      => (string) $result['spec']['command'],
+                    'command_type' => (string) $result['spec']['command_type'],
+                    'description'  => (string) $result['spec']['description'],
+                    'params'       => $result['spec']['params'],
+                ];
+            }
+        }
+
+        return $found;
+    }
+
+    /**
      * The spec currently offered for an already-adopted job (name =
      * <module>:<name>), or null if no enabled module offers it any more.
      * Backs the admin "reset to module defaults" action.

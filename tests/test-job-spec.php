@@ -36,6 +36,7 @@ require __DIR__ . '/../autoload.php';
 
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CommandCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 
 $failures = 0;
@@ -92,7 +93,10 @@ file_put_contents($root . '/modules_v4/fakemod3/cron-jobs.php',
     . ' "jobs" => [ [ "name" => "ev-demo", "trigger_type" => "event", "event_name" => "index-dirty",'
     . '  "command_type" => "module", "command" => "modules_v4/fakemod3/cli/real-job.php" ] ],'
     . ' "events" => [ [ "name" => "index-dirty", "description" => "Link index needs a rebuild",'
-    . '  "payload" => [ "tree" ] ] ]'
+    . '  "payload" => [ "tree" ] ] ],'
+    . ' "commands" => [ [ "command" => "modules_v4/fakemod3/cli/real-job.php",'
+    . '  "command_type" => "module", "description" => "Run the demo",'
+    . '  "params" => [ [ "name" => "--force", "optional" => true, "description" => "bypass cooldown" ] ] ] ]'
     . '];' . "\n");
 file_put_contents($root . '/modules_v4/fakemod3/cli/real-job.php', '<?php // stub' . "\n");
 
@@ -206,6 +210,33 @@ check('eventSpec: >8 payload keys rejected', $r['errors'] !== []);
 $r = ScheduleService::validateEventSpec(['name' => 'x', 'payload' => ['a', '', 3]]);
 check('eventSpec: payload normalized to strings, empty dropped', $r['errors'] === [] && $r['spec']['payload'] === ['a', '3']);
 
+// --- validateCommandSpec (§12 command announcements) -------------------------
+$r = ScheduleService::validateCommandSpec(['command' => $command, 'command_type' => 'module', 'description' => 'Run it', 'params' => [['name' => '--force', 'optional' => true, 'description' => 'bypass']]]);
+check('cmdSpec: valid module command', $r['errors'] === [] && $r['spec']['command_type'] === 'module' && $r['spec']['description'] === 'Run it' && count($r['spec']['params']) === 1);
+check('cmdSpec: param normalized (optional default)', $r['spec']['params'][0] === ['name' => '--force', 'optional' => true, 'default' => null, 'description' => 'bypass']);
+$r = ScheduleService::validateCommandSpec(['command' => 'tree-export']);
+check('cmdSpec: command_type derived for core command', $r['errors'] === [] && $r['spec']['command_type'] === 'core');
+$r = ScheduleService::validateCommandSpec(['command' => '']);
+check('cmdSpec: empty command rejected', $r['errors'] !== []);
+$r = ScheduleService::validateCommandSpec(['command' => str_repeat('a', 256)]);
+check('cmdSpec: command >255 rejected', $r['errors'] !== []);
+$r = ScheduleService::validateCommandSpec(['command' => 'random-thing']);
+check('cmdSpec: neither module path nor core -> rejected', $r['errors'] !== []);
+$r = ScheduleService::validateCommandSpec(['command' => $command, 'description' => str_repeat('a', 256)]);
+check('cmdSpec: long description rejected', $r['errors'] !== []);
+$r = ScheduleService::validateCommandSpec(['command' => $command, 'params' => 'nope']);
+check('cmdSpec: non-list params rejected', $r['errors'] !== []);
+$tooMany = [];
+for ($i = 0; $i < 9; $i++) {
+    $tooMany[] = ['name' => '--o' . $i];
+}
+$r = ScheduleService::validateCommandSpec(['command' => $command, 'params' => $tooMany]);
+check('cmdSpec: >8 params rejected', $r['errors'] !== []);
+$r = ScheduleService::validateCommandSpec(['command' => $command, 'params' => [['name' => ''], ['name' => '--ok'], ['name' => 'bad name']]]);
+check('cmdSpec: malformed params dropped silently', $r['errors'] === [] && $r['spec']['params'] === [['name' => '--ok', 'optional' => true, 'default' => null, 'description' => '']]);
+$r = ScheduleService::validateCommandSpec(['command' => $command, 'params' => [['name' => '--tree', 'optional' => false, 'default' => 'I123']]]);
+check('cmdSpec: required + default kept', $r['spec']['params'][0] === ['name' => '--tree', 'optional' => false, 'default' => 'I123', 'description' => '']);
+
 // --- isValidEventName (§11 naming scheme) ------------------------------------
 check('eventName: plain slug valid', CronjobUtils::isValidEventName('index-dirty') === true);
 check('eventName: namespaced valid', CronjobUtils::isValidEventName('linkenhancer:index-dirty') === true);
@@ -220,13 +251,14 @@ check('eventName: 65 chars rejected', CronjobUtils::isValidEventName(str_repeat(
 
 // --- loadManifestFile --------------------------------------------------------
 $manifest = CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod/cron-jobs.php');
-check('manifest: plain list -> jobs', is_array($manifest) && count($manifest['jobs']) === 1 && ($manifest['jobs'][0]['name'] ?? '') === 'demo' && $manifest['events'] === []);
+check('manifest: plain list -> jobs', is_array($manifest) && count($manifest['jobs']) === 1 && ($manifest['jobs'][0]['name'] ?? '') === 'demo' && $manifest['events'] === [] && $manifest['commands'] === []);
 $manifest = CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod3/cron-jobs.php');
 check('manifest: assoc form -> jobs', count($manifest['jobs']) === 1 && ($manifest['jobs'][0]['name'] ?? '') === 'ev-demo');
 check('manifest: assoc form -> events', count($manifest['events']) === 1 && ($manifest['events'][0]['name'] ?? '') === 'index-dirty' && ($manifest['events'][0]['payload'] ?? null) === ['tree']);
-check('manifest: non-array returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/no-array.php') === ['jobs' => [], 'events' => []]);
-check('manifest: throwing returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/cron-jobs.php') === ['jobs' => [], 'events' => []]);
-check('manifest: missing file returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/nope.php') === ['jobs' => [], 'events' => []]);
+check('manifest: assoc form -> commands', count($manifest['commands']) === 1 && ($manifest['commands'][0]['command'] ?? '') === 'modules_v4/fakemod3/cli/real-job.php' && count($manifest['commands'][0]['params']) === 1);
+check('manifest: non-array returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/no-array.php') === ['jobs' => [], 'events' => [], 'commands' => []]);
+check('manifest: throwing returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/cron-jobs.php') === ['jobs' => [], 'events' => [], 'commands' => []]);
+check('manifest: missing file returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/nope.php') === ['jobs' => [], 'events' => [], 'commands' => []]);
 
 // --- findOfferedSpec -----------------------------------------------------------
 $offered = [
@@ -280,6 +312,33 @@ check('payload: escapes modules_v4 -> null',
     CliBootstrap::resolvePayloadPath($root . '/modules_v4/fakemod/cli/../../index.php', $modules) === null);
 check('payload: not under cli/ -> null',
     CliBootstrap::resolvePayloadPath($root . '/modules_v4/fakemod/offcli.php', $modules) === null);
+
+// --- mergeCatalog (§12 command inventory, pure) -----------------------------
+$core = [
+    ['command' => 'tree-list', 'command_type' => 'core', 'source' => 'core', 'description' => 'List trees.', 'params' => []],
+    ['command' => 'site-setting', 'command_type' => 'core', 'source' => 'core', 'description' => 'Site settings.', 'params' => [['name' => '--list', 'optional' => true]]],
+];
+$announced = [
+    ['module' => 'fakemod', 'command' => 'modules_v4/fakemod/cli/real-job.php', 'command_type' => 'module', 'description' => 'Demo', 'params' => [['name' => '--force', 'optional' => true]]],
+];
+$globbed = [
+    ['command' => 'modules_v4/fakemod/cli/real-job.php', 'module' => 'fakemod'],
+    ['command' => 'modules_v4/fakemod/cli/internal.php', 'module' => 'fakemod'],    // fakemod announced -> suppressed
+    ['command' => 'modules_v4/fakemod2/cli/other.php', 'module' => 'fakemod2'],      // not announced -> included
+];
+$catalog = CommandCatalogService::mergeCatalog($core, $announced, $globbed);
+check('mergeCatalog: core included', isset($catalog['tree-list']) && $catalog['tree-list']['source'] === 'core');
+check('mergeCatalog: core params normalized', ($catalog['site-setting']['params'][0]['name'] ?? '') === '--list' && ($catalog['site-setting']['params'][0]['optional'] ?? null) === true);
+check('mergeCatalog: announced included with params + source', isset($catalog['modules_v4/fakemod/cli/real-job.php']) && $catalog['modules_v4/fakemod/cli/real-job.php']['source'] === 'fakemod' && count($catalog['modules_v4/fakemod/cli/real-job.php']['params']) === 1);
+check('mergeCatalog: announcing module globbed script suppressed', !isset($catalog['modules_v4/fakemod/cli/internal.php']));
+check('mergeCatalog: non-announcing module globbed script included', isset($catalog['modules_v4/fakemod2/cli/other.php']) && $catalog['modules_v4/fakemod2/cli/other.php']['command_type'] === 'module');
+check('mergeCatalog: count (2 core + 1 announced + 1 globbed)', count($catalog) === 4);
+$dup = CommandCatalogService::mergeCatalog(
+    [['command' => 'tree-list', 'command_type' => 'core', 'source' => 'core', 'description' => 'CORE', 'params' => []]],
+    [['module' => 'm', 'command' => 'tree-list', 'command_type' => 'module', 'description' => 'ANN', 'params' => []]],
+    []
+);
+check('mergeCatalog: first source wins (core over announced)', $dup['tree-list']['source'] === 'core' && $dup['tree-list']['description'] === 'CORE' && count($dup) === 1);
 
 rrm($root);
 

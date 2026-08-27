@@ -47,6 +47,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
 use Throwable;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CommandCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
@@ -90,7 +91,7 @@ class CronjobModule extends AbstractModule
     use ModuleConfigTrait;
     use ModuleCustomTrait;
 
-    public const SCHEMA_TARGET_VERSION = 4;
+    public const SCHEMA_TARGET_VERSION = 5;
 
     /** Module preference key holding the webhook token (§6.1). */
     public const PREF_EVENT_TOKEN = 'event_token';
@@ -248,6 +249,7 @@ class CronjobModule extends AbstractModule
             'offered'       => $offered,
             'route_events'  => $this->getPreference(RouteEventService::SETTING, '') === '1',
             'event_catalog' => EventCatalogService::listCatalog(),
+            'command_catalog' => CommandCatalogService::listCatalog(),
         ]);
     }
 
@@ -320,7 +322,11 @@ class CronjobModule extends AbstractModule
             'job'          => $job,
             'copy_of'      => $copy_of,
             'form_values'  => $form_values,
-            'candidates'   => array_merge(CronjobUtils::jobScriptCandidates(), JobRunner::ALLOWED_CORE_COMMANDS),
+            // Command candidates + available parameters (command catalog: core
+            // allowlist, module announcements, globbed module scripts). A module
+            // that announces commands curates its own list, so its internal
+            // scripts (tick/watch/wrap) are not offered here.
+            'command_catalog' => CommandCatalogService::listCatalog(),
             'preview'      => $preview,
             'cron_now'     => ScheduleService::now(),
             'trigger_type' => $trigger_type,

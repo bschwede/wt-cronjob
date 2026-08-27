@@ -10,7 +10,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
  * @var string $title
  * @var \Schwendinger\Webtrees\Module\Cronjob\CronjobModule $module
  * @var object|null $job
- * @var array<int, string> $candidates
+ * @var array<string, array{command_type: string, source: string, description: string, params: list<array<string, mixed>>}> $command_catalog
  * @var array<int, string>|null $preview
  * @var string $cron_now
  * @var string $trigger_type
@@ -27,6 +27,16 @@ $back_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
 $is_edit  = $job !== null;
 $job_id      = $is_edit ? (int) $job->id : 0;
 $event_catalog = $event_catalog ?? [];
+$command_catalog = $command_catalog ?? [];
+
+// Announced commands that carry available parameters, keyed by command value
+// (drives the dynamic hint under the command field).
+$command_params = [];
+foreach ($command_catalog as $command => $entry) {
+    if (($entry['params'] ?? []) !== []) {
+        $command_params[(string) $command] = $entry['params'];
+    }
+}
 
 // A module-offered job keeps its <module>:<name> key; the name field is then
 // read-only and its pattern also accepts the module prefix.
@@ -167,11 +177,12 @@ if ($copy_of !== null) {
                    placeholder="modules_v4/linkenhancer/cli/build-link-index.php"
                    value="<?= e($command_v) ?>">
             <datalist id="cj_commands">
-                <?php foreach ($candidates as $candidate): ?>
-                    <option value="<?= e($candidate) ?>"></option>
+                <?php foreach ($command_catalog as $command => $entry): ?>
+                    <option value="<?= e((string) $command) ?>"><?= e($entry['description'] !== '' ? I18N::translate((string) $entry['description']) : (string) $entry['source']) ?></option>
                 <?php endforeach; ?>
             </datalist>
             <div class="form-text"><?= I18N::translate('A %1s path or an allowlisted core command (%2$s).', '<code>modules_v4/&lt;module&gt;/cli/&lt;script&gt;.php</code>', '<code>' . implode(', ', JobRunner::ALLOWED_CORE_COMMANDS) . '</code>') ?></div>
+            <div id="cj_command_params_hint" class="form-text" hidden></div>
         </div>
 
         <div class="mb-3">
@@ -201,6 +212,7 @@ if ($copy_of !== null) {
 
 <script>
     (function () {
+        // Trigger type toggle (time vs event fields).
         var sel = document.getElementById('cj_trigger_type');
         var timeFields = document.getElementById('cj_time_fields');
         var eventFields = document.getElementById('cj_event_fields');
@@ -215,5 +227,44 @@ if ($copy_of !== null) {
         }
         sel.addEventListener('change', toggle);
         toggle();
+
+        // Dynamic hint: when the entered command matches an announced command,
+        // list its available parameters under the field.
+        var commandInput = document.getElementById('cj_command');
+        var paramsHint = document.getElementById('cj_command_params_hint');
+        var commandParams = <?= json_encode($command_params, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+        var paramsLabel = <?= json_encode(I18N::translate('Available parameters'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+        var requiredLabel = <?= json_encode(I18N::translate('required'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+        function updateParamsHint() {
+            var params = commandParams[commandInput.value.trim()];
+            if (!params || params.length === 0) {
+                paramsHint.hidden = true;
+                paramsHint.innerHTML = '';
+                return;
+            }
+            var lines = params.map(function (p) {
+                var line = '<code>' + escapeHtml(p.name) + '</code>';
+                if (p.optional === false) {
+                    line += ' <span class="text-danger">(' + escapeHtml(requiredLabel) + ')</span>';
+                }
+                if (p.default) {
+                    line += ' <span class="text-muted">[default: ' + escapeHtml(p.default) + ']</span>';
+                }
+                if (p.description) {
+                    line += ' <span class="text-muted">' + escapeHtml(p.description) + '</span>';
+                }
+                return line;
+            });
+            paramsHint.innerHTML = '<strong>' + escapeHtml(paramsLabel) + ':</strong><br>' + lines.join('<br>');
+            paramsHint.hidden = false;
+        }
+        commandInput.addEventListener('input', updateParamsHint);
+        commandInput.addEventListener('change', updateParamsHint);
+        updateParamsHint();
     })();
 </script>

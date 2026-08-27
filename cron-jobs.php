@@ -25,7 +25,7 @@
 declare(strict_types=1);
 
 /**
- * cronjob's own job manifest (self-registration, §6.3).
+ * cronjob's own job manifest (self-registration, §6.3 / §12).
  *
  * It offers the pseudo-events polling job to itself - dogfooding the manifest
  * mechanism and the forced own-manifest sync (on a module update the stored
@@ -33,19 +33,42 @@ declare(strict_types=1);
  * admin's enabled/notify/name and the run history). Discovered as
  * `cronjob:pseudo-events`; starts disabled (opt-in, like every offered job).
  *
- * Pure data - the JobSpec shape, interpreted by cronjob's validator.
+ * It also announces its runnable CLI command(s) and their available
+ * parameters (§12 command catalog) - here just pseudo-events.php. By
+ * announcing, cronjob takes over curation of its own commands: the glob-based
+ * discovery no longer lists its internal scripts (tick/watch/wrap/smoke-job),
+ * which must not be invoked directly as jobs.
+ *
+ * Pure data - the JobSpec / command-spec shapes, interpreted by cronjob's
+ * validators.
  */
 
 return [
-    [
-        'name'         => 'pseudo-events',
-        'title'        => 'Cronjob: Pseudo-Events (state-poll detectors)',
-        'trigger_type' => 'time',
-        'cron'         => '*/5 * * * *',
-        'command_type' => 'module',
-        'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
-        'args'         => '',
-        'timeout_sec'  => 120,
-        'enabled'      => false,
+    'jobs' => [
+        [
+            'name'         => 'pseudo-events',
+            'title'        => 'Cronjob: Pseudo-Events (state-poll detectors)',
+            'trigger_type' => 'time',
+            'cron'         => '*/5 * * * *',
+            'command_type' => 'module',
+            'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
+            'args'         => '',
+            'timeout_sec'  => 120,
+            'enabled'      => false,
+        ],
+    ],
+    'commands' => [
+        [
+            'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
+            'command_type' => 'module',
+            'description'  => 'Poll the built-in pseudo-event detectors (GEDCOM change, new media, new user) and queue any detected transitions for the tick.',
+            'params'       => [
+                [
+                    'name'        => '--force',
+                    'optional'    => true,
+                    'description' => 'Bypass the 5-minute cooldown (a manual run).',
+                ],
+            ],
+        ],
     ],
 ];

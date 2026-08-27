@@ -286,25 +286,27 @@ final class CronjobUtils {
      * Load a <module>/cron-jobs.php manifest in an isolated scope.
      *
      * The file returns either a plain list of job specs (simple form) or an
-     * associative array with optional 'jobs' and 'events' lists (event
-     * announcements, see ScheduleService::discoverExternalEvents()). Returns
-     * the normalized ['jobs' => …, 'events' => …] shape, or two empty lists
-     * on any error - a broken or misbehaving manifest must never break the
-     * tick. Same containment strategy as core's ModuleService::load()
+     * associative array with optional 'jobs', 'events' and 'commands' lists
+     * (event announcements, see ScheduleService::discoverExternalEvents(),
+     * and command announcements, see
+     * ScheduleService::discoverExternalCommands()). Returns the normalized
+     * ['jobs' => …, 'events' => …, 'commands' => …] shape, or three empty
+     * lists on any error - a broken or misbehaving manifest must never break
+     * the tick. Same containment strategy as core's ModuleService::load()
      * (include in a try/catch); a manifest that calls exit() cannot be
      * contained (same limitation as module.php).
      *
-     * @return array{jobs: list<array<string, mixed>>, events: list<array<string, mixed>>}
+     * @return array{jobs: list<array<string, mixed>>, events: list<array<string, mixed>>, commands: list<array<string, mixed>>}
      */
     public static function loadManifestFile(string $path): array {
         if (!is_file($path)) {
-            return ['jobs' => [], 'events' => []];
+            return ['jobs' => [], 'events' => [], 'commands' => []];
         }
 
         $loader = static function (string $p): array {
             $result = include $p;
             if (!is_array($result)) {
-                return ['jobs' => [], 'events' => []];
+                return ['jobs' => [], 'events' => [], 'commands' => []];
             }
             if (array_is_list($result)) {
                 $jobs = [];
@@ -314,22 +316,24 @@ final class CronjobUtils {
                     }
                 }
 
-                return ['jobs' => $jobs, 'events' => []];
+                return ['jobs' => $jobs, 'events' => [], 'commands' => []];
             }
 
-            $jobs   = $result['jobs'] ?? [];
-            $events = $result['events'] ?? [];
+            $jobs     = $result['jobs'] ?? [];
+            $events   = $result['events'] ?? [];
+            $commands = $result['commands'] ?? [];
 
             return [
-                'jobs'   => is_array($jobs) ? array_values($jobs) : [],
-                'events' => is_array($events) ? array_values($events) : [],
+                'jobs'     => is_array($jobs) ? array_values($jobs) : [],
+                'events'   => is_array($events) ? array_values($events) : [],
+                'commands' => is_array($commands) ? array_values($commands) : [],
             ];
         };
 
         try {
             return $loader($path);
         } catch (Throwable) {
-            return ['jobs' => [], 'events' => []];
+            return ['jobs' => [], 'events' => [], 'commands' => []];
         }
     }
 

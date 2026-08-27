@@ -107,7 +107,7 @@ final class EventCatalogService {
             $catalog[$name] = [
                 'source'      => RouteEventService::DOMAIN,
                 'description' => 'POST ' . strval($entry['path']),
-                'payload'     => [],
+                'payload'     => RouteEventService::payloadKeys(strval($entry['path'])),
             ];
         }
 

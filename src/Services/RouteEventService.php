@@ -327,6 +327,33 @@ final class RouteEventService {
     }
 
     /**
+     * The payload key names a mapped route would produce, derived purely from
+     * the route path (standalone-testable, no webtrees dependency).
+     *
+     * Mirrors flattenAttributes(): the `{tree}` placeholder expands to
+     * `tree` and `tree_name` (the Tree object contributes id + name); every
+     * other `{param}` placeholder contributes its own name. Keys are returned
+     * in the order the placeholders appear in the path.
+     *
+     * @return list<string>
+     */
+    public static function payloadKeys(string $path): array {
+        $keys = [];
+        if (preg_match_all('/\{\/?([a-z0-9_]+)\}/i', $path, $matches) > 0) {
+            foreach ($matches[1] as $param) {
+                if ($param === 'tree') {
+                    $keys[] = 'tree';
+                    $keys[] = 'tree_name';
+                } else {
+                    $keys[] = $param;
+                }
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
      * Flattens the Tree attribute and the matched route params to a map.
      * webtrees-dependent (the Tree object) - not covered by the standalone
      * tests.

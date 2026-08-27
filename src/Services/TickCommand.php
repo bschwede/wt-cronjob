@@ -107,15 +107,20 @@ final class TickCommand extends Command {
             ScheduleService::markStuckRuns($now);
 
             // Sync externally-offered jobs into cj_job (insert-if-missing,
-            // keyed <module>:<name>) and the event inventory (catalog).
-            // Skipped under --dry-run so a dry run has no side effects on
-            // the registries.
+            // keyed <module>:<name>) and the event/command inventories
+            // (catalogs). Skipped under --dry-run so a dry run has no side
+            // effects on the registries.
             if (!$dry_run) {
                 ScheduleService::syncDiscoveredJobs();
                 try {
                     EventCatalogService::syncCatalog($now);
                 } catch (Throwable $exception) {
                     $output->writeln('<error>event catalog sync failed: ' . $exception->getMessage() . '</error>');
+                }
+                try {
+                    CommandCatalogService::syncCatalog($now);
+                } catch (Throwable $exception) {
+                    $output->writeln('<error>command catalog sync failed: ' . $exception->getMessage() . '</error>');
                 }
             }
 

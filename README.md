@@ -72,7 +72,7 @@ then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 | **Trigger** | **Time-based** (a cron schedule) or **Event** (runs when a named event is queued). See "Event-driven jobs". |
 | **Cron expression** | (time-based only) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 5 runs. |
 | **Event name** | (event only) the event this job reacts to, e.g. `linkenhancer:index-dirty`. Suggestions come from the **event catalog** (module announcements, built-in pseudo-events `cronjob:…`, route events `_route:…` and listened names); any own name (webhook / direct module push) works too. Slug or `<domain>:slug`, max 64 chars. |
-| **Command** | a `modules_v4/<module>/cli/<script>.php` path (discovered scripts are offered as suggestions) or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting` |
+| **Command** | a `modules_v4/<module>/cli/<script>.php` path or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting`. Suggestions come from the **command catalog** (core allowlist + module announcements + module scripts). When the entered command matches an announced command, its **available parameters** are listed as a hint under the field. |
 | **Arguments** | plain options/values only (e.g. `--limit=5000`), max 10 tokens |
 | **Timeout** | 30 - 3600 s |
 | **Notify on failure** | opt-in: alert the administrator accounts when this job fails |
@@ -322,6 +322,53 @@ return [
 | `description` | no | shown in the event catalog (translation key, max 255) |
 | `payload` | no | list of payload parameter names (max 8), shown in the catalog |
 
+### Announcing commands
+
+The same manifest can also **announce commands** a job may run, with their available
+parameters. A plain manifest list is still "jobs only"; to announce commands the
+manifest returns the associative form with a `commands` list:
+
+```php
+<?php
+// modules_v4/linkenhancer/cron-jobs.php
+declare(strict_types=1);
+
+return [
+    'jobs' => [ /* … */ ],
+    'commands' => [
+        [
+            'command'      => 'modules_v4/linkenhancer/cli/build-link-index.php',
+            // 'command_type' => 'module',  // optional - derived from the command value
+            'description'  => 'Rebuild the link index incrementally.',
+            'params' => [
+                ['name' => '--limit', 'optional' => true, 'default' => '5000', 'description' => 'max records per run'],
+                ['name' => '--since', 'optional' => true, 'description' => 'only changes since this timestamp'],
+            ],
+        ],
+    ],
+];
+```
+
+**Command spec fields**
+
+| Key | Required | Meaning |
+| :--- | :--- | :--- |
+| `command` | yes | a `modules_v4/…/cli/*.php` path or an allowlisted core command, max 255 |
+| `command_type` | no | `module` or `core` (derived from `command` when omitted) |
+| `description` | no | shown in the command catalog (translation key, max 255) |
+| `params` | no | list of parameter descriptors (max 8) |
+
+Each parameter descriptor has `name` (the option token, e.g. `--limit`), `optional`
+(bool, default `true` — set `false` for a required option), `default` (an optional
+value) and `description` (optional). Equivalent marker method:
+`getModuleCommands(): array` (same command-spec shape).
+
+> **Curation rule:** a module that announces commands **curates its own command list** —
+> the glob-based discovery no longer lists *its* scripts, so internal scripts
+> (`tick.php`, `watch.php`, `wrap.php`, `smoke-job.php`) are not offered as job
+> commands. A module that announces nothing falls back to glob discovery of its
+> `cli/` scripts (backward compatible).
+
 ### Job spec fields
 
 | Key | Required | Meaning |
@@ -556,8 +603,31 @@ It merges, in this priority order:
    `listening`) — this covers webhook-only names
 
 Each entry carries its source, a description (stored as a translation key, translated
-at render time only) and the known payload parameter names. The full list is also
-what the "Event name" datalist in the job form offers.
+at render time only) and the known payload parameter names. For **route events** the
+payload is **derived from the route path**: the `{param}` placeholders in the order
+they appear, with `{tree}` expanding to `tree` + `tree_name` (mirroring what the live
+event payload carries). The full list is also what the "Event name" datalist in the job
+form offers. The catalog is rendered as a client-side **DataTables** (sort/filter/
+paging) in the Events section.
+
+## Command catalog
+
+The job form's command suggestions and the admin page (Events section) are fed by a
+**command inventory** (`cj_command_catalog`, synced by the tick like the others). It
+merges, in this priority order (first source wins per command):
+
+1. the **allowlisted core commands** (`tree-export`, `tree-list`, `user-list`,
+   `site-setting`), with their known parameters
+2. commands **announced by modules** (manifest `commands` section /
+   `getModuleCommands()`) — with a description and structured parameters
+3. **module CLI scripts** found by glob (`modules_v4/<module>/cli/*.php`), *except*
+   for a module that announced commands (that module curates its own list, so its
+   internal scripts are not offered)
+
+Each entry carries its type (`module` / `core`), its source, a description (translation
+key, translated at render time) and the available parameters (structured: name,
+optional, default, description). In the job form, entering a command that matches an
+announced command shows its parameters as a hint under the field.
 
 ## Failure notification
 
@@ -603,8 +673,13 @@ job names**, the **event naming scheme** (`<domain>:<slug>`, `_route:*` /
 `edit…/delete…/add…/create…` routes under `/tree/{tree}/`, opt-in toggle), the
 **event catalog** (module announcements + built-ins + route events + listened
 names, in `cj_event_catalog`), the **`cj_event_run` cross table** with triggering
-events shown in the run history, and **PRG form handling** (a failed save redirects
-to the form page with the entered values kept). See the sections above.
+events shown in the run history, **PRG form handling** (a failed save redirects
+to the form page with the entered values kept), the **route-event payload derived
+from the route path** in the event catalog, **DataTables** for the event and command
+catalogs in the admin page, and the **command catalog** (`cj_command_catalog`: core
+allowlist + module command announcements with structured parameters + module scripts,
+with a per-module curation rule so internal scripts are not offered, and a dynamic
+parameter hint in the job form). See the sections above.
 
 Still open:
 
@@ -619,9 +694,9 @@ php modules_v4/cronjob/tests/test-args-validator.php  # command whitelist + arg 
 php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cleanly without the bundled vendor)
 php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron descriptions (standalone)
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
-php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event spec validators, manifest loading, event naming, W1 payload confinement (standalone)
+php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event+command spec validators, manifest loading (jobs/events/commands), event naming, command-catalog merge, W1 payload confinement (standalone)
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
-php modules_v4/cronjob/tests/test-route-events.php   # route events: rule-based map builder (filters, collision suffixes, fallback), success gate, payload builder (standalone)
+php modules_v4/cronjob/tests/test-route-events.php   # route events: rule-based map builder (filters, collision suffixes, fallback), success gate, payload builder, payload-key derivation from path (standalone)
 ```
 
 ## License

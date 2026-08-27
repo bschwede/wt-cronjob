@@ -19,6 +19,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var array<string, string> $offered
  * @var bool $route_events
  * @var array<string, array{source: string, description: string, payload: list<string>}> $event_catalog
+ * @var array<string, array{command_type: string, source: string, description: string, params: list<array<string, mixed>>}> $command_catalog
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -356,7 +357,11 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
             <p class="text-muted">
                 <?= I18N::translate('All known event names: announced by modules, built-in pseudo-events (cronjob:…), route events (_route:…) and names currently listened for by an enabled job. Synced by the tick; use these names in the “Event name” field of an event job.') ?>
             </p>
-            <table class="table table-sm table-striped mb-0">
+            <table id="wt-cronjob-events"
+                   class="table table-sm table-striped datatables d-none"
+                   <?= view('lists/datatables-attributes') ?>
+                   data-sorting='[[0,"asc"]]'
+                   data-columns='[{},{},{},{}]'>
                 <thead>
                     <tr>
                         <th><?= I18N::translate('Event') ?></th>
@@ -377,8 +382,74 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 </tbody>
             </table>
         </fieldset>
+
+        <fieldset class="border rounded p-3 mt-4">
+            <legend><?= I18N::translate('Command catalog') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('Every command a job may run: the allowlisted core commands, commands announced by modules (with their available parameters) and module CLI scripts. A module that announces commands curates its own list, so its internal scripts (e.g. cronjob tick/watch/wrap) are not offered. Use these in the “Command” field of a job.') ?>
+            </p>
+            <table id="wt-cronjob-commands"
+                   class="table table-sm table-striped datatables d-none"
+                   <?= view('lists/datatables-attributes') ?>
+                   data-sorting='[[0,"asc"]]'
+                   data-columns='[{},{},{},{},{}]'>
+                <thead>
+                    <tr>
+                        <th><?= I18N::translate('Command') ?></th>
+                        <th><?= I18N::translate('Type') ?></th>
+                        <th><?= I18N::translate('Source') ?></th>
+                        <th><?= I18N::translate('Description') ?></th>
+                        <th><?= I18N::translate('Parameters') ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($command_catalog as $command => $entry): ?>
+                    <tr>
+                        <td><code><?= e((string) $command) ?></code></td>
+                        <td><?= e((string) $entry['command_type']) ?></td>
+                        <td><?= e((string) $entry['source']) ?></td>
+                        <td><?= e(I18N::translate((string) $entry['description'])) ?></td>
+                        <td>
+                            <?php if ($entry['params'] === []): ?>
+                                —
+                            <?php else: ?>
+                                <ul class="list-unstyled mb-0">
+                                    <?php foreach ($entry['params'] as $param): ?>
+                                        <li>
+                                            <code><?= e((string) $param['name']) ?></code><?= !empty($param['default']) ? '=' . e((string) $param['default']) : '' ?>
+                                            <?php if (empty($param['optional'])): ?> <span class="badge bg-warning"><?= I18N::translate('required') ?></span><?php endif; ?>
+                                            <?php if (!empty($param['description'])): ?> <span class="text-muted"><?= e(I18N::translate((string) $param['description'])) ?></span><?php endif; ?>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </fieldset>
       </div>
     </div>
   </div>
 
 </div>
+
+<script>
+    (function () {
+        // The event/command catalogs are DataTables inside a collapsed
+        // accordion: re-measure them once their panel is shown so the column
+        // widths and the paging/search controls render correctly.
+        var accordion = document.getElementById('accordion');
+        if (accordion && typeof jQuery !== 'undefined') {
+            accordion.addEventListener('shown.bs.collapse', function () {
+                jQuery('#wt-cronjob-events, #wt-cronjob-commands').each(function () {
+                    var instance = jQuery(this).DataTable();
+                    if (instance) {
+                        instance.columns.adjust();
+                    }
+                });
+            });
+        }
+    })();
+</script>
