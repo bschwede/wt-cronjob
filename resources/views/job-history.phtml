@@ -10,6 +10,7 @@ use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
  * @var \Schwendinger\Webtrees\Module\Cronjob\CronjobModule $module
  * @var object|null $job
  * @var array<int, object> $runs
+ * @var array<int, list<array{name: string, payload: array<string, mixed>, created_at: string}>> $run_events
  * @var int $page
  * @var int $per_page
  * @var int $total
@@ -51,6 +52,7 @@ $crumbs[0] = I18N::translate('History');
                 <tr>
                     <th><?= I18N::translate('Started (UTC)') ?></th>
                     <th><?= I18N::translate('Trigger') ?></th>
+                    <th><?= I18N::translate('Event') ?></th>
                     <th><?= I18N::translate('Status') ?></th>
                     <th><?= I18N::translate('Exit') ?></th>
                     <th><?= I18N::translate('Duration') ?></th>
@@ -70,6 +72,17 @@ $crumbs[0] = I18N::translate('History');
                 <tr>
                     <td><?= e((string) $run->started_at) ?></td>
                     <td><?= e((string) $run->trigger) ?></td>
+                    <td class="text-start">
+                        <?php foreach ($run_events[(int) $run->id] ?? [] as $event): ?>
+                            <div>
+                                <code><?= e($event['name']) ?></code>
+                                <span class="text-muted"><?= e($event['created_at']) ?></span>
+                                <?php if ($event['payload'] !== []): ?>
+                                    <div class="text-muted"><code><?= e(json_encode($event['payload'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) ?></code></div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </td>
                     <td><span class="badge bg-<?= $badge ?>"><?= e((string) $run->status) ?></span></td>
                     <td><?= $run->exit_code !== null ? (int) $run->exit_code : '—' ?></td>
                     <td><?= $run->duration_ms !== null ? (int) $run->duration_ms . ' ms' : '—' ?></td>

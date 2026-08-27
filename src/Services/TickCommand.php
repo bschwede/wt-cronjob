@@ -28,6 +28,7 @@ namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 use Fisharebest\Webtrees\DB;
 use Fisharebest\Webtrees\Webtrees;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Throwable;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -106,10 +107,16 @@ final class TickCommand extends Command {
             ScheduleService::markStuckRuns($now);
 
             // Sync externally-offered jobs into cj_job (insert-if-missing,
-            // keyed <module>:<name>). Skipped under --dry-run so a dry run
-            // has no side effects on the registry.
+            // keyed <module>:<name>) and the event inventory (catalog).
+            // Skipped under --dry-run so a dry run has no side effects on
+            // the registries.
             if (!$dry_run) {
                 ScheduleService::syncDiscoveredJobs();
+                try {
+                    EventCatalogService::syncCatalog($now);
+                } catch (Throwable $exception) {
+                    $output->writeln('<error>event catalog sync failed: ' . $exception->getMessage() . '</error>');
+                }
             }
 
             $failures = 0;
@@ -230,8 +237,13 @@ final class TickCommand extends Command {
             foreach ($matched as $job) {
                 $output->writeln('  job ' . $job->name . ':');
                 $result = $this->runOneJob($job, 'event', $input, $output);
-                if ($run_id === 0) {
+                if ($run_id === 0 && $result['run_id'] !== 0) {
                     $run_id = $result['run_id'];
+                }
+                // Many-to-many audit: every consuming run is linked to the
+                // event (handled_run_id only stores the first one).
+                if (!$dry_run && $result['run_id'] !== 0) {
+                    EventQueue::recordRun((int) $event->id, $result['run_id']);
                 }
                 $failures += $result['ok'] ? 0 : 1;
             }

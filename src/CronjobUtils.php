@@ -33,6 +33,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 use Throwable;
 
+use function array_is_list;
 use function array_values;
 use function basename;
 use function get_current_user;
@@ -236,6 +237,24 @@ final class CronjobUtils {
     }
 
     /**
+     * Whether an event name is valid under the event naming scheme (analogous
+     * to job names): a plain slug (custom / webhook events) or a namespaced
+     * `<domain>:<slug>` (route events `_route:*`, built-in pseudo-events
+     * `cronjob:*`, module-announced events `<module>:*`). Unlike job names,
+     * the domain part may start with an underscore (reserved domains like
+     * `_route`). The whole name must fit the 64-char cj_event.event_name
+     * column.
+     */
+    public static function isValidEventName(string $name): bool {
+        if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1) {
+            return true;
+        }
+
+        return strlen($name) <= 64
+            && preg_match('/^[a-z0-9_][a-z0-9_\-]{0,63}:[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1;
+    }
+
+    /**
      * Discover all module CLI scripts that may be used as jobs
      * (modules_v4/&lt;module&gt;/cli/&lt;script&gt;.php, template files with a '_' prefix excluded).
      *
@@ -266,29 +285,51 @@ final class CronjobUtils {
     /**
      * Load a <module>/cron-jobs.php manifest in an isolated scope.
      *
-     * Returns the list the file returns (normalized to a list), or [] on any
-     * error - a broken or misbehaving manifest must never break the tick.
-     * Same containment strategy as core's ModuleService::load() (include in a
-     * try/catch). The contract is "return an array of job specs"; a manifest
-     * that calls exit() cannot be contained (same limitation as module.php).
+     * The file returns either a plain list of job specs (simple form) or an
+     * associative array with optional 'jobs' and 'events' lists (event
+     * announcements, see ScheduleService::discoverExternalEvents()). Returns
+     * the normalized ['jobs' => …, 'events' => …] shape, or two empty lists
+     * on any error - a broken or misbehaving manifest must never break the
+     * tick. Same containment strategy as core's ModuleService::load()
+     * (include in a try/catch); a manifest that calls exit() cannot be
+     * contained (same limitation as module.php).
      *
-     * @return list<array<string, mixed>>
+     * @return array{jobs: list<array<string, mixed>>, events: list<array<string, mixed>>}
      */
     public static function loadManifestFile(string $path): array {
         if (!is_file($path)) {
-            return [];
+            return ['jobs' => [], 'events' => []];
         }
 
         $loader = static function (string $p): array {
             $result = include $p;
+            if (!is_array($result)) {
+                return ['jobs' => [], 'events' => []];
+            }
+            if (array_is_list($result)) {
+                $jobs = [];
+                foreach ($result as $spec) {
+                    if (is_array($spec)) {
+                        $jobs[] = $spec;
+                    }
+                }
 
-            return is_array($result) ? array_values($result) : [];
+                return ['jobs' => $jobs, 'events' => []];
+            }
+
+            $jobs   = $result['jobs'] ?? [];
+            $events = $result['events'] ?? [];
+
+            return [
+                'jobs'   => is_array($jobs) ? array_values($jobs) : [],
+                'events' => is_array($events) ? array_values($events) : [],
+            ];
         };
 
         try {
             return $loader($path);
         } catch (Throwable) {
-            return [];
+            return ['jobs' => [], 'events' => []];
         }
     }
 

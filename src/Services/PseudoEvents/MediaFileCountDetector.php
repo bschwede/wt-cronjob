@@ -31,13 +31,13 @@ use function max;
 
 /**
  * Detects that media records were added, via the COUNT(*) of the media_file
- * table. State is the current count; an increase fires `media-added`. A pure
- * decrease (deletions) does not fire - the event name promises additions.
+ * table. State is the current count; an increase fires `cronjob:media-added`.
+ * A pure decrease (deletions) does not fire - the event name promises additions.
  */
 class MediaFileCountDetector implements PseudoEventDetectorInterface {
 
     public function eventName(): string {
-        return 'media-added';
+        return 'cronjob:media-added';
     }
 
     public function label(): string {

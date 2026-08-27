@@ -18,15 +18,15 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
  * @var bool $notify
  * @var string|null $copy_of
  * @var array<string, mixed>|null $form_values
- * @var array<int, \Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventDetectorInterface> $pseudo_events
+ * @var array<string, array{source: string, description: string, payload: list<string>}> $event_catalog
  */
 
 $copy_of  = $copy_of ?? null;
 $fv       = $form_values ?? [];
 $back_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
 $is_edit  = $job !== null;
-$job_id   = $is_edit ? (int) $job->id : 0;
-$pseudo_events = $pseudo_events ?? [];
+$job_id      = $is_edit ? (int) $job->id : 0;
+$event_catalog = $event_catalog ?? [];
 
 // A module-offered job keeps its <module>:<name> key; the name field is then
 // read-only and its pattern also accepts the module prefix.
@@ -142,23 +142,18 @@ if ($copy_of !== null) {
             <div class="mb-3">
                 <label for="cj_event_name" class="form-label"><?= I18N::translate('Event name') ?></label>
                 <input type="text" class="form-control" id="cj_event_name" name="event_name"
-                       pattern="[a-z0-9][a-z0-9_\-]{0,63}"
+                       pattern="[a-z0-9][a-z0-9_\-]{0,63}(?::[a-z0-9_][a-z0-9_\-]{0,63})?"
+                       maxlength="64"
                        list="cj_event_names"
-                       placeholder="index-dirty"
+                       placeholder="cronjob:gedcom-changed"
                        value="<?= e($event_name) ?>">
                 <datalist id="cj_event_names">
-                    <?php foreach ($pseudo_events as $detector): ?>
-                        <option value="<?= e($detector->eventName()) ?>"><?= e(I18N::translate($detector->label())) ?></option>
+                    <?php foreach ($event_catalog as $name => $entry): ?>
+                        <option value="<?= e((string) $name) ?>"><?= e($entry['description'] !== '' ? I18N::translate((string) $entry['description']) : ((string) $name . ' (' . $entry['source'] . ')')) ?></option>
                     <?php endforeach; ?>
                 </datalist>
-                <div class="form-text"><?= I18N::translate('The job runs once for each queued event with this name (from the webhook, a module call, or a built-in pseudo-event poller).') ?></div>
-                <?php
-                $pseudo_names = [];
-                foreach ($pseudo_events as $detector) {
-                    $pseudo_names[] = $detector->eventName();
-                }
-                ?>
-                <div class="form-text"><?= I18N::translate('Built-in pseudo-events: %s. Custom names work too.', implode(', ', $pseudo_names)) ?></div>
+                <div class="form-text"><?= I18N::translate('The job runs once for each queued event with this name (webhook, module push, built-in pseudo-event poller, or a route trigger).') ?></div>
+                <div class="form-text"><?= I18N::translate('Suggested: module-announced events, built-in pseudo-events (cronjob:…) and route events (_route:…). Plain slugs for your own events work too. The full list is in the event catalog on the admin page.') ?></div>
             </div>
         </div>
     </fieldset>

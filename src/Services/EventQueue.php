@@ -27,6 +27,7 @@ namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 
 use Fisharebest\Webtrees\DB;
 use InvalidArgumentException;
+use PDOException;
 
 use function date;
 use function is_array;
@@ -58,8 +59,15 @@ use const JSON_UNESCAPED_UNICODE;
  */
 final class EventQueue {
 
-    /** Event names are slugs: [a-z0-9][a-z0-9_-]{0,63}. */
-    public const NAME_PATTERN = '/^[a-z0-9][a-z0-9_\-]{0,63}$/';
+    /**
+     * Event names follow the job-name scheme: a slug [a-z0-9][a-z0-9_-]{0,63},
+     * optionally namespaced `<domain>:<slug>` (route events `_route:*`,
+     * built-in pseudo-events `cronjob:*`, module-announced `<module>:*`).
+     * The domain may start with an underscore (reserved domains). The total
+     * length (colon included) is capped at 64 by the callers
+     * (CronjobUtils::isValidEventName / push()).
+     */
+    public const NAME_PATTERN = '/^(?:[a-z0-9_][a-z0-9_\-]*:)?[a-z0-9][a-z0-9_\-]{0,63}$/';
 
     private const PAYLOAD_MAX = 4000;
 
@@ -74,7 +82,7 @@ final class EventQueue {
      */
     public static function push(string $event_name, array $payload = []): int {
         $event_name = trim($event_name);
-        if (preg_match(self::NAME_PATTERN, $event_name) !== 1) {
+        if (strlen($event_name) > 64 || preg_match(self::NAME_PATTERN, $event_name) !== 1) {
             throw new InvalidArgumentException('invalid event name: ' . $event_name);
         }
 
@@ -109,11 +117,28 @@ final class EventQueue {
 
     /**
      * Mark an event consumed by a run (retention + audit; see purge()).
+     * Only the FIRST consuming run is stored here; every consuming run is
+     * recorded many-to-many in cj_event_run (see recordRun()).
      */
     public static function markHandled(int $event_id, int $run_id): void {
         DB::table('cj_event')->where('id', '=', $event_id)->update([
             'handled_run_id' => $run_id,
         ]);
+    }
+
+    /**
+     * Record that a run consumed (part of) an event (cj_event_run, many-to-many
+     * audit: one event can trigger several jobs). Duplicates are ignored.
+     */
+    public static function recordRun(int $event_id, int $run_id): void {
+        try {
+            DB::table('cj_event_run')->insert([
+                'event_id' => $event_id,
+                'run_id'   => $run_id,
+            ]);
+        } catch (PDOException) {
+            // (event_id, run_id) unique - already recorded.
+        }
     }
 
     /**

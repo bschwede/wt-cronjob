@@ -41,12 +41,12 @@ use function stat;
  *
  * State shape: map of gedcom_id => ['mtime' => int, 'size' => int, 'name' => string]
  * for every tree whose GEDCOM file exists. A transition (new/removed tree, or
- * a changed mtime/size) fires `gedcom-changed`.
+ * a changed mtime/size) fires `cronjob:gedcom-changed`.
  */
 class GedcomFileDetector implements PseudoEventDetectorInterface {
 
     public function eventName(): string {
-        return 'gedcom-changed';
+        return 'cronjob:gedcom-changed';
     }
 
     public function label(): string {

@@ -71,6 +71,7 @@ function rrm(string $dir): void {
 $root = sys_get_temp_dir() . '/cronjob-jspec-' . uniqid();
 @mkdir($root . '/modules_v4/fakemod/cli', 0777, true);
 @mkdir($root . '/modules_v4/fakemod2/cli', 0777, true);
+@mkdir($root . '/modules_v4/fakemod3/cli', 0777, true);
 file_put_contents($root . '/modules_v4/fakemod/cli/real-job.php', '<?php // stub' . "\n");
 file_put_contents($root . '/modules_v4/fakemod/cli/real-job.logic.php', '<?php // payload' . "\n");
 file_put_contents($root . '/modules_v4/fakemod/cli/nologic.php', '<?php // stub without payload' . "\n");
@@ -86,6 +87,14 @@ file_put_contents($root . '/modules_v4/fakemod2/cron-jobs.php',
     '<?php throw new RuntimeException("boom");' . "\n");
 file_put_contents($root . '/modules_v4/fakemod2/no-array.php',
     '<?php return "not an array";' . "\n");
+file_put_contents($root . '/modules_v4/fakemod3/cron-jobs.php',
+    '<?php return ['
+    . ' "jobs" => [ [ "name" => "ev-demo", "trigger_type" => "event", "event_name" => "index-dirty",'
+    . '  "command_type" => "module", "command" => "modules_v4/fakemod3/cli/real-job.php" ] ],'
+    . ' "events" => [ [ "name" => "index-dirty", "description" => "Link index needs a rebuild",'
+    . '  "payload" => [ "tree" ] ] ]'
+    . '];' . "\n");
+file_put_contents($root . '/modules_v4/fakemod3/cli/real-job.php', '<?php // stub' . "\n");
 
 $command = 'modules_v4/fakemod/cli/real-job.php';
 
@@ -167,12 +176,57 @@ $r = ScheduleService::validateJobSpec([
 ], $root);
 check('event job with bad event_name rejected', $r['errors'] !== []);
 
+$r = ScheduleService::validateJobSpec([
+    'name' => 'on-dirty', 'trigger_type' => 'event', 'event_name' => 'linkenhancer:index-dirty',
+    'command_type' => 'module', 'command' => $command,
+], $root);
+check('event job: namespaced event_name kept as-is', $r['errors'] === [] && $r['spec']['event_name'] === 'linkenhancer:index-dirty');
+
+$r = ScheduleService::validateJobSpec([
+    'name' => 'on-dirty', 'trigger_type' => 'event', 'event_name' => 'a:b:c',
+    'command_type' => 'module', 'command' => $command,
+], $root);
+check('event job: double-colon event_name rejected', $r['errors'] !== []);
+
+// --- validateEventSpec (§11 event announcements) -----------------------------
+$r = ScheduleService::validateEventSpec(['name' => 'index-dirty', 'description' => 'Index needs a rebuild', 'payload' => ['tree', 'limit']]);
+check('eventSpec: valid', $r['errors'] === [] && $r['spec'] === ['name' => 'index-dirty', 'description' => 'Index needs a rebuild', 'payload' => ['tree', 'limit']]);
+$r = ScheduleService::validateEventSpec(['name' => 'index-dirty']);
+check('eventSpec: description/payload optional', $r['errors'] === [] && $r['spec']['description'] === '' && $r['spec']['payload'] === []);
+$r = ScheduleService::validateEventSpec(['name' => 'Bad Name']);
+check('eventSpec: non-slug name rejected', $r['errors'] !== []);
+$r = ScheduleService::validateEventSpec(['name' => '']);
+check('eventSpec: empty name rejected', $r['errors'] !== []);
+$r = ScheduleService::validateEventSpec(['name' => 'x', 'description' => str_repeat('a', 256)]);
+check('eventSpec: long description rejected', $r['errors'] !== []);
+$r = ScheduleService::validateEventSpec(['name' => 'x', 'payload' => 'nope']);
+check('eventSpec: non-list payload rejected', $r['errors'] !== []);
+$r = ScheduleService::validateEventSpec(['name' => 'x', 'payload' => ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']]);
+check('eventSpec: >8 payload keys rejected', $r['errors'] !== []);
+$r = ScheduleService::validateEventSpec(['name' => 'x', 'payload' => ['a', '', 3]]);
+check('eventSpec: payload normalized to strings, empty dropped', $r['errors'] === [] && $r['spec']['payload'] === ['a', '3']);
+
+// --- isValidEventName (§11 naming scheme) ------------------------------------
+check('eventName: plain slug valid', CronjobUtils::isValidEventName('index-dirty') === true);
+check('eventName: namespaced valid', CronjobUtils::isValidEventName('linkenhancer:index-dirty') === true);
+check('eventName: route domain valid', CronjobUtils::isValidEventName('_route:edit-note-object') === true);
+check('eventName: pseudo domain valid', CronjobUtils::isValidEventName('cronjob:gedcom-changed') === true);
+check('eventName: double colon rejected', CronjobUtils::isValidEventName('a:b:c') === false);
+check('eventName: leading colon rejected', CronjobUtils::isValidEventName(':x') === false);
+check('eventName: trailing colon rejected', CronjobUtils::isValidEventName('x:') === false);
+check('eventName: uppercase rejected', CronjobUtils::isValidEventName('Mod:Name') === false);
+check('eventName: 64 chars incl. colon valid', CronjobUtils::isValidEventName(str_repeat('a', 31) . ':' . str_repeat('b', 32)) === true);
+check('eventName: 65 chars rejected', CronjobUtils::isValidEventName(str_repeat('a', 32) . ':' . str_repeat('b', 33)) === false);
+
 // --- loadManifestFile --------------------------------------------------------
-$specs = CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod/cron-jobs.php');
-check('manifest: valid returns list', is_array($specs) && count($specs) === 1 && ($specs[0]['name'] ?? '') === 'demo');
-check('manifest: non-array returns []', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/no-array.php') === []);
-check('manifest: throwing returns []', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/cron-jobs.php') === []);
-check('manifest: missing file returns []', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/nope.php') === []);
+$manifest = CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod/cron-jobs.php');
+check('manifest: plain list -> jobs', is_array($manifest) && count($manifest['jobs']) === 1 && ($manifest['jobs'][0]['name'] ?? '') === 'demo' && $manifest['events'] === []);
+$manifest = CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod3/cron-jobs.php');
+check('manifest: assoc form -> jobs', count($manifest['jobs']) === 1 && ($manifest['jobs'][0]['name'] ?? '') === 'ev-demo');
+check('manifest: assoc form -> events', count($manifest['events']) === 1 && ($manifest['events'][0]['name'] ?? '') === 'index-dirty' && ($manifest['events'][0]['payload'] ?? null) === ['tree']);
+check('manifest: non-array returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/no-array.php') === ['jobs' => [], 'events' => []]);
+check('manifest: throwing returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/cron-jobs.php') === ['jobs' => [], 'events' => []]);
+check('manifest: missing file returns empty', CronjobUtils::loadManifestFile($root . '/modules_v4/fakemod2/nope.php') === ['jobs' => [], 'events' => []]);
 
 // --- findOfferedSpec -----------------------------------------------------------
 $offered = [

@@ -40,9 +40,12 @@ use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Throwable;
 
+use function array_filter;
 use function array_flip;
 use function array_intersect_key;
+use function array_map;
 use function array_merge;
+use function array_values;
 use function class_exists;
 use function count;
 use function date;
@@ -54,6 +57,7 @@ use function max;
 use function method_exists;
 use function preg_match;
 use function preg_split;
+use function str_contains;
 use function str_pad;
 use function strpos;
 use function strlen;
@@ -478,8 +482,8 @@ final class ScheduleService {
         }
 
         $event_name = trim((string) ($spec['event_name'] ?? ''));
-        if ($trigger_type === self::TRIGGER_EVENT && preg_match(EventQueue::NAME_PATTERN, $event_name) !== 1) {
-            $errors[] = 'event jobs require an event_name slug of [a-z0-9_-] (max 64)';
+        if ($trigger_type === self::TRIGGER_EVENT && !CronjobUtils::isValidEventName($event_name)) {
+            $errors[] = 'event jobs require an event_name slug or <domain>:slug (max 64 chars total)';
         }
 
         $cron = trim((string) ($spec['cron'] ?? ''));
@@ -570,7 +574,7 @@ final class ScheduleService {
             $raw_specs = [];
             $manifest  = $dir . 'cron-jobs.php';
             if (is_file($manifest)) {
-                $raw_specs = array_merge($raw_specs, CronjobUtils::loadManifestFile($manifest));
+                $raw_specs = array_merge($raw_specs, CronjobUtils::loadManifestFile($manifest)['jobs']);
             }
             if (method_exists($module, 'getCronJobs')) {
                 try {
@@ -588,13 +592,130 @@ final class ScheduleService {
                     continue;
                 }
                 $result = self::validateJobSpec($raw, $root_dir);
-                if ($result['errors'] === []) {
-                    $found[] = ['module' => $short, 'spec' => $result['spec']];
+                if ($result['errors'] !== []) {
+                    continue;
                 }
+                $spec = $result['spec'];
+                // Announced module events are namespaced <module>:<event>, like
+                // the offered job keys. A name that already carries a colon
+                // (e.g. a listener for cronjob:gedcom-changed) is kept as-is.
+                if ($spec['trigger_type'] === self::TRIGGER_EVENT
+                    && $spec['event_name'] !== null
+                    && !str_contains((string) $spec['event_name'], ':')) {
+                    $spec['event_name'] = $short . ':' . $spec['event_name'];
+                }
+                $found[] = ['module' => $short, 'spec' => $spec];
             }
         }
 
         return $found;
+    }
+
+    /**
+     * Discover events announced by other enabled modules: via the 'events'
+     * section of a <module>/cron-jobs.php manifest and/or a getModuleEvents()
+     * marker method. Exception-safe like discoverExternalJobs() - a broken or
+     * throwing source is skipped. Announced names are plain slugs; the catalog
+     * namespaces them <module>:<name> (like the offered job keys).
+     *
+     * Event spec shape: ['name' => slug, 'description' => ?string,
+     * 'payload' => ?list<string>].
+     *
+     * @return list<array{module: string, name: string, description: string, payload: list<string>}>
+     */
+    public static function discoverExternalEvents(): array {
+        $found = [];
+
+        try {
+            $modules = Registry::container()->get(ModuleService::class)->all(false);
+        } catch (Throwable) {
+            return $found;
+        }
+
+        /** @var ModuleInterface $module */
+        foreach ($modules as $module) {
+            $short = trim($module->name(), '_');
+            $dir   = Webtrees::MODULES_DIR . $short . DIRECTORY_SEPARATOR;
+
+            $raw_events = [];
+            $manifest   = $dir . 'cron-jobs.php';
+            if (is_file($manifest)) {
+                $raw_events = array_merge($raw_events, CronjobUtils::loadManifestFile($manifest)['events']);
+            }
+            if (method_exists($module, 'getModuleEvents')) {
+                try {
+                    $announced = $module->getModuleEvents();
+                } catch (Throwable) {
+                    $announced = [];
+                }
+                if (is_array($announced)) {
+                    $raw_events = array_merge($raw_events, array_values($announced));
+                }
+            }
+
+            foreach ($raw_events as $raw) {
+                if (!is_array($raw)) {
+                    continue;
+                }
+                $result = self::validateEventSpec($raw);
+                if ($result['errors'] !== []) {
+                    continue;
+                }
+                $found[] = [
+                    'module'      => $short,
+                    'name'        => (string) $result['spec']['name'],
+                    'description' => (string) $result['spec']['description'],
+                    'payload'     => $result['spec']['payload'],
+                ];
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * Normalize + validate an event spec announced by an external module.
+     *
+     * The spec is a plain array - deliberately NOT a shared class, so
+     * announcing modules never reference the cronjob namespace.
+     *
+     * @param array<string, mixed> $spec
+     * @return array{spec: array{name: string, description: string, payload: list<string>}, errors: list<string>}
+     */
+    public static function validateEventSpec(array $spec): array {
+        $errors = [];
+
+        $name = trim((string) ($spec['name'] ?? ''));
+        if ($name === '' || strlen($name) > 64 || preg_match('/^[a-z0-9][a-z0-9_\-]*$/', $name) !== 1) {
+            $errors[] = 'event name must be a non-empty slug of [a-z0-9_-] (max 64 chars)';
+        }
+
+        $description = trim((string) ($spec['description'] ?? ''));
+        if (strlen($description) > 255) {
+            $errors[] = 'description must be at most 255 chars';
+        }
+
+        $payload = $spec['payload'] ?? [];
+        if (!is_array($payload)) {
+            $errors[] = 'payload must be a list of parameter names';
+            $payload  = [];
+        }
+        $payload = array_values(array_filter(
+            array_map('strval', array_values($payload)),
+            static fn (string $p): bool => $p !== ''
+        ));
+        if (count($payload) > 8) {
+            $errors[] = 'payload must list at most 8 parameter names';
+        }
+
+        return [
+            'spec'   => [
+                'name'        => $name,
+                'description' => $description,
+                'payload'     => $payload,
+            ],
+            'errors' => $errors,
+        ];
     }
 
     /**

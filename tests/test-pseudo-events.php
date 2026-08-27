@@ -73,9 +73,9 @@ namespace {
     }
 
     // --- detectors: event names --------------------------------------------
-    check('gedcom detector event name', (new GedcomFileDetector())->eventName() === 'gedcom-changed');
-    check('media detector event name', (new MediaFileCountDetector())->eventName() === 'media-added');
-    check('user detector event name', (new UserMaxIdDetector())->eventName() === 'user-registered');
+    check('gedcom detector event name', (new GedcomFileDetector())->eventName() === 'cronjob:gedcom-changed');
+    check('media detector event name', (new MediaFileCountDetector())->eventName() === 'cronjob:media-added');
+    check('user detector event name', (new UserMaxIdDetector())->eventName() === 'cronjob:user-registered');
 
     // --- GedcomFileDetector::compare ----------------------------------------
     $ged = new GedcomFileDetector();
@@ -183,9 +183,9 @@ namespace {
     check('service: cooldown elapsed after the interval', PseudoEventService::cooldownElapsed() === true);
 
     check('service: loadState default when no file', PseudoEventService::loadState() === ['last_run_at' => 0, 'detectors' => []]);
-    PseudoEventService::saveState(['last_run_at' => 12345, 'detectors' => ['media-added' => 5, 'user-registered' => 7]]);
+    PseudoEventService::saveState(['last_run_at' => 12345, 'detectors' => ['cronjob:media-added' => 5, 'cronjob:user-registered' => 7]]);
     $loaded = PseudoEventService::loadState();
-    check('service: state round-trip', $loaded === ['last_run_at' => 12345, 'detectors' => ['media-added' => 5, 'user-registered' => 7]]);
+    check('service: state round-trip', $loaded === ['last_run_at' => 12345, 'detectors' => ['cronjob:media-added' => 5, 'cronjob:user-registered' => 7]]);
 
     $list  = PseudoEventService::detectors();
     $names = [];
@@ -193,7 +193,7 @@ namespace {
         $names[] = $detector->eventName();
     }
     check('service: three detectors registered in order',
-        count($list) === 3 && $names === ['gedcom-changed', 'media-added', 'user-registered']);
+        count($list) === 3 && $names === ['cronjob:gedcom-changed', 'cronjob:media-added', 'cronjob:user-registered']);
 
     // Cleanup
     foreach (glob($data . 'cronjob-pseudo-events*') ?: [] as $file) {

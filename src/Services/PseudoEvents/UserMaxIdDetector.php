@@ -32,12 +32,12 @@ use function max;
 /**
  * Detects that a user registered, via MAX(user_id) on the user table
  * (user_id is auto-increment, so it only ever grows as new users sign up).
- * State is the highest user_id; a higher maximum fires `user-registered`.
+ * State is the highest user_id; a higher maximum fires `cronjob:user-registered`.
  */
 class UserMaxIdDetector implements PseudoEventDetectorInterface {
 
     public function eventName(): string {
-        return 'user-registered';
+        return 'cronjob:user-registered';
     }
 
     public function label(): string {

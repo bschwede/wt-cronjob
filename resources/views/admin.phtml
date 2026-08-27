@@ -20,6 +20,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var array<int, \Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventDetectorInterface> $detectors
  * @var bool $route_events
  * @var string $route_offered
+ * @var array<string, array{source: string, description: string, payload: list<string>}> $event_catalog
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -340,6 +341,33 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                     </button>
                 </form>
             </p>
+        </fieldset>
+
+        <fieldset class="border rounded p-3 mt-4">
+            <legend><?= I18N::translate('Event catalog') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('All known event names: announced by modules, built-in pseudo-events (cronjob:…), route events (_route:…) and names currently listened for by an enabled job. Synced by the tick; use these names in the “Event name” field of an event job.') ?>
+            </p>
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th><?= I18N::translate('Event') ?></th>
+                        <th><?= I18N::translate('Source') ?></th>
+                        <th><?= I18N::translate('Description') ?></th>
+                        <th><?= I18N::translate('Payload') ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($event_catalog as $name => $entry): ?>
+                    <tr>
+                        <td><code><?= e((string) $name) ?></code></td>
+                        <td><?= e((string) $entry['source']) ?></td>
+                        <td><?= e(I18N::translate((string) $entry['description'])) ?></td>
+                        <td><?php if ($entry['payload'] !== []): ?><code><?= e(implode(', ', $entry['payload'])) ?></code><?php else: ?>—<?php endif; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
         </fieldset>
       </div>
     </div>

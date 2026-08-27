@@ -35,6 +35,7 @@ use Fisharebest\Webtrees\Module\ModuleConfigTrait;
 use Fisharebest\Webtrees\Module\ModuleCustomInterface;
 use Fisharebest\Webtrees\Module\ModuleCustomTrait;
 use Fisharebest\Webtrees\Registry;
+use Fisharebest\Webtrees\Session;
 use Fisharebest\Webtrees\Services\RateLimitService;
 use Fisharebest\Webtrees\Validator;
 use Fisharebest\Webtrees\View;
@@ -46,6 +47,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
 use Throwable;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
@@ -54,6 +56,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
 use function array_column;
+use function array_map;
 use function array_merge;
 use function bin2hex;
 use function dirname;
@@ -66,7 +69,6 @@ use function is_array;
 use function is_readable;
 use function json_decode;
 use function mb_strlen;
-use function preg_match;
 use function random_bytes;
 use function str_ends_with;
 use function strlen;
@@ -88,10 +90,13 @@ class CronjobModule extends AbstractModule
     use ModuleConfigTrait;
     use ModuleCustomTrait;
 
-    public const SCHEMA_TARGET_VERSION = 2;
+    public const SCHEMA_TARGET_VERSION = 4;
 
     /** Module preference key holding the webhook token (§6.1). */
     public const PREF_EVENT_TOKEN = 'event_token';
+
+    /** Session key of the one-shot job-form stash (PRG after a failed save). */
+    public const SESSION_JOB_FORM = 'cronjob_job_form';
 
     // Single source of truth lives in ScheduleService (shared with the
     // external-job spec validator).
@@ -243,6 +248,7 @@ class CronjobModule extends AbstractModule
             'offered'       => $offered,
             'detectors'     => PseudoEventService::detectors(),
             'route_events'  => $this->getPreference(RouteEventService::SETTING, '') === '1',
+            'event_catalog' => EventCatalogService::listCatalog(),
             'route_offered' => implode(', ', array_column(RouteEventService::map(), 'event')),
         ]);
     }
@@ -276,8 +282,21 @@ class CronjobModule extends AbstractModule
         $trigger_type = $job !== null ? ((string) $job->trigger_type === 'event' ? 'event' : 'time') : 'time';
         $event_name   = $job !== null ? (string) ($job->event_name ?? '') : '';
         $notify       = $job !== null ? ((int) $job->notify === 1) : false;
+        $form_values  = null;
 
-        return $this->jobFormView($job, $copy_of, $trigger_type, $event_name, $notify, null);
+        // PRG: restore the values a failed save stashed (one-shot pull).
+        $stashed = Session::pull(self::SESSION_JOB_FORM);
+        if (is_array($stashed) && is_array($stashed['values'] ?? null)) {
+            $form_values  = $stashed['values'];
+            $trigger_type = (string) ($stashed['trigger_type'] ?? $trigger_type);
+            $event_name   = (string) ($stashed['event_name'] ?? $event_name);
+            $notify       = (bool) ($stashed['notify'] ?? $notify);
+            if ($copy_of === null) {
+                $copy_of = $stashed['copy_of'] ?? null;
+            }
+        }
+
+        return $this->jobFormView($job, $copy_of, $trigger_type, $event_name, $notify, $form_values);
     }
 
     /**
@@ -309,7 +328,10 @@ class CronjobModule extends AbstractModule
             'trigger_type' => $trigger_type,
             'event_name'   => $event_name,
             'notify'       => $notify,
-            'pseudo_events' => PseudoEventService::detectors(),
+            // Suggested event names (catalog: announcements, built-ins,
+            // route events, listened jobs). DB-backed; falls back to a live
+            // collect while the table is still empty.
+            'event_catalog' => EventCatalogService::listCatalog(),
         ]);
     }
 
@@ -357,8 +379,8 @@ class CronjobModule extends AbstractModule
             $errors[] = I18N::translate('Job title must not be empty.');
         }
         if ($trigger_type === 'event') {
-            if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $event_name) !== 1) {
-                $errors[] = I18N::translate('Event name must be a slug: %1$s, max %2$s characters.', 'a-z, 0-9, "_", "-"', '64');
+            if (!CronjobUtils::isValidEventName($event_name)) {
+                $errors[] = I18N::translate('Event name must be a slug or %1$s, max %2$s characters.', '<domain>:slug', '64');
             }
         } else {
             try {
@@ -396,21 +418,16 @@ class CronjobModule extends AbstractModule
             foreach ($errors as $error) {
                 FlashMessages::addMessage($error, 'danger');
             }
-            // Re-render the form with the submitted values (no redirect, so
-            // nothing the user entered is lost and the duplicate context
-            // survives); the layout shows the flash messages.
-            $this->layout = 'layouts/administration';
 
-            return $this->jobFormView($existing, $copy_of, $trigger_type, $event_name, $notify, $form_values);
+            return $this->storeFormAndRedirect($form_values, $trigger_type, $event_name, $notify, $copy_of, (int) ($existing?->id ?? 0));
         }
 
         // Renaming onto another job's slug would overwrite that job.
         $foreign = DB::table('cj_job')->where('name', '=', $name)->first();
         if ($foreign !== null && ($existing === null || (int) $foreign->id !== (int) $existing->id)) {
             FlashMessages::addMessage(I18N::translate('A job with this name already exists.'), 'danger');
-            $this->layout = 'layouts/administration';
 
-            return $this->jobFormView($existing, $copy_of, $trigger_type, $event_name, $notify, $form_values);
+            return $this->storeFormAndRedirect($form_values, $trigger_type, $event_name, $notify, $copy_of, (int) ($existing?->id ?? 0));
         }
 
         $now = ScheduleService::now();
@@ -434,6 +451,31 @@ class CronjobModule extends AbstractModule
     }
 
     /**
+     * PRG after a failed save: stash the submitted values for one form render
+     * and redirect to the form page - clean URL (no "resend form data"
+     * prompt), nothing the user entered is lost, flash messages travel in the
+     * session. getAdminJobFormAction() pulls the stash exactly once.
+     *
+     * @param array<string, mixed> $form_values
+     */
+    private function storeFormAndRedirect(array $form_values, string $trigger_type, string $event_name, bool $notify, ?string $copy_of, int $job_id): ResponseInterface {
+        Session::put(self::SESSION_JOB_FORM, [
+            'values'       => $form_values,
+            'trigger_type' => $trigger_type,
+            'event_name'   => $event_name,
+            'notify'       => $notify,
+            'copy_of'      => $copy_of,
+        ]);
+
+        $params = ['module' => $this->name(), 'action' => 'AdminJobForm'];
+        if ($job_id > 0) {
+            $params['job'] = $job_id;
+        }
+
+        return redirect(route('module', $params));
+    }
+
+    /**
      * Run history of one job (?job=<id>).
      */
     public function getAdminJobHistoryAction(ServerRequestInterface $request): ResponseInterface {
@@ -444,8 +486,9 @@ class CronjobModule extends AbstractModule
         $page     = max(1, Validator::queryParams($request)->integer('page', 1));
         $per_page = 25;
 
-        $runs  = [];
-        $total = 0;
+        $runs       = [];
+        $total      = 0;
+        $run_events = [];
         if ($job !== null) {
             $total = (int) DB::table('cj_run')->where('job_id', '=', $job->id)->count();
             $runs  = DB::table('cj_run')
@@ -456,16 +499,36 @@ class CronjobModule extends AbstractModule
                 ->offset(($page - 1) * $per_page)
                 ->get()
                 ->all();
+
+            // Events that triggered the runs of this page (cj_event_run
+            // cross table; empty for time-based jobs).
+            if ($runs !== []) {
+                $run_ids = array_map(static fn (object $run): int => (int) $run->id, $runs);
+                $rows    = DB::table('cj_event_run', 'r')
+                    ->join('cj_event', 'cj_event.id', '=', 'r.event_id')
+                    ->whereIn('r.run_id', $run_ids)
+                    ->orderBy('cj_event.created_at')
+                    ->get(['r.run_id', 'cj_event.event_name', 'cj_event.payload', 'cj_event.created_at'])
+                    ->all();
+                foreach ($rows as $row) {
+                    $run_events[(int) $row->run_id][] = [
+                        'name'       => (string) $row->event_name,
+                        'payload'    => EventQueue::decodePayload((object) ['payload' => $row->payload]),
+                        'created_at' => (string) $row->created_at,
+                    ];
+                }
+            }
         }
 
         return $this->viewResponse($this->name() . '::job-history', [
-            'title'    => I18N::translate('Run History'),
-            'module'   => $this,
-            'job'      => $job,
-            'runs'     => $runs,
-            'page'     => $page,
-            'per_page' => $per_page,
-            'total'    => $total,
+            'title'      => I18N::translate('Run History'),
+            'module'     => $this,
+            'job'        => $job,
+            'runs'       => $runs,
+            'run_events' => $run_events,
+            'page'       => $page,
+            'per_page'   => $per_page,
+            'total'      => $total,
         ]);
     }
 
@@ -689,7 +752,7 @@ class CronjobModule extends AbstractModule
         }
 
         $event = trim(Validator::queryParams($request)->string('event', ''));
-        if (preg_match(EventQueue::NAME_PATTERN, $event) !== 1) {
+        if (!CronjobUtils::isValidEventName($event)) {
             return $factory->response(['ok' => false, 'error' => 'invalid event'], 400);
         }
 

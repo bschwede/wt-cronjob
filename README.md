@@ -71,7 +71,7 @@ then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 | **Title** | human readable name |
 | **Trigger** | **Time-based** (a cron schedule) or **Event** (runs when a named event is queued). See "Event-driven jobs". |
 | **Cron expression** | (time-based only) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 5 runs. |
-| **Event name** | (event only) the event this job reacts to, e.g. `index-dirty`. The built-in pseudo-events (`gedcom-changed`, `media-added`, `user-registered`) are offered as suggestions; any custom name (webhook / direct module push) works too. |
+| **Event name** | (event only) the event this job reacts to, e.g. `linkenhancer:index-dirty`. Suggestions come from the **event catalog** (module announcements, built-in pseudo-events `cronjob:…`, route events `_route:…` and listened names); any own name (webhook / direct module push) works too. Slug or `<domain>:slug`, max 64 chars. |
 | **Command** | a `modules_v4/<module>/cli/<script>.php` path (discovered scripts are offered as suggestions) or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting` |
 | **Arguments** | plain options/values only (e.g. `--limit=5000`), max 10 tokens |
 | **Timeout** | 30 - 3600 s |
@@ -274,6 +274,54 @@ return [
 cronjob detects it with `method_exists()` - the module does **not** implement any
 cronjob interface (so an absent cronjob module is harmless).
 
+### Announcing events
+
+The same manifest can also **announce events** your module emits (so they show up in
+the event catalog and the job form's suggestions). Instead of a plain job list, the
+manifest may return an associative array with optional `jobs` and `events` lists (a
+plain list still means "jobs only"):
+
+```php
+<?php
+// modules_v4/linkenhancer/cron-jobs.php
+declare(strict_types=1);
+
+return [
+    'jobs' => [
+        [
+            'name'         => 'link-index',
+            'cron'         => '*/30 * * * *',
+            'command_type' => 'module',
+            'command'      => 'modules_v4/linkenhancer/cli/build-link-index.php',
+        ],
+        [
+            'name'         => 'reindex-on-dirty',
+            'trigger_type' => 'event',
+            'event_name'   => 'linkenhancer:index-dirty', // listen to your own event
+            'command_type' => 'module',
+            'command'      => 'modules_v4/linkenhancer/cli/build-link-index.php',
+        ],
+    ],
+    'events' => [
+        ['name' => 'index-dirty', 'description' => 'The link index is out of date.', 'payload' => ['tree']],
+    ],
+];
+```
+
+- An announced event is namespaced **`<module>:<name>`** (like the offered job keys).
+- An event job's `event_name` that carries no colon is auto-namespaced
+  `<module>:<event>`; a name that already has a colon (e.g.
+  `cronjob:gedcom-changed`) is kept as-is.
+- Equivalent marker method: `getModuleEvents(): array` (same event-spec shape).
+
+**Event spec fields**
+
+| Key | Required | Meaning |
+| :--- | :--- | :--- |
+| `name` | yes | slug `a-z 0-9 _ -` (stored as `<module>:<name>`) |
+| `description` | no | shown in the event catalog (translation key, max 255) |
+| `payload` | no | list of payload parameter names (max 8), shown in the catalog |
+
 ### Job spec fields
 
 | Key | Required | Meaning |
@@ -348,6 +396,16 @@ event system, so events are plain DB rows (a small `cj_event` queue) that the ti
 drains once a minute. An event-triggered job runs **once for each queued event** whose
 name matches its **Event name**.
 
+**Naming scheme (analogous to job names).** Event names are slugs
+(`a-z 0-9 _ -`, max 64 chars total), optionally namespaced `<domain>:<slug>`:
+
+| Form | Meaning |
+| :--- | :--- |
+| plain slug (e.g. `index-dirty`) | your own events - webhook or direct `EventQueue::push()` |
+| `cronjob:<slug>` | built-in pseudo-events (state pollers) |
+| `_route:<slug>` | route-triggered events (see below) |
+| `<module>:<slug>` | events announced by a module (see "Announcing events") |
+
 Queuing an event has four sources:
 
 1. **Webhook (external systems).** GET the endpoint shown in the admin page
@@ -362,20 +420,23 @@ Queuing an event has four sources:
    `\Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue::push('index-dirty', ['tree' => 'X']);`
    - this requires the cronjob module to be installed; guard it with
      `class_exists('Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue')`.
-
-The tick matches each pending event against enabled `trigger_type='event'` jobs, runs
-them, then marks the event handled (consumed once - even on failure, so a failing job
-does not re-run the same event forever). Handled events are purged after 7 days; events
-with no matching job are discarded so the queue does not grow.
-
 3. **Pseudo-events (built-in pollers).** webtrees core actions (a GEDCOM import,
    new media, a new user) cannot be hooked without a core change, so they are
    *observed by polling*. Enable the offered `cronjob:pseudo-events` job and the
    module checks the state below at most every 5 minutes, queueing an event on each
    transition. See "Pseudo-events (state polling)".
-4. **Route events (built-in, request-triggered).** A curated set of mutating
-   routes (currently: saving a note) queues its event immediately, right inside the
-   request that made the change. See "Route events (request-triggered)".
+4. **Route events (built-in, request-triggered).** A rule-based set of mutating
+   editor routes (every POST `edit…/delete…/add…/create…` route under
+   `/tree/{tree}/`) queues its event immediately, right inside the request that made
+   the change. See "Route events (request-triggered)".
+
+The tick matches each pending event against enabled `trigger_type='event'` jobs, runs
+them, then marks the event handled (consumed once - even on failure, so a failing job
+does not re-run the same event forever). Every consuming run is additionally linked to
+the event in the `cj_event_run` cross table (an event can trigger several jobs), and
+the run history shows which event triggered a run. Handled events are purged after
+7 days (their `cj_event_run` links are removed by the FK cascade); events with no
+matching job are discarded so the queue does not grow.
 
 ## Pseudo-events (state polling)
 
@@ -388,9 +449,9 @@ until you enable the offered `cronjob:pseudo-events` job.
 
 | Event | Fires when | State polled |
 | :--- | :--- | :--- |
-| `gedcom-changed` | a GEDCOM file in `data/` changed (mtime or size) — i.e. a standard import/export re-wrote it | per-tree file mtime + size |
-| `media-added` | the `media_file` row count increased | `COUNT(media_file)` |
-| `user-registered` | `MAX(user_id)` grew (a new user signed up) | `MAX(user.user_id)` |
+| `cronjob:gedcom-changed` | a GEDCOM file in `data/` changed (mtime or size) — i.e. a standard import/export re-wrote it | per-tree file mtime + size |
+| `cronjob:media-added` | the `media_file` row count increased | `COUNT(media_file)` |
+| `cronjob:user-registered` | `MAX(user_id)` grew (a new user signed up) | `MAX(user.user_id)` |
 
 **How it runs**
 
@@ -412,7 +473,8 @@ until you enable the offered `cronjob:pseudo-events` job.
 
 Detected events go into the same `cj_event` queue as webhooks and are consumed by the
 tick's normal event drain. To act on one, create an event-triggered job whose
-**Event name** matches (e.g. re-run the linkenhancer index on `gedcom-changed`).
+**Event name** matches (e.g. re-run the linkenhancer index on
+`cronjob:gedcom-changed`).
 
 > The GEDCOM detector watches the file in `data/`, so it reflects imports/exports that
 > rewrite that file. It is a polling heuristic (~5 min latency), not a true hook — a
@@ -421,40 +483,81 @@ tick's normal event drain. To act on one, create an event-triggered job whose
 ## Route events (request-triggered)
 
 A complementary, *immediate* detection mechanism: instead of polling state on a
-schedule, the module observes the HTTP request itself. When a request to a
-**curated mutating route** has been handled successfully (2xx/3xx), it queues the
-matching event into the same `cj_event` queue — a listening event job then reacts
-at the next tick (~60 s), with no polling latency.
+schedule, the module observes the HTTP request itself. When a request to a **mapped
+mutating route** has been handled successfully (2xx/3xx), it queues the matching
+event into the same `cj_event` queue — a listening event job then reacts at the next
+tick (~60 s), with no polling latency.
 
-**Curated routes** (keyed by the webtrees handler class):
+**Which routes are mapped** (rule-based, derived from the live webtrees route table —
+no manual list, so core updates are picked up automatically):
 
-| Event | Fires when | Payload |
+- path starts with `/tree/{tree}/`
+- HTTP **POST** only (the GET page routes of the same actions are not mapped)
+- handler in webtrees' `RequestHandlers` namespace whose class name starts with
+  `Edit`, `Delete`, `Add` or `Create` (this excludes non-mutating POSTs like
+  `SelectNewFact` / `CopyFact` / `PasteFact` and `Link*` / `Reorder*` / `Change*`)
+
+**Event names.** The third path segment, namespaced `_route:<segment>`. When two
+mapped routes share a segment (currently `delete` and `edit-raw`), the following path
+parameters are appended, hyphen-separated:
+
+| Event | Route | Payload |
 | :--- | :--- | :--- |
-| `edit-note-object` | a note was saved (POST `edit-note-object`) | `tree` (id), `xref` |
+| `_route:edit-note-object` | POST `/tree/{tree}/edit-note-object/{xref}` | `tree`, `xref` |
+| `_route:update-record` | POST `/tree/{tree}/update-record/{xref}` | `tree`, `xref` |
+| `_route:update-fact` | POST `/tree/{tree}/update-fact/{xref}{/fact_id}` | `tree`, `xref` (, `fact_id`) |
+| `_route:delete-xref` | POST `/tree/{tree}/delete/{xref}` | `tree`, `xref` |
+| `_route:delete-xref-fact_id` | POST `/tree/{tree}/delete/{xref}/{fact_id}` | `tree`, `xref`, `fact_id` |
+| `_route:edit-raw-xref` / `_route:edit-raw-xref-fact_id` | POST `/tree/{tree}/edit-raw/…` | same |
+| … 17 more | all remaining POST `edit…/delete…/add…/create…` routes | the route's parameters |
+
+In total 23 events: every family/individual/spouse/child addition (`_route:add-*`),
+record creation (`_route:create-*`, incl. notes, repositories, sources, media,
+locations, submitters, submissions), the record/fact/media/note/raw edits above and
+the two deletes. The payload always contains `tree` (id) + `tree_name` plus all
+matched route parameters (`xref`, `fact_id`, …).
 
 **How it works**
 
 - **Gated twice, off by default.** An event fires only while the admin toggle
   "Route events" (Events section) is on *and* at least one enabled event-triggered
-  job listens for that event name. A request that does not match the curated map
-  costs nothing (one in-memory lookup); only a successful request on a mapped route
-  does two tiny indexed DB reads.
+  job listens for that event name. A request that is not mapped costs nothing (one
+  in-memory lookup); only a successful request on a mapped route does two tiny
+  indexed DB reads.
 - **Transactional.** The `cj_event` insert runs in the *same DB transaction* as the
   mutation (the module middleware sits inside webtrees' request transaction), so
   the queued event commits or rolls back together with the change — no drift, no
   double fire on a failed save.
 - **Never blocks.** Detection runs *after* the handler, is exception-wrapped, and
   can never alter the response.
-- **Robust to core upgrades.** Map keys are fully-qualified class *strings*; if
-  webtrees renames a handler, the entry silently stops matching instead of
-  fatalling.
+- **Robust to core upgrades.** The map is rebuilt from the route table (keyed by
+  handler class *strings*, no `::class`), so a renamed/removed handler simply stops
+  matching instead of fatalling. If the route table is not available (e.g. CLI), a
+  static fallback map with the note route keeps the pilot working.
 
 To act on one, create an event-triggered job whose **Event name** matches (e.g.
-`edit-note-object`) and enable the "Route events" toggle. Note the overlap with the
-`gedcom-changed` poller: a note edit rewrites the GEDCOM file, so a
-`gedcom-changed` event follows at the next poll as well — pick the mechanism whose
-latency/precision fits the job (route events are near-instant and precise per
+`_route:update-record`) and enable the "Route events" toggle. Note the overlap with
+the `cronjob:gedcom-changed` poller: an editor save rewrites the GEDCOM file, so a
+`cronjob:gedcom-changed` event follows at the next poll as well — pick the mechanism
+whose latency/precision fits the job (route events are near-instant and precise per
 object; pollers are coarser but also catch changes made outside the web UI).
+
+## Event catalog
+
+The admin page (Events section) and the job form's event-name suggestions are fed by
+an **event inventory** (`cj_event_catalog`, synced by the tick like the job registry).
+It merges, in this priority order:
+
+1. events **announced by modules** (manifest `events` section / `getModuleEvents()`),
+   namespaced `<module>:<name>`
+2. **built-in pseudo-events** (`cronjob:*`, from the detectors)
+3. **route events** (`_route:*`, derived from the live route table)
+4. event names currently **listened for** by an enabled event job (source
+   `listening`) — this covers webhook-only names
+
+Each entry carries its source, a description (stored as a translation key, translated
+at render time only) and the known payload parameter names. The full list is also
+what the "Event name" datalist in the job form offers.
 
 ## Failure notification
 
@@ -477,23 +580,31 @@ beyond the text. A notification problem never breaks the tick.
 | GEDCOM backup (tree export) | `tree-export <tree_name>` — writes `data/<tree_name>.ged`, **full personal data**; plan retention/cleanup of `data/*.ged` | time `0 3 * * 0` |
 | Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | time `0 3 * * 0` |
 | Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | time `0 4 * * *` |
-| Re-index on change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `index-dirty` (queued by a webhook or a linkenhancer call) |
-| Pseudo-events poll (offered job) | `modules_v4/cronjob/cli/pseudo-events.php` | time `*/5 * * * *` (fires `gedcom-changed` / `media-added` / `user-registered`) |
+| Re-index on change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `linkenhancer:index-dirty` (announced by the linkenhancer manifest; queued by its code or a webhook) |
+| Re-index on GEDCOM change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `cronjob:gedcom-changed` |
+| Re-index on any record edit (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `_route:update-record` (route events must be enabled) |
+| Pseudo-events poll (offered job) | `modules_v4/cronjob/cli/pseudo-events.php` | time `*/5 * * * *` (fires `cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered`) |
 
 ## Roadmap (phase 2)
 
-Implemented so far: **job self-registration** (manifest / marker method), the
-**W1 wrapper**, **event-driven jobs** (webhook + `cj_event` queue + `EventQueue::push()`),
-    **pseudo-events** (state pollers: `gedcom-changed` / `media-added` /
-    `user-registered`, driven by the offered `cronjob:pseudo-events` job), **forced re-sync of the module's own manifest job**
-on update, **failure notification** to the administrator accounts, a
+Implemented so far: **job self-registration** (manifest / marker method, incl.
+**event announcements**), the **W1 wrapper**, **event-driven jobs** (webhook +
+`cj_event` queue + `EventQueue::push()`), **pseudo-events** (state pollers:
+`cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered`, driven
+by the offered `cronjob:pseudo-events` job), **forced re-sync of the module's own
+manifest job** on update, **failure notification** to the administrator accounts, a
 **human-readable schedule** shown next to each cron expression in the admin table
 (translatable via `I18N`; the exact cron string is always shown too), the
 **provenance badge + reset to module defaults** for offered jobs, **duplicate a
 job** via the create form, the **client-side DataTable** (filter/sort/paging)
-for the job table, **Notify/Timeout table columns**, editable
-**module-offered job names**, and **route events** (request-triggered, opt-in
-toggle: `edit-note-object`). See the sections above.
+for the job table, **Notify/Timeout table columns**, editable **module-offered
+job names**, the **event naming scheme** (`<domain>:<slug>`, `_route:*` /
+`cronjob:*` / `<module>:*`), **rule-based route events** (all POST
+`edit…/delete…/add…/create…` routes under `/tree/{tree}/`, opt-in toggle), the
+**event catalog** (module announcements + built-ins + route events + listened
+names, in `cj_event_catalog`), the **`cj_event_run` cross table** with triggering
+events shown in the run history, and **PRG form handling** (a failed save redirects
+to the form page with the entered values kept). See the sections above.
 
 Still open:
 
@@ -508,9 +619,9 @@ php modules_v4/cronjob/tests/test-args-validator.php  # command whitelist + arg 
 php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cleanly without the bundled vendor)
 php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron descriptions (standalone)
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
-php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: spec validator, manifest loading, W1 payload confinement (standalone)
+php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event spec validators, manifest loading, event naming, W1 payload confinement (standalone)
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
-php modules_v4/cronjob/tests/test-route-events.php   # route events: curated map, success gate, payload builder (standalone)
+php modules_v4/cronjob/tests/test-route-events.php   # route events: rule-based map builder (filters, collision suffixes, fallback), success gate, payload builder (standalone)
 ```
 
 ## License
