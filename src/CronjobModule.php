@@ -44,13 +44,16 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
+use Throwable;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\RouteEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
+use function array_column;
 use function array_merge;
 use function bin2hex;
 use function dirname;
@@ -58,6 +61,7 @@ use function fclose;
 use function fopen;
 use function function_exists;
 use function hash_equals;
+use function implode;
 use function is_array;
 use function is_readable;
 use function json_decode;
@@ -123,15 +127,25 @@ class CronjobModule extends AbstractModule
 
     /**
      * Runs on every request (webtrees auto-registers module middlewares via
-     * Router.php). Respawn the resident watch daemon when the admin has enabled
-     * it and it died. Cheap (one file check) in steady state; never throws and
-     * never blocks the request. (Pseudo-event detection runs in the tick's
+     * Router.php). Before the handler: respawn the resident watch daemon when the
+     * admin has enabled it and it died (cheap, one file check). After the handler:
+     * fire a route-triggered event for a curated, successful mutation
+     * (RouteEventService - free on the common path, transactional). Neither throws
+     * nor blocks the request. (Polling pseudo-event detection runs in the tick's
      * child process, not here - see the offered `cronjob:pseudo-events` job.)
      */
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
         WatchService::maybeSpawn();
 
-        return $handler->handle($request);
+        $response = $handler->handle($request);
+
+        try {
+            RouteEventService::maybeFire($request, $response);
+        } catch (Throwable) {
+            // Route-event detection must never break the request.
+        }
+
+        return $response;
     }
 
     // =========================================================================
@@ -228,6 +242,8 @@ class CronjobModule extends AbstractModule
             'event_token'   => $this->getPreference(self::PREF_EVENT_TOKEN),
             'offered'       => $offered,
             'detectors'     => PseudoEventService::detectors(),
+            'route_events'  => $this->getPreference(RouteEventService::SETTING, '') === '1',
+            'route_offered' => implode(', ', array_column(RouteEventService::map(), 'event')),
         ]);
     }
 
@@ -522,6 +538,20 @@ class CronjobModule extends AbstractModule
         } else {
             FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
         }
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Enable/disable route-triggered events (admin).
+     */
+    public function postAdminRouteEventsToggleAction(ServerRequestInterface $request): ResponseInterface {
+        $enabled = $this->getPreference(RouteEventService::SETTING, '') === '1';
+        $this->setPreference(RouteEventService::SETTING, $enabled ? '0' : '1');
+        FlashMessages::addMessage(
+            $enabled ? I18N::translate('Route events disabled.') : I18N::translate('Route events enabled.'),
+            'success'
+        );
 
         return redirect($this->getConfigLink());
     }

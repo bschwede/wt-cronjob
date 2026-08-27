@@ -18,6 +18,8 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var string $event_token
  * @var array<string, string> $offered
  * @var array<int, \Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventDetectorInterface> $detectors
+ * @var bool $route_events
+ * @var string $route_offered
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -317,8 +319,26 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                     </li>
                 <?php endforeach; ?>
             </ul>
+    <p class="text-muted">
+        <?= I18N::translate('To activate, enable the "cronjob:pseudo-events" job in the table above. It runs in the tick child process - isolated from any web request and bounded by its timeout.') ?>
+    </p>
+</fieldset>
+
+        <fieldset class="border rounded p-3 mt-4">
+            <legend><?= I18N::translate('Route events (request-triggered)') ?></legend>
             <p class="text-muted">
-                <?= I18N::translate('To activate, enable the "cronjob:pseudo-events" job in the table above. It runs in the tick child process - isolated from any web request and bounded by its timeout.') ?>
+                <?= I18N::translate('Detects mutations directly from their HTTP route (e.g. a note edit) and queues a matching event immediately - in addition to the polling pseudo-events above. Only curated routes fire, only while this is enabled AND a matching event job is listening. Currently offered: %s.', $route_offered) ?>
+            </p>
+            <p>
+                <span class="badge bg-<?= $route_events ? 'success' : 'secondary' ?>">
+                    <?= $route_events ? I18N::translate('on') : I18N::translate('off') ?>
+                </span>
+                <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminRouteEventsToggle'])) ?>" class="d-inline">
+                    <?= csrf_field() ?>
+                    <button type="submit" class="btn btn-sm btn-<?= $route_events ? 'warning' : 'primary' ?>">
+                        <?= $route_events ? I18N::translate('Disable route events') : I18N::translate('Enable route events') ?>
+                    </button>
+                </form>
             </p>
         </fieldset>
       </div>

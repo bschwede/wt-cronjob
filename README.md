@@ -348,7 +348,7 @@ event system, so events are plain DB rows (a small `cj_event` queue) that the ti
 drains once a minute. An event-triggered job runs **once for each queued event** whose
 name matches its **Event name**.
 
-Queuing an event has two sources:
+Queuing an event has four sources:
 
 1. **Webhook (external systems).** GET the endpoint shown in the admin page
    (section "Event webhook"):
@@ -373,6 +373,9 @@ with no matching job are discarded so the queue does not grow.
    *observed by polling*. Enable the offered `cronjob:pseudo-events` job and the
    module checks the state below at most every 5 minutes, queueing an event on each
    transition. See "Pseudo-events (state polling)".
+4. **Route events (built-in, request-triggered).** A curated set of mutating
+   routes (currently: saving a note) queues its event immediately, right inside the
+   request that made the change. See "Route events (request-triggered)".
 
 ## Pseudo-events (state polling)
 
@@ -415,6 +418,44 @@ tick's normal event drain. To act on one, create an event-triggered job whose
 > rewrite that file. It is a polling heuristic (~5 min latency), not a true hook — a
 > hook would require a core change (out of scope).
 
+## Route events (request-triggered)
+
+A complementary, *immediate* detection mechanism: instead of polling state on a
+schedule, the module observes the HTTP request itself. When a request to a
+**curated mutating route** has been handled successfully (2xx/3xx), it queues the
+matching event into the same `cj_event` queue — a listening event job then reacts
+at the next tick (~60 s), with no polling latency.
+
+**Curated routes** (keyed by the webtrees handler class):
+
+| Event | Fires when | Payload |
+| :--- | :--- | :--- |
+| `edit-note-object` | a note was saved (POST `edit-note-object`) | `tree` (id), `xref` |
+
+**How it works**
+
+- **Gated twice, off by default.** An event fires only while the admin toggle
+  "Route events" (Events section) is on *and* at least one enabled event-triggered
+  job listens for that event name. A request that does not match the curated map
+  costs nothing (one in-memory lookup); only a successful request on a mapped route
+  does two tiny indexed DB reads.
+- **Transactional.** The `cj_event` insert runs in the *same DB transaction* as the
+  mutation (the module middleware sits inside webtrees' request transaction), so
+  the queued event commits or rolls back together with the change — no drift, no
+  double fire on a failed save.
+- **Never blocks.** Detection runs *after* the handler, is exception-wrapped, and
+  can never alter the response.
+- **Robust to core upgrades.** Map keys are fully-qualified class *strings*; if
+  webtrees renames a handler, the entry silently stops matching instead of
+  fatalling.
+
+To act on one, create an event-triggered job whose **Event name** matches (e.g.
+`edit-note-object`) and enable the "Route events" toggle. Note the overlap with the
+`gedcom-changed` poller: a note edit rewrites the GEDCOM file, so a
+`gedcom-changed` event follows at the next poll as well — pick the mechanism whose
+latency/precision fits the job (route events are near-instant and precise per
+object; pollers are coarser but also catch changes made outside the web UI).
+
 ## Failure notification
 
 A job can be marked **Notify on failure**. When such a job fails (non-zero exit or
@@ -449,8 +490,10 @@ on update, **failure notification** to the administrator accounts, a
 **human-readable schedule** shown next to each cron expression in the admin table
 (translatable via `I18N`; the exact cron string is always shown too), the
 **provenance badge + reset to module defaults** for offered jobs, **duplicate a
-job** via the create form, and the **client-side DataTable** (filter/sort/paging)
-for the job table. See the sections above.
+job** via the create form, the **client-side DataTable** (filter/sort/paging)
+for the job table, **Notify/Timeout table columns**, editable
+**module-offered job names**, and **route events** (request-triggered, opt-in
+toggle: `edit-note-object`). See the sections above.
 
 Still open:
 
@@ -467,6 +510,7 @@ php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron desc
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
 php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: spec validator, manifest loading, W1 payload confinement (standalone)
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
+php modules_v4/cronjob/tests/test-route-events.php   # route events: curated map, success gate, payload builder (standalone)
 ```
 
 ## License
