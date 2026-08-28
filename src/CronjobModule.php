@@ -390,7 +390,7 @@ class CronjobModule extends AbstractModule
             try {
                 ScheduleService::validateCron($cron);
             } catch (DomainException | RuntimeException $exception) {
-                $errors[] = I18N::translate('Invalid cron expression "%1$s": %2$s', $cron, $exception->getMessage());
+                $errors[] = I18N::translate('Invalid cron expression "%1$s": %2$s', $cron, e($exception->getMessage()));
             }
             if (strlen($cron) > 64) {
                 $errors[] = I18N::translate('Cron expression must be at most %d characters.', 64);
@@ -406,7 +406,7 @@ class CronjobModule extends AbstractModule
 
         $command_type = CronjobUtils::detectCommandType($command);
         if ($command_type === '') {
-            $errors[] = I18N::translate('Command must be a %1$s path or an allowlisted core command.', 'modules_v4/<module>/cli/<script>.php');
+            $errors[] = I18N::translate('Command must be a %1$s path or an allowlisted core command.', e('modules_v4/<module>/cli/<script>.php'));
         } else {
             $built = JobRunner::buildArgv([
                 'command_type' => $command_type,
@@ -414,7 +414,7 @@ class CronjobModule extends AbstractModule
                 'args'         => $args,
             ], Webtrees::ROOT_DIR);
             if ($built['error'] !== '') {
-                $errors[] = I18N::translate('Invalid command: %s', $built['error']);
+                $errors[] = I18N::translate('Invalid command: %s', e($built['error']));
             }
         }
 
