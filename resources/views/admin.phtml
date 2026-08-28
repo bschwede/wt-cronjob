@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 
 /**
@@ -93,7 +94,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
             <tr>
                 <td>
                     <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])) ?>">
-                        <strong><?= e($job->title) ?></strong>
+                        <strong><?= e(CronjobUtils::translateJobTitle((string) $job->title)) ?></strong>
                     </a>
                     <div class="text-muted"><?= e($job->name) ?></div>
                     <?php if (isset($offered[$job->name])): ?>

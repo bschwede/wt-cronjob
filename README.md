@@ -284,6 +284,11 @@ return [
 ];
 ```
 
+Translatable `title` / `description` literals in a manifest should be wrapped in
+`I18nMark::translate()` (identity marker, see [Translation (i18n)](#translation-i18n))
+so `xgettext` picks them up - translation happens at render time, never at manifest
+load.
+
 ### 2. Marker method
 
 `getCronJobs(): array` on the module's `module.php` class, returning the same shape.
@@ -711,6 +716,31 @@ key, translated at render time) and the available parameters (structured: name,
 optional, default, description). In the job form, entering a command that matches an
 announced command shows its parameters as a hint under the field.
 
+## Translation (i18n)
+
+All user-facing strings are extracted with `xgettext` - no manual PO entries:
+
+- View strings use `I18N::translate()` as usual. Generic strings that already exist
+  in the core `webtrees.pot` are marked with a `/* I18N: webtrees.pot */` comment, so
+  the module-local POT excludes them (dedupe).
+- **Manifest literals** (`cron-jobs.php` is pure data, loaded in tick/CLI context -
+  `I18N::translate()` must not run there) are wrapped in `I18nMark::translate()`, an
+  *identity* marker whose last qualified-name component matches xgettext's
+  `--keyword=translate`. Nothing is translated at manifest load time.
+- **Pipeline:** `util/update-po-files.sh` generates `resources/lang/messages.pot`
+  (from `messages.all.pot`, core-pot entries filtered out) - PO files are maintained
+  via Weblate and land in `resources/lang/<language>.po|.php`. The module's
+  `CronjobModule::customTranslations()` feeds them into webtrees' `I18N::init()`, so
+  the views' `I18N::translate()` calls find the translations **at render time**.
+- **Job titles** are admin-editable DB values, translated at render time through
+  `CronbookUtils::translateJobTitle()` (job table, breadcrumbs, history header): the
+  default title from a manifest appears in the UI language, renamed jobs stay as-is
+  (gettext miss). Titles containing `%` are deliberately **not** translated -
+  `I18N::translate()` applies `sprintf()` to its result, where a bare `%` would be an
+  invalid conversion specification. The job form's title **input** always shows the
+  raw stored value (otherwise the translation would be written back to the DB on save).
+- **Notifications** (tick/CLI context) are not translated.
+
 ## Failure notification
 
 A job can be marked **Notify on failure**. When such a job fails (non-zero exit or
@@ -797,6 +827,7 @@ php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+e
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
 php modules_v4/cronjob/tests/test-route-events.php   # route events: map builder (record-route rule, tree-level allowlist, filters, collision suffixes, fallback), orphaned-event detection, success gate, payload builder, payload-key derivation from path (standalone)
 php modules_v4/cronjob/tests/test-event-queue.php    # event-queue coalescing: newest per event name, name cap, ordering (standalone)
+php modules_v4/cronjob/tests/test-i18n-mark.php      # i18n: I18nMark identity, manifest literals/shape unchanged, translateJobTitle % guard (standalone)
 ```
 
 ## License

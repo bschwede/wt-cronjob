@@ -26,6 +26,7 @@ declare(strict_types=1);
 namespace Schwendinger\Webtrees\Module\Cronjob;
 
 use Fisharebest\Webtrees\DB;
+use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Module\AbstractModule;
 use Fisharebest\Webtrees\Webtrees;
 use PDOException;
@@ -42,6 +43,7 @@ use function in_array;
 use function is_array;
 use function preg_match;
 use function rtrim;
+use function str_contains;
 use function strlen;
 use function str_starts_with;
 use function str_replace;
@@ -393,5 +395,22 @@ final class CronjobUtils {
                 'sudo systemctl enable --now wt-cronjob-tick.timer',
             ]),
         ];
+    }
+
+    /**
+     * Render-time translation of a (admin-renamable) job title.
+     *
+     * I18N::translate() applies sprintf() to the lookup result; a title
+     * containing a bare '%' (user data) would be an invalid conversion
+     * specification (PHP warning + false → TypeError in I18N::translate():
+     * string). Admin-renamed titles are user data anyway, so we skip
+     * translation for those instead of risking a view crash.
+     */
+    public static function translateJobTitle(string $title): string {
+        if (str_contains($title, '%')) {
+            return $title;
+        }
+
+        return I18N::translate($title);
     }
 }

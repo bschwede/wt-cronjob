@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 
 /**
@@ -67,7 +68,7 @@ if ($copy_of !== null) {
     $header = I18N::translate('New Job (copy of %s)', e($copy_of));
     $crumbs[0] = $header;
 } elseif ($is_edit) {
-    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e($job->title);
+    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e(CronjobUtils::translateJobTitle((string) $job->title));
     $header = I18N::translate('Edit Job');
     $crumbs[0] = $header;
 } else {

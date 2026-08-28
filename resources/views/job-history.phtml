@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 
 /**
  * @var string $title
@@ -23,7 +24,7 @@ $crumbs = [
 ];
 if ($job !== null) {
     // The breadcrumb component renders labels unescaped (§16, F3).
-    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e($job->title);
+    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e(CronjobUtils::translateJobTitle((string) $job->title));
 }
 $crumbs[0] = I18N::translate('History');
 
@@ -33,7 +34,7 @@ $crumbs[0] = I18N::translate('History');
 <h1>
     <?= I18N::translate('Run History') ?>
     <?php if ($job !== null): ?>
-        - <?= e($job->title) ?>
+        - <?= e(CronjobUtils::translateJobTitle((string) $job->title)) ?>
     <?php endif; ?>
 </h1>
 
