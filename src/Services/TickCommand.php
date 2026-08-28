@@ -43,9 +43,13 @@ use function implode;
 use function ini_get;
 use function in_array;
 use function is_string;
+use function json_encode;
 use function microtime;
 use function sprintf;
 use function trim;
+
+use const JSON_UNESCAPED_SLASHES;
+use const JSON_UNESCAPED_UNICODE;
 
 /**
  * The once-a-minute trigger. Cheap when nothing is due (a few ms):
@@ -173,9 +177,14 @@ final class TickCommand extends Command {
      * due cron expression(s) - derived from the triggers, defaulting to ''
      * when nothing can be determined (e.g. a "run now" queue).
      *
+     * For event runs, $event_payload (the decoded cj_event payload) reaches
+     * the child process via the environment (see below) - never the argv.
+     *
+     * @param array<string, mixed> $event_payload
+     *
      * @return array{run_id: int, ok: bool}
      */
-    private function runOneJob(object $job, string $trigger, InputInterface $input, OutputInterface $output, string $trigger_detail = ''): array {
+    private function runOneJob(object $job, string $trigger, InputInterface $input, OutputInterface $output, string $trigger_detail = '', array $event_payload = []): array {
         $dry_run     = (bool) $input->getOption('dry-run');
         $full_output = (bool) $input->getOption('full-output');
 
@@ -206,8 +215,23 @@ final class TickCommand extends Command {
             return ['run_id' => 0, 'ok' => false];
         }
 
+        // Event runs hand the event to the child process via the environment
+        // (the argv tokens are strictly validated and carry no JSON).
+        // CRONJOB_EVENT doubles as the "this is an event run" marker; the
+        // payload variable is only set when the event actually carried one.
+        $env = [];
+        if ($trigger === 'event') {
+            $env = ['CRONJOB_EVENT' => $trigger_detail];
+            if ($event_payload !== []) {
+                $env['CRONJOB_EVENT_PAYLOAD'] = json_encode($event_payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]';
+            }
+        }
+
         if ($dry_run) {
             $output->writeln('  dry-run: ' . implode(' ', $built['argv']));
+            foreach ($env as $key => $value) {
+                $output->writeln("  dry-run env: {$key}={$value}");
+            }
 
             return ['run_id' => 0, 'ok' => true];
         }
@@ -216,7 +240,7 @@ final class TickCommand extends Command {
         $run_id      = ScheduleService::startRun((int) $job->id, $trigger, $started_at, $trigger_detail);
         $start_micro = microtime(true);
 
-        $result = JobRunner::run($built['argv'], (int) $job->timeout_sec, JobRunner::cwdFor((array) $job, Webtrees::ROOT_DIR));
+        $result = JobRunner::run($built['argv'], (int) $job->timeout_sec, JobRunner::cwdFor((array) $job, Webtrees::ROOT_DIR), $env);
 
         $duration_ms = (int) round((microtime(true) - $start_micro) * 1000);
         $status      = $result['timed_out']
@@ -256,6 +280,7 @@ final class TickCommand extends Command {
 
         foreach (EventQueue::pending() as $event) {
             $name    = (string) $event->event_name;
+            $payload = EventQueue::decodePayload($event);
             $matched = ScheduleService::eventJobs($name);
 
             $output->writeln('event ' . $name . ($matched === [] ? ': no matching job - discarded' : ':'));
@@ -263,7 +288,7 @@ final class TickCommand extends Command {
             $run_id = 0;
             foreach ($matched as $job) {
                 $output->writeln('  job ' . $job->name . ':');
-                $result = $this->runOneJob($job, 'event', $input, $output, $name);
+                $result = $this->runOneJob($job, 'event', $input, $output, $name, $payload);
                 if ($run_id === 0 && $result['run_id'] !== 0) {
                     $run_id = $result['run_id'];
                 }

@@ -469,9 +469,9 @@ Queuing an event has four sources:
 1. **Webhook (external systems).** GET the endpoint shown in the admin page
    (section "Event webhook"):
    `GET /module/_cronjob_/Event?event=<name>&data=<json>` with the token in the
-   `X-Cronjob-Token` header (or, less securely, as `?token=<token>`). `data` is an
-   optional JSON object, stored with the event. The endpoint requires the token, is
-   rate-limited (30/min per site), and only accepts events while the module is enabled.
+    `X-Cronjob-Token` header (or, less securely, as `?token=<token>`). `data` is an
+    optional JSON object, stored with the event. The endpoint requires the token, is
+    rate-limited (20/min per site), and only accepts events while the module is enabled.
    It is a **GET**, not a POST: webtrees rejects POSTs without a session CSRF token,
    which an external caller cannot send.
 2. **Direct call (your own modules).** From PHP code in another module:
@@ -483,10 +483,11 @@ Queuing an event has four sources:
    *observed by polling*. Enable the offered `cronjob:pseudo-events` job and the
    module checks the state below at most every 5 minutes, queueing an event on each
    transition. See "Pseudo-events (state polling)".
-4. **Route events (built-in, request-triggered).** A rule-based set of mutating
-   editor routes (every POST `edit…/delete…/add…/create…` route under
-   `/tree/{tree}/`) queues its event immediately, right inside the request that made
-   the change. See "Route events (request-triggered)".
+ 4. **Route events (built-in, request-triggered).** A curated set of mutating
+    editor routes under `/tree/{tree}/` (record-specific routes with `{xref}` in
+    the path, plus a small tree-level allowlist) queues its event immediately,
+    right inside the request that made the change. See
+    "Route events (request-triggered)".
 
 The tick matches each pending event against the enabled jobs that carry an event
 trigger for that name (a job can have several event triggers, or none at all), runs
@@ -496,6 +497,31 @@ the event in the `cj_event_run` cross table (an event can trigger several jobs),
 the run history shows which event triggered a run. Handled events are purged after
 7 days (their `cj_event_run` links are removed by the FK cascade); events with no
 matching job are discarded so the queue does not grow.
+
+**Event payload in the child process.** Event runs hand the event to the job script
+via the process environment (the argv is reserved for the job's static, strictly
+validated arguments):
+
+| Variable | Set when | Value |
+| :--- | :--- | :--- |
+| `CRONJOB_EVENT` | every event run | the event name (doubles as the "this is an event run" marker) |
+| `CRONJOB_EVENT_PAYLOAD` | event run **with** a non-empty payload | the event payload as JSON (route parameters, pseudo-event state, webhook `data`) |
+
+```php
+$event   = getenv('CRONJOB_EVENT');                       // false on schedule / manual runs
+$payload = json_decode((string) getenv('CRONJOB_EVENT_PAYLOAD'), true) ?: [];
+$xref    = $payload['xref'] ?? '';                        // e.g. from a _route:* event
+```
+
+- **Variable absent = no payload.** The payload is truncated to 4000 bytes when the
+  event is queued; a JSON cut mid-way no longer decodes, in which case
+  `CRONJOB_EVENT_PAYLOAD` is *not set at all* (never empty, never broken JSON).
+- **Treat the payload as untrusted input** - above all for webhook `data`, whose
+  sender is external. Validate values (xrefs, names, …) before using them.
+- The payload is independent of the command type: module CLI scripts *and* core
+  commands (which simply ignore the variables) both work on event runs.
+- The payload is also visible in the run history (event detail), independent of the
+  child process.
 
 ## Pseudo-events (state polling)
 
@@ -721,11 +747,18 @@ from the route path** in the event catalog, **DataTables** for the event and com
 catalogs in the admin page, and the **command catalog** (`cj_command_catalog`: core
 allowlist + module command announcements with structured parameters + module scripts,
 with a per-module curation rule so internal scripts are not offered, and a dynamic
-parameter hint in the job form), and **multi-trigger jobs** (triggers moved to the
+parameter hint in the job form), **multi-trigger jobs** (triggers moved to the
 `cj_job_trigger` cross table: a job can combine any number of cron schedules and
 event triggers - it fires on any of them; the job's `next_run_at` is the minimum over
 its time triggers, the run history records which cron/event fired, and "Run now" on
-a disabled job runs once at (re-)enable). See the sections above.
+a disabled job runs once at (re-)enable), the **refined route-event rules** (record
+routes now require `{xref}` in the path and use the extended mutating prefixes
+`Link/Paste/Reorder/Pending`; a curated tree-level allowlist adds import, merge,
+renumber, search-replace, data fixes and bulk accept/reject - 38 events; orphaned
+`_route:*` triggers of jobs are flagged with an "unknown route event" badge), and
+**event payload in the child process** (event runs set `CRONJOB_EVENT` and, when the
+event carried one, `CRONJOB_EVENT_PAYLOAD` (JSON) in the job script's environment).
+See the sections above.
 
 Still open:
 

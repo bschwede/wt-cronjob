@@ -29,6 +29,7 @@ use function array_merge;
 use function count;
 use function feof;
 use function fread;
+use function getenv;
 use function in_array;
 use function is_file;
 use function is_resource;
@@ -169,13 +170,25 @@ final class JobRunner {
      * so module scripts can rely on their documented invocation). Output
      * (stdout+stderr) is captured, capped to the last MAX_OUTPUT_BYTES.
      *
+     * $extra_env (event runs only, see TickCommand) is merged OVER the tick
+     * process' environment - proc_open with an env array REPLACES it, so the
+     * parent's variables are carried along explicitly. With an empty array
+     * the child inherits the environment untouched (all non-event runs).
+     *
+     * The exit code comes from the last proc_get_status() snapshot that
+     * observed the exit - that call reaps the child, so proc_close() would
+     * report -1 (ECHILD); proc_close's value is used only when it does the
+     * reaping itself (>= 0).
+     *
      * @param list<string> $argv
+     * @param array<string, string> $extra_env
      *
      * @return array{exit: int, output: string, timed_out: bool}
      */
-    public static function run(array $argv, int $timeout, string $cwd): array {
+    public static function run(array $argv, int $timeout, string $cwd, array $extra_env = []): array {
+        $env   = $extra_env === [] ? null : array_merge(getenv(), $extra_env);
         $pipes = [];
-        $proc  = proc_open($argv, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd);
+        $proc  = proc_open($argv, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $cwd, $env);
 
         if (!is_resource($proc)) {
             return ['exit' => 1, 'output' => 'proc_open() failed', 'timed_out' => false];
@@ -184,9 +197,10 @@ final class JobRunner {
         stream_set_blocking($pipes[1], false);
         stream_set_blocking($pipes[2], false);
 
-        $deadline = microtime(true) + max(1, $timeout);
-        $output   = '';
-        $running  = true;
+        $deadline  = microtime(true) + max(1, $timeout);
+        $output    = '';
+        $running   = true;
+        $exit_code = -1;
 
         while ($running) {
             if (microtime(true) >= $deadline) {
@@ -213,6 +227,10 @@ final class JobRunner {
             $status  = proc_get_status($proc);
             $running = $status['running'];
             if (!$running) {
+                // proc_get_status has reaped the child - proc_close() would
+                // then report -1 (ECHILD), so the real exit code must come
+                // from the status snapshot.
+                $exit_code = (int) $status['exitcode'];
                 self::drainPipes($pipes);
             }
         }
@@ -222,7 +240,12 @@ final class JobRunner {
             proc_terminate($proc, 9);
         }
 
-        $exit_code = proc_close($proc);
+        // proc_close reaps the child only if the status polling did not
+        // already - its return value is authoritative when >= 0.
+        $close_code = proc_close($proc);
+        if ($close_code >= 0) {
+            $exit_code = $close_code;
+        }
 
         return [
             'exit'      => $timed_out ? -9 : $exit_code,

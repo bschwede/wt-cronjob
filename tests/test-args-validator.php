@@ -124,6 +124,24 @@ check('cwd core -> data/', JobRunner::cwdFor(['command_type' => 'core'], $root) 
 check('cwd module -> root', JobRunner::cwdFor(['command_type' => 'module'], $root) === $root);
 check('cwd unknown type -> root (safe default)', JobRunner::cwdFor(['command_type' => 'x'], $root) === $root);
 
+// 17. run(): the event payload channel (§15) - extra env reaches the child,
+//     and only when requested. Real child processes (php -r probe).
+$probe = 'echo json_encode([getenv("CRONJOB_EVENT"), getenv("CRONJOB_EVENT_PAYLOAD")]);';
+$result = JobRunner::run([PHP_BINARY, '-r', $probe], 10, sys_get_temp_dir(), [
+    'CRONJOB_EVENT'         => '_route:paste-fact',
+    'CRONJOB_EVENT_PAYLOAD' => '{"xref":"@I1@"}',
+]);
+check('run(): extra env reaches the child', $result['exit'] === 0 && $result['output'] === '["_route:paste-fact","{\\"xref\\":\\"@I1@\\"}"]');
+$result = JobRunner::run([PHP_BINARY, '-r', $probe], 10, sys_get_temp_dir());
+check('run(): without extra env the vars are absent', $result['exit'] === 0 && $result['output'] === '[false,false]');
+
+// 18. run(): with an env array, proc_open REPLACES the environment - the
+//     parent's variables must be carried along (regression guard for the merge)
+putenv('CRONJOB_TEST_PARENT=parent-value');
+$result = JobRunner::run([PHP_BINARY, '-r', 'echo json_encode([getenv("CRONJOB_TEST_PARENT"), getenv("CRONJOB_EVENT")]);'], 10, sys_get_temp_dir(), ['CRONJOB_EVENT' => 'x']);
+check('run(): parent env inherited alongside extras', $result['exit'] === 0 && $result['output'] === '["parent-value","x"]');
+putenv('CRONJOB_TEST_PARENT');
+
 // Cleanup
 @unlink($root . '/modules_v4/fakemod/cli/real-job.php');
 @unlink($root . '/modules_v4/fakemod2/not-cli.php');
