@@ -53,6 +53,7 @@ use function explode;
 use function in_array;
 use function is_array;
 use function is_file;
+use function json_encode;
 use function max;
 use function method_exists;
 use function preg_match;
@@ -64,6 +65,7 @@ use function strlen;
 use function strtotime;
 use function substr;
 use function trim;
+use function usort;
 
 use const STR_PAD_LEFT;
 
@@ -92,7 +94,7 @@ final class ScheduleService {
     /** A 'running' row older than this can no longer have a live process. */
     public const STUCK_AFTER_SECONDS   = 3660;
 
-    /** Trigger types for cj_job.trigger_type. */
+    /** Trigger types for cj_job_trigger.trigger_type (§13). */
     public const TRIGGER_TIME  = 'time';
     public const TRIGGER_EVENT = 'event';
 
@@ -176,6 +178,165 @@ final class ScheduleService {
         }
 
         return $runs;
+    }
+
+    /**
+     * Normalize + validate a job's trigger list (§13, multi-trigger).
+     *
+     * Accepts the new 'triggers' list - entries ['type' => 'time', 'cron' => …]
+     * or ['type' => 'event', 'event' => …] - and, for backward compatibility
+     * (pre-§13 manifests, stored specs, tests), the legacy single-trigger
+     * keys 'trigger_type' + 'cron' / 'event_name'. Returns the canonical
+     * list, deduplicated, sorted time-first.
+     *
+     * @param array<string, mixed> $spec
+     *
+     * @return array{triggers: list<array{type: string, cron: string, event: string}>, errors: list<string>}
+     */
+    public static function normalizeTriggers(array $spec): array {
+        $errors = [];
+        $raw    = [];
+
+        if (isset($spec['triggers']) && is_array($spec['triggers'])) {
+            foreach (array_values($spec['triggers']) as $raw_trigger) {
+                if (is_array($raw_trigger)) {
+                    $raw[] = $raw_trigger;
+                }
+            }
+        }
+
+        if ($raw === []) {
+            // Legacy single-trigger shape.
+            $legacy_type = (string) ($spec['trigger_type'] ?? self::TRIGGER_TIME);
+            if ($legacy_type === self::TRIGGER_EVENT) {
+                $raw[] = ['type' => self::TRIGGER_EVENT, 'event' => (string) ($spec['event_name'] ?? '')];
+            } else {
+                $raw[] = ['type' => self::TRIGGER_TIME, 'cron' => (string) ($spec['cron'] ?? '')];
+            }
+        }
+
+        $triggers = [];
+        $seen     = [];
+        foreach ($raw as $raw_trigger) {
+            $type = (string) ($raw_trigger['type'] ?? '');
+            if ($type === self::TRIGGER_TIME) {
+                $value = trim((string) ($raw_trigger['cron'] ?? ''));
+                if ($value === '' || strlen($value) > 64) {
+                    $errors[] = "time triggers require a cron expression of 1-64 chars (got '{$value}')";
+                    continue;
+                }
+                try {
+                    self::validateCron($value);
+                } catch (DomainException | RuntimeException $exception) {
+                    $errors[] = 'invalid cron expression: ' . $exception->getMessage();
+                    continue;
+                }
+                $key = self::TRIGGER_TIME . ':' . $value;
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key]   = true;
+                $triggers[]   = ['type' => self::TRIGGER_TIME, 'cron' => $value, 'event' => ''];
+            } elseif ($type === self::TRIGGER_EVENT) {
+                $value = trim((string) ($raw_trigger['event'] ?? ''));
+                if (!CronjobUtils::isValidEventName($value)) {
+                    $errors[] = "event triggers require an event name (slug or <domain>:slug, max 64 chars) - got '{$value}'";
+                    continue;
+                }
+                $key = self::TRIGGER_EVENT . ':' . $value;
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key]   = true;
+                $triggers[]   = ['type' => self::TRIGGER_EVENT, 'cron' => '', 'event' => $value];
+            } else {
+                $errors[] = "trigger type '{$type}' is not supported ('time' or 'event')";
+            }
+        }
+
+        // Time triggers first, so the primary schedule reads first in the UI.
+        usort($triggers, static fn (array $a, array $b): int => (($a['type'] === self::TRIGGER_EVENT) ? 1 : 0) - (($b['type'] === self::TRIGGER_EVENT) ? 1 : 0));
+
+        if ($errors === [] && $triggers === []) {
+            $errors[] = 'a job needs at least one trigger (a cron schedule or an event name)';
+        }
+
+        return ['triggers' => $triggers, 'errors' => $errors];
+    }
+
+    /**
+     * Canonical, order-independent key of a trigger list (§13) - compares
+     * stored vs offered triggers in specDiff().
+     *
+     * @param list<array{type: string, cron: string, event: string}> $triggers
+     */
+    public static function triggersKey(array $triggers): string {
+        $times  = [];
+        $events = [];
+        foreach ($triggers as $trigger) {
+            if (($trigger['type'] ?? '') === self::TRIGGER_TIME) {
+                $times[]  = (string) ($trigger['cron'] ?? '');
+            } else {
+                $events[] = (string) ($trigger['event'] ?? '');
+            }
+        }
+        sort($times);
+        sort($events);
+
+        return json_encode(['time' => $times, 'event' => $events], JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * The minimum of the next runs over all time triggers (§13) - the
+     * job-level cj_job.next_run_at. NULL when the job has no time trigger.
+     *
+     * @param list<array{type: string, cron: string, event: string}> $triggers
+     */
+    public static function nextRunMin(array $triggers, string $from): ?string {
+        $min = null;
+        foreach ($triggers as $trigger) {
+            if (($trigger['type'] ?? '') !== self::TRIGGER_TIME) {
+                continue;
+            }
+            try {
+                $next = self::nextRun((string) $trigger['cron'], $from);
+            } catch (DomainException | RuntimeException) {
+                continue;
+            }
+            if ($min === null || $next < $min) {
+                $min = $next;
+            }
+        }
+
+        return $min;
+    }
+
+    /**
+     * Which time triggers were due between $anchor and $now (§13): the crons
+     * whose next run after $anchor is not after $now. Records
+     * cj_run.trigger_detail for schedule runs. Pure and standalone-testable.
+     *
+     * @param list<array{type: string, cron: string, event: string}> $triggers
+     *
+     * @return list<string> the due cron expressions (sorted)
+     */
+    public static function dueTriggerDetails(array $triggers, string $anchor, string $now): array {
+        $due = [];
+        foreach ($triggers as $trigger) {
+            if (($trigger['type'] ?? '') !== self::TRIGGER_TIME) {
+                continue;
+            }
+            try {
+                if (self::nextRun((string) $trigger['cron'], $anchor) <= $now) {
+                    $due[] = (string) $trigger['cron'];
+                }
+            } catch (DomainException | RuntimeException) {
+                continue;
+            }
+        }
+        sort($due);
+
+        return $due;
     }
 
     /**
@@ -322,16 +483,20 @@ final class ScheduleService {
     }
 
     /**
-     * Enabled event-triggered jobs matching one event name (phase 2, §6.1).
+     * Enabled event-triggered jobs matching one event name (phase 2, §6.1;
+     * §13: the trigger lives in cj_job_trigger, so a job with several event
+     * triggers matches each of them).
      *
      * @return list<object>
      */
     public static function eventJobs(string $event_name): array {
         return DB::table('cj_job')
-            ->where('enabled', 1)
-            ->where('trigger_type', '=', self::TRIGGER_EVENT)
-            ->where('event_name', '=', $event_name)
-            ->orderBy('id')
+            ->join('cj_job_trigger', 'cj_job_trigger.job_id', '=', 'cj_job.id')
+            ->where('cj_job.enabled', 1)
+            ->where('cj_job_trigger.trigger_type', '=', self::TRIGGER_EVENT)
+            ->where('cj_job_trigger.event_name', '=', $event_name)
+            ->orderBy('cj_job.id')
+            ->select('cj_job.*')
             ->get()
             ->all();
     }
@@ -346,12 +511,13 @@ final class ScheduleService {
     /**
      * Insert a new 'running' run row. Returns the new run id.
      */
-    public static function startRun(int $job_id, string $trigger, string $started_at): int {
+    public static function startRun(int $job_id, string $trigger, string $started_at, string $trigger_detail = ''): int {
         return (int) DB::table('cj_run')->insertGetId([
-            'job_id'     => $job_id,
-            'trigger'    => $trigger,
-            'started_at' => $started_at,
-            'status'     => self::STATUS_RUNNING,
+            'job_id'         => $job_id,
+            'trigger'        => $trigger,
+            'trigger_detail' => $trigger_detail !== '' ? $trigger_detail : null,
+            'started_at'     => $started_at,
+            'status'         => self::STATUS_RUNNING,
         ]);
     }
 
@@ -369,15 +535,14 @@ final class ScheduleService {
     }
 
     /**
-     * After a run: update the job's last_* fields and recompute next_run_at.
+     * After a run: update the job's last_* fields and recompute next_run_at
+     * as the minimum over the job's time triggers (§13; NULL when the job
+     * has no time trigger).
+     *
+     * @param list<array{type: string, cron: string, event: string}> $triggers
      */
-    public static function updateJobAfterRun(object $job, string $now, string $status, int $exit_code): void {
-        try {
-            $next = self::nextRun((string) $job->cron, $now);
-        } catch (DomainException | RuntimeException) {
-            // Cron became unparseable - stop scheduling this job.
-            $next = null;
-        }
+    public static function updateJobAfterRun(object $job, array $triggers, string $now, string $status, int $exit_code): void {
+        $next = self::nextRunMin($triggers, $now);
 
         DB::table('cj_job')->where('id', '=', (int) $job->id)->update([
             'last_run_at' => $now,
@@ -386,6 +551,61 @@ final class ScheduleService {
             'next_run_at' => $next,
             'updated_at'  => $now,
         ]);
+    }
+
+    /**
+     * The trigger rows of one job (§13), in the canonical shape used by
+     * normalizeTriggers()/nextRunMin()/replaceJobTriggers().
+     *
+     * @return list<array{type: string, cron: string, event: string}>
+     */
+    public static function jobTriggers(int $job_id): array {
+        $triggers = [];
+        foreach (DB::table('cj_job_trigger')->where('job_id', '=', $job_id)->get() as $row) {
+            $triggers[] = [
+                'type'  => (string) $row->trigger_type,
+                'cron'  => (string) ($row->cron ?? ''),
+                'event' => (string) ($row->event_name ?? ''),
+            ];
+        }
+
+        return $triggers;
+    }
+
+    /**
+     * Replace all trigger rows of a job (§13) - delete + insert, in one go.
+     * The caller passes an already-validated, normalized trigger list.
+     *
+     * @param list<array{type: string, cron: string, event: string}> $triggers
+     */
+    public static function replaceJobTriggers(int $job_id, array $triggers): void {
+        DB::table('cj_job_trigger')->where('job_id', '=', $job_id)->delete();
+        foreach ($triggers as $trigger) {
+            DB::table('cj_job_trigger')->insert([
+                'job_id'       => $job_id,
+                'trigger_type' => (string) $trigger['type'],
+                'cron'         => $trigger['type'] === self::TRIGGER_TIME ? (string) $trigger['cron'] : null,
+                'event_name'   => $trigger['type'] === self::TRIGGER_EVENT ? (string) $trigger['event'] : null,
+            ]);
+        }
+    }
+
+    /**
+     * All trigger rows grouped by job id (§13) - one query for the admin table.
+     *
+     * @return array<int, list<array{type: string, cron: string, event: string}>>
+     */
+    public static function allJobTriggers(): array {
+        $grouped = [];
+        foreach (DB::table('cj_job_trigger')->get() as $row) {
+            $grouped[(int) $row->job_id][] = [
+                'type'  => (string) $row->trigger_type,
+                'cron'  => (string) ($row->cron ?? ''),
+                'event' => (string) ($row->event_name ?? ''),
+            ];
+        }
+
+        return $grouped;
     }
 
     /**
@@ -476,28 +696,11 @@ final class ScheduleService {
             $errors[] = 'title must be at most 128 chars';
         }
 
-        $trigger_type = (string) ($spec['trigger_type'] ?? self::TRIGGER_TIME);
-        if (!in_array($trigger_type, [self::TRIGGER_TIME, self::TRIGGER_EVENT], true)) {
-            $errors[] = "trigger_type '$trigger_type' is not supported ('time' or 'event')";
+        $trigger_result = self::normalizeTriggers($spec);
+        foreach ($trigger_result['errors'] as $error) {
+            $errors[] = $error;
         }
-
-        $event_name = trim((string) ($spec['event_name'] ?? ''));
-        if ($trigger_type === self::TRIGGER_EVENT && !CronjobUtils::isValidEventName($event_name)) {
-            $errors[] = 'event jobs require an event_name slug or <domain>:slug (max 64 chars total)';
-        }
-
-        $cron = trim((string) ($spec['cron'] ?? ''));
-        if ($trigger_type === self::TRIGGER_TIME) {
-            if ($cron === '' || strlen($cron) > 64) {
-                $errors[] = 'cron must be a non-empty expression of at most 64 chars';
-            } else {
-                try {
-                    self::parse($cron);
-                } catch (DomainException | RuntimeException $exception) {
-                    $errors[] = 'invalid cron expression: ' . $exception->getMessage();
-                }
-            }
-        }
+        $triggers = $trigger_result['triggers'];
 
         $command_type = (string) ($spec['command_type'] ?? '');
         if (!in_array($command_type, ['module', 'core'], true)) {
@@ -522,17 +725,13 @@ final class ScheduleService {
             $timeout = self::TIMEOUT_STD;
         }
 
-        $enabled    = (bool) ($spec['enabled'] ?? false);
-        $is_event   = $trigger_type === self::TRIGGER_EVENT;
-        $final_type = $is_event ? self::TRIGGER_EVENT : self::TRIGGER_TIME;
+        $enabled = (bool) ($spec['enabled'] ?? false);
 
         return [
             'spec'   => [
                 'name'         => $name,
                 'title'        => $title,
-                'trigger_type' => $final_type,
-                'event_name'   => $is_event ? $event_name : null,
-                'cron'         => $is_event ? '' : $cron,
+                'triggers'     => $triggers,
                 'command_type' => $command_type,
                 'command'      => $command,
                 'args'         => $args,
@@ -599,10 +798,10 @@ final class ScheduleService {
                 // Announced module events are namespaced <module>:<event>, like
                 // the offered job keys. A name that already carries a colon
                 // (e.g. a listener for cronjob:gedcom-changed) is kept as-is.
-                if ($spec['trigger_type'] === self::TRIGGER_EVENT
-                    && $spec['event_name'] !== null
-                    && !str_contains((string) $spec['event_name'], ':')) {
-                    $spec['event_name'] = $short . ':' . $spec['event_name'];
+                foreach ($spec['triggers'] as $i => $trigger) {
+                    if ($trigger['type'] === self::TRIGGER_EVENT && !str_contains($trigger['event'], ':')) {
+                        $spec['triggers'][$i]['event'] = $short . ':' . $trigger['event'];
+                    }
                 }
                 $found[] = ['module' => $short, 'spec' => $spec];
             }
@@ -893,33 +1092,21 @@ final class ScheduleService {
             return;
         }
 
-        $trigger    = ((string) $spec['trigger_type']) === self::TRIGGER_EVENT ? self::TRIGGER_EVENT : self::TRIGGER_TIME;
-        $event_name = (string) ($spec['event_name'] ?? '');
+        $triggers = (array) ($spec['triggers'] ?? []);
 
-        $next = null;
-        if ($trigger === self::TRIGGER_TIME) {
-            try {
-                $next = self::nextRun((string) $spec['cron'], $now);
-            } catch (DomainException | RuntimeException) {
-                $next = null; // validated already; defensive only
-            }
-        }
-
-        DB::table('cj_job')->insert([
+        $job_id = (int) DB::table('cj_job')->insertGetId([
             'name'         => $key,
             'title'        => (string) $spec['title'],
-            'trigger_type' => $trigger,
-            'event_name'   => $trigger === self::TRIGGER_EVENT ? $event_name : null,
-            'cron'         => (string) $spec['cron'],
             'command_type' => (string) $spec['command_type'],
             'command'      => (string) $spec['command'],
             'args'         => (string) $spec['args'],
             'enabled'      => ($spec['enabled'] ? 1 : 0),
             'timeout_sec'  => (int) $spec['timeout_sec'],
-            'next_run_at'  => $next,
+            'next_run_at'  => self::nextRunMin($triggers, $now),
             'created_at'   => $now,
             'updated_at'   => $now,
         ]);
+        self::replaceJobTriggers($job_id, $triggers);
     }
 
     /**
@@ -951,13 +1138,11 @@ final class ScheduleService {
      * @return array<string, mixed>
      */
     private static function mirrorValues(array $spec): array {
-        $is_event = ((string) ($spec['trigger_type'] ?? self::TRIGGER_TIME)) === self::TRIGGER_EVENT;
-
         return [
             'title'        => (string) ($spec['title'] ?? ''),
-            'trigger_type' => $is_event ? self::TRIGGER_EVENT : self::TRIGGER_TIME,
-            'event_name'   => $is_event ? (string) ($spec['event_name'] ?? '') : null,
-            'cron'         => (string) ($spec['cron'] ?? ''),
+            // Canonical trigger key (§13) - NOT a cj_job column, consumed by
+            // syncOwnOfferedJob() as the change marker for replaceJobTriggers().
+            'triggers_key' => self::triggersKey((array) ($spec['triggers'] ?? [])),
             'command_type' => (string) ($spec['command_type'] ?? ''),
             'command'      => (string) ($spec['command'] ?? ''),
             'args'         => (string) ($spec['args'] ?? ''),
@@ -994,7 +1179,7 @@ final class ScheduleService {
      * current manifest. Insert-if-missing; when the row exists, update only
      * the manifest-mirrored fields that changed - the admin's name/enabled/
      * notify/created_at and the run history are preserved, and next_run_at is
-     * only rescheduled when the cron expression itself changed.
+     * only rescheduled when the trigger set itself changed (§13).
      *
      * @param array<string, mixed> $spec normalized offered spec
      */
@@ -1013,9 +1198,7 @@ final class ScheduleService {
 
         $row  = [
             'title'        => (string) $job->title,
-            'trigger_type' => (string) $job->trigger_type,
-            'event_name'   => (string) ($job->event_name ?? ''),
-            'cron'         => (string) $job->cron,
+            'triggers_key' => self::triggersKey(self::jobTriggers((int) $job->id)),
             'command_type' => (string) $job->command_type,
             'command'      => (string) $job->command,
             'args'         => (string) $job->args,
@@ -1026,18 +1209,15 @@ final class ScheduleService {
             return;
         }
 
-        $values         = array_intersect_key(self::mirrorValues($spec), array_flip($diff));
+        $triggers = (array) ($spec['triggers'] ?? []);
+        $values   = array_intersect_key(self::mirrorValues($spec), array_flip($diff));
+        unset($values['triggers_key']); // not a cj_job column
         $values['updated_at'] = $now;
 
-        // Reschedule only when the schedule itself changed.
-        if (in_array('cron', $diff, true) || in_array('trigger_type', $diff, true)) {
-            if ((string) $spec['trigger_type'] === self::TRIGGER_TIME) {
-                try {
-                    $values['next_run_at'] = self::nextRun((string) $spec['cron'], $now);
-                } catch (DomainException | RuntimeException) {
-                    $values['next_run_at'] = null;
-                }
-            }
+        // Re-place the triggers and reschedule only when the schedule itself changed.
+        if (in_array('triggers_key', $diff, true)) {
+            self::replaceJobTriggers((int) $job->id, $triggers);
+            $values['next_run_at'] = self::nextRunMin($triggers, $now);
         }
 
         DB::table('cj_job')->where('id', '=', (int) $job->id)->update($values);

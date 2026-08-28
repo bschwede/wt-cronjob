@@ -57,6 +57,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
 use function array_column;
+use function array_filter;
 use function array_map;
 use function array_merge;
 use function bin2hex;
@@ -91,7 +92,7 @@ class CronjobModule extends AbstractModule
     use ModuleConfigTrait;
     use ModuleCustomTrait;
 
-    public const SCHEMA_TARGET_VERSION = 5;
+    public const SCHEMA_TARGET_VERSION = 6;
 
     /** Module preference key holding the webhook token (§6.1). */
     public const PREF_EVENT_TOKEN = 'event_token';
@@ -250,6 +251,8 @@ class CronjobModule extends AbstractModule
             'route_events'  => $this->getPreference(RouteEventService::SETTING, '') === '1',
             'event_catalog' => EventCatalogService::listCatalog(),
             'command_catalog' => CommandCatalogService::listCatalog(),
+            // Triggers grouped by job id (§13) - one query for the whole table.
+            'triggers_by_job' => ScheduleService::allJobTriggers(),
         ]);
     }
 
@@ -279,40 +282,71 @@ class CronjobModule extends AbstractModule
             }
         }
 
-        $trigger_type = $job !== null ? ((string) $job->trigger_type === 'event' ? 'event' : 'time') : 'time';
-        $event_name   = $job !== null ? (string) ($job->event_name ?? '') : '';
-        $notify       = $job !== null ? ((int) $job->notify === 1) : false;
-        $form_values  = null;
+        // The job's triggers (§13), as plain lists for the form's two
+        // repeatable groups (time rows / event rows).
+        $triggers_time  = [];
+        $triggers_event = [];
+        $trigger_source_id = 0;
+        if ($job !== null) {
+            $trigger_source_id = (int) $job->id;
+        } elseif ($duplicate > 0) {
+            $trigger_source_id = $duplicate;
+        }
+        if ($trigger_source_id > 0) {
+            foreach (ScheduleService::jobTriggers($trigger_source_id) as $trigger) {
+                if ($trigger['type'] === ScheduleService::TRIGGER_TIME) {
+                    $triggers_time[] = $trigger['cron'];
+                } else {
+                    $triggers_event[] = $trigger['event'];
+                }
+            }
+        }
+        if ($triggers_time === []) {
+            // New job, event-only job, or a legacy row without a usable
+            // trigger: start with one empty cron row (empty rows are
+            // dropped on save).
+            $triggers_time = [''];
+        }
+
+        $notify      = $job !== null ? ((int) $job->notify === 1) : false;
+        $form_values = null;
 
         // PRG: restore the values a failed save stashed (one-shot pull).
         $stashed = Session::pull(self::SESSION_JOB_FORM);
         if (is_array($stashed) && is_array($stashed['values'] ?? null)) {
-            $form_values  = $stashed['values'];
-            $trigger_type = (string) ($stashed['trigger_type'] ?? $trigger_type);
-            $event_name   = (string) ($stashed['event_name'] ?? $event_name);
-            $notify       = (bool) ($stashed['notify'] ?? $notify);
+            $form_values    = $stashed['values'];
+            $triggers_time  = array_values(array_map('strval', (array) ($stashed['values']['triggers_time'] ?? $triggers_time)));
+            $triggers_event = array_values(array_map('strval', (array) ($stashed['values']['triggers_event'] ?? $triggers_event)));
+            $notify         = (bool) ($stashed['notify'] ?? $notify);
             if ($copy_of === null) {
                 $copy_of = $stashed['copy_of'] ?? null;
             }
         }
 
-        return $this->jobFormView($job, $copy_of, $trigger_type, $event_name, $notify, $form_values);
+        return $this->jobFormView($job, $copy_of, $triggers_time, $triggers_event, $notify, $form_values);
     }
 
     /**
      * Render the job create/edit form. $form_values (submitted field values)
      * are restored when a save failed validation, so no input is lost.
      *
+     * @param list<string> $triggers_time  cron expressions (time triggers)
+     * @param list<string> $triggers_event event names (event triggers)
      * @param array<string, mixed>|null $form_values
      */
-    private function jobFormView(?object $job, ?string $copy_of, string $trigger_type, string $event_name, bool $notify, ?array $form_values): ResponseInterface {
-        $preview = null;
-        $cron    = (string) ($form_values['cron'] ?? ($job !== null ? $job->cron : ''));
-        if ($trigger_type === 'time' && $cron !== '' && ScheduleService::hasCronLibrary()) {
-            try {
-                $preview = ScheduleService::upcomingRuns($cron, 5, ScheduleService::now());
-            } catch (DomainException | RuntimeException) {
-                $preview = null;
+    private function jobFormView(?object $job, ?string $copy_of, array $triggers_time, array $triggers_event, bool $notify, ?array $form_values): ResponseInterface {
+        // Next-runs preview per cron row (null when the expression is invalid).
+        $previews = [];
+        if (ScheduleService::hasCronLibrary()) {
+            foreach ($triggers_time as $i => $cron) {
+                if (trim((string) $cron) === '') {
+                    continue;
+                }
+                try {
+                    $previews[$i] = ScheduleService::upcomingRuns((string) $cron, 3, ScheduleService::now());
+                } catch (DomainException | RuntimeException) {
+                    $previews[$i] = null;
+                }
             }
         }
 
@@ -327,11 +361,11 @@ class CronjobModule extends AbstractModule
             // that announces commands curates its own list, so its internal
             // scripts (tick/watch/wrap) are not offered here.
             'command_catalog' => CommandCatalogService::listCatalog(),
-            'preview'      => $preview,
-            'cron_now'     => ScheduleService::now(),
-            'trigger_type' => $trigger_type,
-            'event_name'   => $event_name,
-            'notify'       => $notify,
+            'cron_now'       => ScheduleService::now(),
+            'triggers_time'  => $triggers_time,
+            'triggers_event' => $triggers_event,
+            'cron_previews'  => $previews,
+            'notify'         => $notify,
             // Suggested event names (catalog: announcements, built-ins,
             // route events, listened jobs). DB-backed; falls back to a live
             // collect while the table is still empty.
@@ -343,32 +377,40 @@ class CronjobModule extends AbstractModule
      * Save a job (create or update).
      */
     public function postAdminJobSaveAction(ServerRequestInterface $request): ResponseInterface {
-        $data         = Validator::parsedBody($request);
-        $name         = trim($data->string('name', ''));
-        $title        = trim($data->string('title', ''));
-        $cron         = trim($data->string('cron', ''));
-        $command      = trim($data->string('command', ''));
-        $args         = trim($data->string('args', ''));
-        $timeout      = $data->integer('timeout', self::TIMEOUT_STD);
-        $enabled      = $data->boolean('enabled', false);
-        $notify       = $data->boolean('notify', false);
-        $trigger_type = $data->string('trigger_type', 'time') === 'event' ? 'event' : 'time';
-        $event_name   = trim($data->string('event_name', ''));
-        $job_id       = $data->integer('job_id', 0);
-        $copy_of      = $data->string('copy_of', '') !== '' ? $data->string('copy_of') : null;
+        $data           = Validator::parsedBody($request);
+        $name           = trim($data->string('name', ''));
+        $title          = trim($data->string('title', ''));
+        $command        = trim($data->string('command', ''));
+        $args           = trim($data->string('args', ''));
+        $timeout        = $data->integer('timeout', self::TIMEOUT_STD);
+        $enabled        = $data->boolean('enabled', false);
+        $notify         = $data->boolean('notify', false);
+        $triggers_time  = array_values(array_filter(array_map('trim', $data->array('triggers_time')), static fn (string $v): bool => $v !== ''));
+        $triggers_event = array_values(array_filter(array_map('trim', $data->array('triggers_event')), static fn (string $v): bool => $v !== ''));
+        $job_id         = $data->integer('job_id', 0);
+        $copy_of        = $data->string('copy_of', '') !== '' ? $data->string('copy_of') : null;
 
         $existing = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
 
         // Submitted values, restored when the save fails (form re-render).
         $form_values = [
-            'name'    => $name,
-            'title'   => $title,
-            'cron'    => $cron,
-            'command' => $command,
-            'args'    => $args,
-            'timeout' => $timeout,
-            'enabled' => $enabled,
+            'name'           => $name,
+            'title'          => $title,
+            'triggers_time'  => $triggers_time,
+            'triggers_event' => $triggers_event,
+            'command'        => $command,
+            'args'           => $args,
+            'timeout'        => $timeout,
+            'enabled'        => $enabled,
         ];
+
+        $raw_triggers = [];
+        foreach ($triggers_time as $cron) {
+            $raw_triggers[] = ['type' => ScheduleService::TRIGGER_TIME, 'cron' => $cron];
+        }
+        foreach ($triggers_event as $event) {
+            $raw_triggers[] = ['type' => ScheduleService::TRIGGER_EVENT, 'event' => $event];
+        }
 
         $errors = [];
         // A module-offered job keeps its <module>:<name> key (the form renders the
@@ -382,21 +424,12 @@ class CronjobModule extends AbstractModule
         if ($title === '') {
             $errors[] = I18N::translate('Job title must not be empty.');
         }
-        if ($trigger_type === 'event') {
-            if (!CronjobUtils::isValidEventName($event_name)) {
-                $errors[] = I18N::translate('Event name must be a slug or %1$s, max %2$s characters.', '<domain>:slug', '64');
-            }
-        } else {
-            try {
-                ScheduleService::validateCron($cron);
-            } catch (DomainException | RuntimeException $exception) {
-                $errors[] = I18N::translate('Invalid cron expression "%1$s": %2$s', $cron, e($exception->getMessage()));
-            }
-            if (strlen($cron) > 64) {
-                $errors[] = I18N::translate('Cron expression must be at most %d characters.', 64);
-            }
+        $trigger_result = ScheduleService::normalizeTriggers(['triggers' => $raw_triggers]);
+        foreach ($trigger_result['errors'] as $error) {
+            // Source strings; unknown keys are returned unchanged by I18N.
+            $errors[] = I18N::translate($error);
         }
-        // DB column widths (Migration0/1): title 128, cron 64, args 255.
+        // DB column widths (Migration0/1): title 128, args 255.
         if (mb_strlen($title) > 128) {
             $errors[] = I18N::translate('Job title must be at most %d characters.', 128);
         }
@@ -423,7 +456,7 @@ class CronjobModule extends AbstractModule
                 FlashMessages::addMessage($error, 'danger');
             }
 
-            return $this->storeFormAndRedirect($form_values, $trigger_type, $event_name, $notify, $copy_of, (int) ($existing?->id ?? 0));
+            return $this->storeFormAndRedirect($form_values, $notify, $copy_of, (int) ($existing?->id ?? 0));
         }
 
         // Renaming onto another job's slug would overwrite that job.
@@ -431,16 +464,14 @@ class CronjobModule extends AbstractModule
         if ($foreign !== null && ($existing === null || (int) $foreign->id !== (int) $existing->id)) {
             FlashMessages::addMessage(I18N::translate('A job with this name already exists.'), 'danger');
 
-            return $this->storeFormAndRedirect($form_values, $trigger_type, $event_name, $notify, $copy_of, (int) ($existing?->id ?? 0));
+            return $this->storeFormAndRedirect($form_values, $notify, $copy_of, (int) ($existing?->id ?? 0));
         }
 
         $now = ScheduleService::now();
         CronjobUtils::saveJob([
             'name'         => $name,
             'title'        => $title,
-            'trigger_type' => $trigger_type,
-            'event_name'   => $trigger_type === 'event' ? $event_name : '',
-            'cron'         => $trigger_type === 'time' ? $cron : '',
+            'triggers'     => $trigger_result['triggers'],
             'command_type' => $command_type,
             'command'      => $command,
             'args'         => $args,
@@ -462,13 +493,13 @@ class CronjobModule extends AbstractModule
      *
      * @param array<string, mixed> $form_values
      */
-    private function storeFormAndRedirect(array $form_values, string $trigger_type, string $event_name, bool $notify, ?string $copy_of, int $job_id): ResponseInterface {
+    private function storeFormAndRedirect(array $form_values, bool $notify, ?string $copy_of, int $job_id): ResponseInterface {
+        // The trigger rows travel inside $form_values (triggers_time /
+        // triggers_event), like every other submitted field.
         Session::put(self::SESSION_JOB_FORM, [
-            'values'       => $form_values,
-            'trigger_type' => $trigger_type,
-            'event_name'   => $event_name,
-            'notify'       => $notify,
-            'copy_of'      => $copy_of,
+            'values'  => $form_values,
+            'notify'  => $notify,
+            'copy_of' => $copy_of,
         ]);
 
         $params = ['module' => $this->name(), 'action' => 'AdminJobForm'];
@@ -530,6 +561,8 @@ class CronjobModule extends AbstractModule
             'job'        => $job,
             'runs'       => $runs,
             'run_events' => $run_events,
+            // The job's current triggers (§13) for the header line.
+            'triggers'   => $job !== null ? ScheduleService::jobTriggers((int) $job->id) : [],
             'page'       => $page,
             'per_page'   => $per_page,
             'total'      => $total,
@@ -537,7 +570,10 @@ class CronjobModule extends AbstractModule
     }
 
     /**
-     * Queue a job for the next tick (<= 60 s).
+     * Queue a job for the next tick (<= 60 s). Due to dueJobs()' enabled
+     * filter, a disabled job's queued run happens at the first tick after
+     * (re-)enabling - the flash message says so (no guard by design: the
+     * same state is reachable by disabling right after the click).
      */
     public function postAdminJobRunNowAction(ServerRequestInterface $request): ResponseInterface {
         $job_id = Validator::parsedBody($request)->integer('job_id', 0);
@@ -549,7 +585,13 @@ class CronjobModule extends AbstractModule
                 'next_run_at' => $now,
                 'updated_at'  => $now,
             ]);
-            FlashMessages::addMessage(I18N::translate('Job queued - it will run at the next tick (within 60 seconds).'), 'success');
+            if ((int) $job->enabled === 1) {
+                FlashMessages::addMessage(I18N::translate('Job queued - it will run at the next tick (within 60 seconds).'), 'success');
+            } else {
+                // The run is queued (next_run_at in the past) but the tick skips
+                // disabled jobs - it will run once when the job is (re-)enabled.
+                FlashMessages::addMessage(I18N::translate('Job queued - it is disabled, so it will run once at the next tick after it is (re-)enabled.'), 'success');
+            }
         } else {
             FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
         }
@@ -649,9 +691,7 @@ class CronjobModule extends AbstractModule
         CronjobUtils::saveJob([
             'name'         => (string) $job->name,
             'title'        => (string) $spec['title'],
-            'trigger_type' => (string) $spec['trigger_type'],
-            'event_name'   => (string) ($spec['event_name'] ?? ''),
-            'cron'         => (string) $spec['cron'],
+            'triggers'     => (array) ($spec['triggers'] ?? []),
             'command_type' => (string) $spec['command_type'],
             'command'      => (string) $spec['command'],
             'args'         => (string) $spec['args'],

@@ -118,13 +118,13 @@ namespace {
     check('user: payload', $up['payload'] === ['new_user_id' => 9, 'added' => 2]);
     check('user: max decrease not detected', $user->compare(9, 5)['detected'] === false);
 
-    // --- ScheduleService::specDiff ------------------------------------------
+    // --- ScheduleService::specDiff (§13: triggers_key) -----------------------
     $spec = [
         'name'         => 'pseudo-events',
         'title'        => 'T',
-        'trigger_type' => 'time',
-        'event_name'   => null,
-        'cron'         => '*/5 * * * *',
+        'triggers'     => [
+            ['type' => 'time', 'cron' => '*/5 * * * *', 'event' => ''],
+        ],
         'command_type' => 'module',
         'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
         'args'         => '',
@@ -133,9 +133,7 @@ namespace {
     ];
     $identical = [
         'title'        => 'T',
-        'trigger_type' => 'time',
-        'event_name'   => null,
-        'cron'         => '*/5 * * * *',
+        'triggers_key' => ScheduleService::triggersKey($spec['triggers']),
         'command_type' => 'module',
         'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
         'args'         => '',
@@ -145,8 +143,8 @@ namespace {
     check('specDiff: identical -> no diff', ScheduleService::specDiff($identical, $spec) === []);
 
     $cron_changed = $identical;
-    $cron_changed['cron'] = '*/10 * * * *';
-    check('specDiff: cron change -> [cron]', ScheduleService::specDiff($cron_changed, $spec) === ['cron']);
+    $cron_changed['triggers_key'] = ScheduleService::triggersKey([['type' => 'time', 'cron' => '*/10 * * * *', 'event' => '']]);
+    check('specDiff: cron change -> [triggers_key]', ScheduleService::specDiff($cron_changed, $spec) === ['triggers_key']);
 
     $timeout_changed = $identical;
     $timeout_changed['timeout_sec'] = 60;
@@ -161,17 +159,10 @@ namespace {
     $multi['args']  = '--x';
     check('specDiff: multiple changes in manifest order', ScheduleService::specDiff($multi, $spec) === ['title', 'args']);
 
-    $ev_row = $identical;
-    $ev_row['event_name'] = '';
-    check('specDiff: time job event_name null=="" no diff', ScheduleService::specDiff($ev_row, $spec) === []);
-
-    $ev_spec   = $spec;
-    $ev_spec['trigger_type'] = 'event';
-    $ev_spec['event_name']   = 'gedcom-changed';
-    $ev_spec['cron']         = '';
+    $ev_spec = $spec;
+    $ev_spec['triggers'] = [['type' => 'event', 'cron' => '', 'event' => 'cronjob:gedcom-changed']];
     $ev_diff = ScheduleService::specDiff($identical, $ev_spec);
-    check('specDiff: time->event job flags trigger_type+event_name+cron',
-        in_array('trigger_type', $ev_diff, true) && in_array('event_name', $ev_diff, true) && in_array('cron', $ev_diff, true));
+    check('specDiff: time->event job flags triggers_key only', $ev_diff === ['triggers_key']);
 
     // --- PseudoEventService file-based logic --------------------------------
     check('service: cooldown elapsed when no last file', PseudoEventService::cooldownElapsed() === true);

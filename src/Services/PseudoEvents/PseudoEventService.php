@@ -178,12 +178,13 @@ final class PseudoEventService {
      * @return list<string>
      */
     private static function activeEventNames(): array {
-        return DB::table('cj_job')
-            ->where('enabled', 1)
-            ->where('trigger_type', '=', ScheduleService::TRIGGER_EVENT)
-            ->whereNotNull('event_name')
+        return DB::table('cj_job_trigger')
+            ->join('cj_job', 'cj_job.id', '=', 'cj_job_trigger.job_id')
+            ->where('cj_job.enabled', 1)
+            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
+            ->whereNotNull('cj_job_trigger.event_name')
             ->distinct()
-            ->pluck('event_name')
+            ->pluck('cj_job_trigger.event_name')
             ->all();
     }
 

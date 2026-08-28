@@ -111,7 +111,7 @@ check('valid spec: no errors', $r['errors'] === []);
 check('valid spec: title defaults to name', $r['spec']['title'] === 'demo');
 check('valid spec: enabled defaults to false', $r['spec']['enabled'] === false);
 check('valid spec: timeout defaults to 300', $r['spec']['timeout_sec'] === 300);
-check('valid spec: trigger_type normalized to time', $r['spec']['trigger_type'] === 'time');
+check('valid spec: legacy cron normalized to one time trigger', $r['spec']['triggers'] === [['type' => 'time', 'cron' => '*/30 * * * *', 'event' => '']]);
 
 $r = ScheduleService::validateJobSpec([
     'name' => 'demo', 'cron' => 'not a cron',
@@ -164,9 +164,9 @@ $r = ScheduleService::validateJobSpec([
     'command_type' => 'module', 'command' => $command,
 ], $root);
 check('event job: no errors', $r['errors'] === []);
-check('event job: trigger_type normalized', $r['spec']['trigger_type'] === 'event');
-check('event job: event_name kept', $r['spec']['event_name'] === 'index-dirty');
-check('event job: cron cleared', $r['spec']['cron'] === '');
+check('event job: legacy event normalized to one event trigger', $r['spec']['triggers'] === [['type' => 'event', 'cron' => '', 'event' => 'index-dirty']]);
+check('event job: event name kept', $r['spec']['triggers'][0]['event'] === 'index-dirty');
+check('event job: no time trigger left', !in_array('time', array_column($r['spec']['triggers'], 'type'), true));
 
 $r = ScheduleService::validateJobSpec([
     'name' => 'on-dirty', 'trigger_type' => 'event',
@@ -184,7 +184,7 @@ $r = ScheduleService::validateJobSpec([
     'name' => 'on-dirty', 'trigger_type' => 'event', 'event_name' => 'linkenhancer:index-dirty',
     'command_type' => 'module', 'command' => $command,
 ], $root);
-check('event job: namespaced event_name kept as-is', $r['errors'] === [] && $r['spec']['event_name'] === 'linkenhancer:index-dirty');
+check('event job: namespaced event kept as-is', $r['errors'] === [] && $r['spec']['triggers'][0]['event'] === 'linkenhancer:index-dirty');
 
 $r = ScheduleService::validateJobSpec([
     'name' => 'on-dirty', 'trigger_type' => 'event', 'event_name' => 'a:b:c',
@@ -339,6 +339,92 @@ $dup = CommandCatalogService::mergeCatalog(
     []
 );
 check('mergeCatalog: first source wins (core over announced)', $dup['tree-list']['source'] === 'core' && $dup['tree-list']['description'] === 'CORE' && count($dup) === 1);
+
+// --- normalizeTriggers / triggersKey / nextRunMin / dueTriggerDetails (§13) --
+$r = ScheduleService::normalizeTriggers(['triggers' => [
+    ['type' => 'event', 'event' => 'a:one'],
+    ['type' => 'time', 'cron' => '0 3 * * *'],
+    ['type' => 'time', 'cron' => '*/5 * * * *'],
+]]);
+check('triggers: mixed valid, time sorted first', $r['errors'] === [] && $r['triggers'] === [
+    ['type' => 'time', 'cron' => '0 3 * * *', 'event' => ''],
+    ['type' => 'time', 'cron' => '*/5 * * * *', 'event' => ''],
+    ['type' => 'event', 'cron' => '', 'event' => 'a:one'],
+]);
+$r = ScheduleService::normalizeTriggers(['triggers' => []]);
+check('triggers: empty list rejected', $r['errors'] !== [] && $r['triggers'] === []);
+$r = ScheduleService::normalizeTriggers(['trigger_type' => 'event', 'event_name' => 'x:y']);
+check('triggers: legacy event shape normalized', $r['errors'] === [] && $r['triggers'] === [['type' => 'event', 'cron' => '', 'event' => 'x:y']]);
+$r = ScheduleService::normalizeTriggers(['triggers' => [['type' => 'time', 'cron' => 'nope']]]);
+check('triggers: invalid cron rejected', $r['errors'] !== [] && $r['triggers'] === []);
+$r = ScheduleService::normalizeTriggers(['triggers' => [['type' => 'time', 'cron' => '  ']]]);
+check('triggers: blank cron rejected', $r['errors'] !== []);
+$r = ScheduleService::normalizeTriggers(['triggers' => [['type' => 'time', 'cron' => str_repeat('a', 65)]]]);
+check('triggers: cron >64 rejected', $r['errors'] !== []);
+$r = ScheduleService::normalizeTriggers(['triggers' => [['type' => 'event', 'event' => 'a:b:c']]]);
+check('triggers: double-colon event rejected', $r['errors'] !== []);
+$r = ScheduleService::normalizeTriggers(['triggers' => [['type' => 'daily']]]);
+check('triggers: unknown type rejected', $r['errors'] !== []);
+$r = ScheduleService::normalizeTriggers(['triggers' => [
+    ['type' => 'time', 'cron' => '*/5 * * * *'],
+    ['type' => 'time', 'cron' => '*/5 * * * *'],
+    ['type' => 'event', 'event' => 'x'],
+    ['type' => 'event', 'event' => 'x'],
+]]);
+check('triggers: duplicates deduped', $r['errors'] === [] && count($r['triggers']) === 2);
+$r = ScheduleService::normalizeTriggers(['triggers' => [
+    ['type' => 'time', 'cron' => '*/5 * * * *'],
+    ['type' => 'event', 'event' => ''],
+]]);
+check('triggers: invalid member flagged, valid kept', $r['errors'] !== [] && count($r['triggers']) === 1);
+
+$ta = ScheduleService::triggersKey([
+    ['type' => 'time', 'cron' => '0 3 * * *', 'event' => ''],
+    ['type' => 'event', 'cron' => '', 'event' => 'a:one'],
+]);
+$tb = ScheduleService::triggersKey([
+    ['type' => 'event', 'cron' => '', 'event' => 'a:one'],
+    ['type' => 'time', 'cron' => '0 3 * * *', 'event' => ''],
+]);
+check('triggersKey: order independent', $ta === $tb);
+check('triggersKey: different list differs', $ta !== ScheduleService::triggersKey([['type' => 'time', 'cron' => '*/5 * * * *', 'event' => '']]));
+check('triggersKey: empty list', ScheduleService::triggersKey([]) === '{"time":[],"event":[]}');
+
+$from = '2026-08-28 12:00:00';
+$t = [
+    ['type' => 'time', 'cron' => '0 0 1 1 *', 'event' => ''],
+    ['type' => 'time', 'cron' => '*/5 * * * *', 'event' => ''],
+    ['type' => 'event', 'cron' => '', 'event' => 'x'],
+];
+check('nextRunMin: min over time triggers', ScheduleService::nextRunMin($t, $from) === '2026-08-28 12:05:00');
+check('nextRunMin: event-only -> null', ScheduleService::nextRunMin([['type' => 'event', 'cron' => '', 'event' => 'x']], $from) === null);
+check('nextRunMin: empty -> null', ScheduleService::nextRunMin([], $from) === null);
+
+$anchor = '2026-08-28 11:50:00';
+$now    = '2026-08-28 12:10:00';
+$t2 = [
+    ['type' => 'time', 'cron' => '*/5 * * * *', 'event' => ''],
+    ['type' => 'time', 'cron' => '0 0 1 1 *', 'event' => ''],
+    ['type' => 'event', 'cron' => '', 'event' => 'x'],
+];
+check('dueTriggerDetails: only the due cron', ScheduleService::dueTriggerDetails($t2, $anchor, $now) === ['*/5 * * * *']);
+check('dueTriggerDetails: none due', ScheduleService::dueTriggerDetails($t2, '2026-08-28 12:00:00', '2026-08-28 12:02:00') === []);
+$t3 = [
+    ['type' => 'time', 'cron' => '0 12 * * *', 'event' => ''],
+    ['type' => 'time', 'cron' => '*/10 * * * *', 'event' => ''],
+];
+check('dueTriggerDetails: multiple due, sorted', ScheduleService::dueTriggerDetails($t3, $anchor, $now) === ['*/10 * * * *', '0 12 * * *']);
+check('dueTriggerDetails: event triggers ignored', ScheduleService::dueTriggerDetails([['type' => 'event', 'cron' => '', 'event' => 'x']], $anchor, $now) === []);
+
+// specDiff / mirrorValues via the canonical triggers_key (§13)
+$spec_new = ['title' => 'T', 'triggers' => [
+    ['type' => 'time', 'cron' => '*/5 * * * *', 'event' => ''],
+    ['type' => 'event', 'cron' => '', 'event' => 'a:one'],
+], 'command_type' => 'module', 'command' => 'x', 'args' => '', 'timeout_sec' => 300];
+$row_same = ['title' => 'T', 'triggers_key' => ScheduleService::triggersKey($spec_new['triggers']), 'command_type' => 'module', 'command' => 'x', 'args' => '', 'timeout_sec' => 300];
+check('specDiff: same triggers -> no diff', ScheduleService::specDiff($row_same, $spec_new) === []);
+$row_changed = ['title' => 'T', 'triggers_key' => ScheduleService::triggersKey([['type' => 'time', 'cron' => '*/5 * * * *', 'event' => '']]), 'command_type' => 'module', 'command' => 'x', 'args' => '', 'timeout_sec' => 300];
+check('specDiff: added event trigger -> triggers_key in diff', in_array('triggers_key', ScheduleService::specDiff($row_changed, $spec_new), true));
 
 rrm($root);
 

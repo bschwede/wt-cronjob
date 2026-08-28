@@ -69,17 +69,21 @@ then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 | :--- | :--- |
 | **Name (slug)** | technical identifier, `a-z 0-9 _ -`. **Read-only for module-offered jobs** (their `<module>:<name>` key is fixed and cannot be retargeted); editable for jobs you create yourself. |
 | **Title** | human readable name |
-| **Trigger** | **Time-based** (a cron schedule) or **Event** (runs when a named event is queued). See "Event-driven jobs". |
-| **Cron expression** | (time-based only) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 5 runs. |
-| **Event name** | (event only) the event this job reacts to, e.g. `linkenhancer:index-dirty`. Suggestions come from the **event catalog** (module announcements, built-in pseudo-events `cronjob:…`, route events `_route:…` and listened names); any own name (webhook / direct module push) works too. Slug or `<domain>:slug`, max 64 chars. |
+| **Triggers** | one or more **time triggers** (cron schedules) and/or one or more **event triggers** (runs when a named event is queued) - the job fires when *any* of its triggers fires. At least one trigger is required. Rows can be added/removed in the form. See "Event-driven jobs". |
+| **Cron expression** | (time trigger) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). Multiple cron rows are possible (e.g. hourly *and* a daily full run). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 3 runs per expression. |
+| **Event name** | (event trigger) the event this job reacts to, e.g. `linkenhancer:index-dirty`. Multiple event rows are possible. Suggestions come from the **event catalog** (module announcements, built-in pseudo-events `cronjob:…`, route events `_route:…` and listened names); any own name (webhook / direct module push) works too. Slug or `<domain>:slug`, max 64 chars. |
 | **Command** | a `modules_v4/<module>/cli/<script>.php` path or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting`. Suggestions come from the **command catalog** (core allowlist + module announcements + module scripts). When the entered command matches an announced command, its **available parameters** are listed as a hint under the field. |
 | **Arguments** | plain options/values only (e.g. `--limit=5000`), max 10 tokens |
 | **Timeout** | 30 - 3600 s |
 | **Notify on failure** | opt-in: alert the administrator accounts when this job fails |
 
-The **Run now** button queues the job for the next tick (≤ 60 s). The **History**
-page shows status, exit code, duration and the captured output (last 64 KB) of the
-last 25 runs per job (plus a 30-day global retention window).
+The **Run now** button queues the job for the next tick (≤ 60 s). For a **disabled**
+job the queued run happens at the first tick *after* it is (re-)enabled - the button
+tooltip and the flash message say so (there is deliberately no guard: disabling the
+job right after the click reaches the same state anyway). The **History** page shows
+status, exit code, duration, the **trigger that fired the run** (the due cron
+expression(s) or the event name) and the captured output (last 64 KB) of the last 25
+runs per job (plus a 30-day global retention window).
 
 The job table is a **client-side DataTable** (search box, sortable columns, paging,
 state saved in the browser) - no extra setup needed. The **Enabled** and **Notify**
@@ -258,7 +262,9 @@ return [
     [
         'name'         => 'link-index',
         'title'        => 'Update the link index',
-        'cron'         => '*/30 * * * *',
+        'triggers'     => [
+            ['type' => 'time', 'cron' => '*/30 * * * *'],
+        ],
         'command_type' => 'module',
         'command'      => 'modules_v4/linkenhancer/cli/build-link-index.php',
         'args'         => '--limit=5000',
@@ -289,15 +295,20 @@ declare(strict_types=1);
 return [
     'jobs' => [
         [
-            'name'         => 'link-index',
-            'cron'         => '*/30 * * * *',
+            'name'     => 'link-index',
+            'triggers' => [
+                ['type' => 'time', 'cron' => '*/30 * * * *'],
+                // A job may combine several triggers:
+                // ['type' => 'event', 'event' => 'linkenhancer:index-dirty'],
+            ],
             'command_type' => 'module',
             'command'      => 'modules_v4/linkenhancer/cli/build-link-index.php',
         ],
         [
-            'name'         => 'reindex-on-dirty',
-            'trigger_type' => 'event',
-            'event_name'   => 'linkenhancer:index-dirty', // listen to your own event
+            'name'     => 'reindex-on-dirty',
+            'triggers' => [
+                ['type' => 'event', 'event' => 'linkenhancer:index-dirty'], // listen to your own event
+            ],
             'command_type' => 'module',
             'command'      => 'modules_v4/linkenhancer/cli/build-link-index.php',
         ],
@@ -309,7 +320,7 @@ return [
 ```
 
 - An announced event is namespaced **`<module>:<name>`** (like the offered job keys).
-- An event job's `event_name` that carries no colon is auto-namespaced
+- An event trigger's `event` value that carries no colon is auto-namespaced
   `<module>:<event>`; a name that already has a colon (e.g.
   `cronjob:gedcom-changed`) is kept as-is.
 - Equivalent marker method: `getModuleEvents(): array` (same event-spec shape).
@@ -375,7 +386,7 @@ value) and `description` (optional). Equivalent marker method:
 | :--- | :--- | :--- |
 | `name` | yes | slug `a-z 0-9 _ -`, max 64; stored as `<module>:<name>` |
 | `title` | no | human name (defaults to `name`) |
-| `cron` | yes | 5-field cron expression |
+| `triggers` | yes | list of trigger entries: `['type' => 'time', 'cron' => '…']` and/or `['type' => 'event', 'event' => '…']`, at least one (mixing both is allowed - the job fires on any of them). The legacy single-trigger keys `trigger_type` + `cron` / `event_name` are still accepted and normalized to one trigger. |
 | `command_type` | yes | `module` (`modules_v4/.../cli/*.php`) or `core` (allowlisted) |
 | `command` | yes | the command - validated exactly like a hand-made job |
 | `args` | no | plain option/value tokens |
@@ -384,21 +395,21 @@ value) and `description` (optional). Equivalent marker method:
 
 A malformed or misbehaving manifest is skipped silently - it can never break the
 tick. Once a discovered job is inserted it is **admin-owned**: later ticks never
-overwrite it, so edits to cron, arguments or the enabled flag are safe. (A spec
+overwrite it, so edits to triggers, arguments or the enabled flag are safe. (A spec
 *added* to the manifest appears on the next tick; a *removed* spec leaves the
 already-created job in place.)
 
 **Exception - the module's own manifest.** cronjob also ships a
 `modules_v4/cronjob/cron-jobs.php` that offers its own `cronjob:pseudo-events`
 job. Unlike external jobs, this one is **force-synced to the manifest on every
-tick**: if a module update changes the spec (cron, timeout, command, …), the
+tick**: if a module update changes the spec (triggers, timeout, command, …), the
 stored job is re-synced to the new values within one tick. The admin's `enabled`
 state, the notify flag, the slug and the run history are preserved, and the next
-run is only rescheduled when the cron expression itself changed.
+run is only rescheduled when the trigger set itself changed.
 
 In the admin table, every job that is **currently offered by a module** carries a
 "from module …" badge. Its **Reset** button restores the defaults currently in the
-manifest (title, trigger, cron, command, args, timeout, enabled state); the slug,
+manifest (title, triggers, command, args, timeout, enabled state); the slug,
 the notify setting and the run history are kept. If the module is removed or no
 longer offers the spec, the badge and the reset button disappear.
 
@@ -477,7 +488,8 @@ Queuing an event has four sources:
    `/tree/{tree}/`) queues its event immediately, right inside the request that made
    the change. See "Route events (request-triggered)".
 
-The tick matches each pending event against enabled `trigger_type='event'` jobs, runs
+The tick matches each pending event against the enabled jobs that carry an event
+trigger for that name (a job can have several event triggers, or none at all), runs
 them, then marks the event handled (consumed once - even on failure, so a failing job
 does not re-run the same event forever). Every consuming run is additionally linked to
 the event in the `cj_event_run` cross table (an event can trigger several jobs), and
@@ -679,7 +691,11 @@ from the route path** in the event catalog, **DataTables** for the event and com
 catalogs in the admin page, and the **command catalog** (`cj_command_catalog`: core
 allowlist + module command announcements with structured parameters + module scripts,
 with a per-module curation rule so internal scripts are not offered, and a dynamic
-parameter hint in the job form). See the sections above.
+parameter hint in the job form), and **multi-trigger jobs** (triggers moved to the
+`cj_job_trigger` cross table: a job can combine any number of cron schedules and
+event triggers - it fires on any of them; the job's `next_run_at` is the minimum over
+its time triggers, the run history records which cron/event fired, and "Run now" on
+a disabled job runs once at (re-)enable). See the sections above.
 
 Still open:
 
@@ -694,7 +710,7 @@ php modules_v4/cronjob/tests/test-args-validator.php  # command whitelist + arg 
 php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cleanly without the bundled vendor)
 php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron descriptions (standalone)
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
-php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event+command spec validators, manifest loading (jobs/events/commands), event naming, command-catalog merge, W1 payload confinement (standalone)
+php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event+command spec validators, manifest loading (jobs/events/commands), event naming, command-catalog merge, W1 payload confinement, multi-trigger (normalizeTriggers/triggersKey/nextRunMin/dueTriggerDetails, specDiff) (standalone)
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
 php modules_v4/cronjob/tests/test-route-events.php   # route events: rule-based map builder (filters, collision suffixes, fallback), success gate, payload builder, payload-key derivation from path (standalone)
 ```

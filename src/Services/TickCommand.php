@@ -34,7 +34,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+use function array_filter;
 use function array_map;
+use function array_values;
 use function explode;
 use function function_exists;
 use function implode;
@@ -167,18 +169,38 @@ final class TickCommand extends Command {
      * Run one job (shared by the time-based loop and the event queue):
      * definition check, dry-run, execution, history, failure notification.
      *
+     * $trigger_detail names what fired the run (§13): for schedule runs the
+     * due cron expression(s) - derived from the triggers, defaulting to ''
+     * when nothing can be determined (e.g. a "run now" queue).
+     *
      * @return array{run_id: int, ok: bool}
      */
-    private function runOneJob(object $job, string $trigger, InputInterface $input, OutputInterface $output): array {
+    private function runOneJob(object $job, string $trigger, InputInterface $input, OutputInterface $output, string $trigger_detail = ''): array {
         $dry_run     = (bool) $input->getOption('dry-run');
         $full_output = (bool) $input->getOption('full-output');
+
+        $triggers = ScheduleService::jobTriggers((int) $job->id);
+
+        if ($trigger === 'schedule' && $trigger_detail === '') {
+            // Which cron(s) were due since the previous run (anchor: last
+            // run, or the job creation for never-run jobs)?
+            $anchor = (string) ($job->last_run_at ?? $job->created_at);
+            $trigger_detail = implode(' + ', ScheduleService::dueTriggerDetails(
+                array_values(array_filter(
+                    $triggers,
+                    static fn (array $t): bool => $t['type'] === ScheduleService::TRIGGER_TIME
+                )),
+                $anchor,
+                ScheduleService::now()
+            ));
+        }
 
         $built = JobRunner::buildArgv((array) $job, Webtrees::ROOT_DIR);
         if ($built['error'] !== '') {
             $output->writeln('  <error>invalid job definition: ' . $built['error'] . '</error>');
             // Move the schedule forward so a broken job does not re-trigger
             // every minute; a broken definition is a failure to report.
-            ScheduleService::updateJobAfterRun($job, ScheduleService::now(), ScheduleService::STATUS_ERROR, -1);
+            ScheduleService::updateJobAfterRun($job, $triggers, ScheduleService::now(), ScheduleService::STATUS_ERROR, -1);
             NotifyService::notifyJobFailed($job, ScheduleService::STATUS_ERROR, -1, 0, '', ScheduleService::now());
 
             return ['run_id' => 0, 'ok' => false];
@@ -191,7 +213,7 @@ final class TickCommand extends Command {
         }
 
         $started_at  = ScheduleService::now();
-        $run_id      = ScheduleService::startRun((int) $job->id, $trigger, $started_at);
+        $run_id      = ScheduleService::startRun((int) $job->id, $trigger, $started_at, $trigger_detail);
         $start_micro = microtime(true);
 
         $result = JobRunner::run($built['argv'], (int) $job->timeout_sec, JobRunner::cwdFor((array) $job, Webtrees::ROOT_DIR));
@@ -203,7 +225,7 @@ final class TickCommand extends Command {
 
         $done = ScheduleService::now();
         ScheduleService::finishRun($run_id, $status, $result['exit'], $duration_ms, $result['output'], $done);
-        ScheduleService::updateJobAfterRun($job, $done, $status, $result['exit']);
+        ScheduleService::updateJobAfterRun($job, $triggers, $done, $status, $result['exit']);
 
         if ($full_output && $result['output'] !== '') {
             foreach (explode("\n", trim($result['output'])) as $line) {
@@ -241,7 +263,7 @@ final class TickCommand extends Command {
             $run_id = 0;
             foreach ($matched as $job) {
                 $output->writeln('  job ' . $job->name . ':');
-                $result = $this->runOneJob($job, 'event', $input, $output);
+                $result = $this->runOneJob($job, 'event', $input, $output, $name);
                 if ($run_id === 0 && $result['run_id'] !== 0) {
                     $run_id = $result['run_id'];
                 }

@@ -48,8 +48,9 @@ return [
         [
             'name'         => 'pseudo-events',
             'title'        => 'Cronjob: Pseudo-Events (state-poll detectors)',
-            'trigger_type' => 'time',
-            'cron'         => '*/5 * * * *',
+            'triggers'     => [
+                ['type' => 'time', 'cron' => '*/5 * * * *'],
+            ],
             'command_type' => 'module',
             'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
             'args'         => '',

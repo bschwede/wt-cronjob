@@ -112,10 +112,12 @@ final class EventCatalogService {
         }
 
         // 4. Listened for by an enabled event job (webhook-only names too).
-        foreach (DB::table('cj_job')
-            ->where('enabled', '=', 1)
-            ->where('trigger_type', '=', ScheduleService::TRIGGER_EVENT)
-            ->pluck('event_name') as $name) {
+        foreach (DB::table('cj_job_trigger')
+            ->join('cj_job', 'cj_job.id', '=', 'cj_job_trigger.job_id')
+            ->where('cj_job.enabled', '=', 1)
+            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
+            ->whereNotNull('cj_job_trigger.event_name')
+            ->pluck('cj_job_trigger.event_name') as $name) {
             $name = strval($name);
             if ($name !== '' && strlen($name) <= 64 && !isset($catalog[$name])) {
                 $catalog[$name] = [

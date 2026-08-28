@@ -11,6 +11,7 @@ use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
  * @var object|null $job
  * @var array<int, object> $runs
  * @var array<int, list<array{name: string, payload: array<string, mixed>, created_at: string}>> $run_events
+ * @var list<array{type: string, cron: string, event: string}> $triggers
  * @var int $page
  * @var int $per_page
  * @var int $total
@@ -39,7 +40,15 @@ $crumbs[0] = I18N::translate('History');
     <p><?= I18N::translate('Job not found.') ?></p>
 <?php else: ?>
     <p class="text-muted">
-        <code><?= e($job->cron) ?></code>
+        <?php foreach ($triggers as $trigger): ?>
+            <?php if ($trigger['type'] === 'event'): ?>
+                <span class="badge bg-info"><?= I18N::translate('event') ?></span>
+                <code><?= e($trigger['event']) ?></code>
+            <?php else: ?>
+                <code><?= e($trigger['cron']) ?></code>
+            <?php endif; ?>
+            <?php if (count($triggers) > 1): ?><?= I18N::translate('or') ?> <?php endif; ?>
+        <?php endforeach; ?>
         · <?= e($job->command) ?>
         <?php if ($job->args !== ''): ?><?= e($job->args) ?><?php endif; ?>
     </p>
@@ -71,7 +80,12 @@ $crumbs[0] = I18N::translate('History');
                 ?>
                 <tr>
                     <td><?= e((string) $run->started_at) ?></td>
-                    <td><?= e((string) $run->trigger) ?></td>
+                    <td>
+                        <?= e((string) $run->trigger) ?>
+                        <?php if (isset($run->trigger_detail) && $run->trigger_detail !== null && (string) $run->trigger_detail !== ''): ?>
+                            <br><code><?= e((string) $run->trigger_detail) ?></code>
+                        <?php endif; ?>
+                    </td>
                     <td class="text-start">
                         <?php foreach ($run_events[(int) $run->id] ?? [] as $event): ?>
                             <div>

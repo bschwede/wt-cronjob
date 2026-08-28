@@ -108,7 +108,7 @@ final class CronjobUtils {
 
         $latest = [];
         $runs   = DB::table('cj_run')
-            ->get(['id', 'job_id', 'started_at', 'finished_at', 'status', 'exit_code', 'duration_ms'])
+            ->get(['id', 'job_id', 'started_at', 'finished_at', 'status', 'exit_code', 'duration_ms', 'trigger', 'trigger_detail'])
             ->all();
         foreach ($runs as $run) {
             $job_id = (int) $run->job_id;
@@ -132,34 +132,29 @@ final class CronjobUtils {
     }
 
     /**
-     * Insert or update a job row. $data keys: name, title, cron,
+     * Insert or update a job row. $data keys: name, title, triggers
+     * (normalized list, see ScheduleService::normalizeTriggers()),
      * command_type, command, args, timeout_sec, enabled, created_at.
      *
      * With $id > 0 the existing row is updated by id - renaming a job
      * (changing its slug) then works instead of creating a duplicate.
-     * next_run_at is (re)computed from $now.
+     * next_run_at is (re)computed from $now as the minimum over the time
+     * triggers (§13); the trigger rows are replaced.
+     *
+     * @param array<string, mixed> $data
      */
     public static function saveJob(array $data, string $now, int $id = 0): void {
-        $trigger    = (($data['trigger_type'] ?? 'time') === 'event') ? 'event' : 'time';
-        $event_name = $trigger === 'event' ? ($data['event_name'] ?? null) : null;
-
-        $next = null;
-        if ($trigger === 'time') {
-            $next = Services\ScheduleService::nextRun($data['cron'], $now);
-        }
+        $triggers = (array) ($data['triggers'] ?? []);
 
         $values = [
             'title'        => $data['title'],
-            'trigger_type' => $trigger,
-            'event_name'   => $event_name,
-            'cron'         => $trigger === 'time' ? $data['cron'] : '',
             'command_type' => $data['command_type'],
             'command'      => $data['command'],
             'args'         => $data['args'],
             'enabled'      => $data['enabled'] ? 1 : 0,
             'notify'       => (!empty($data['notify'])) ? 1 : 0,
             'timeout_sec'  => $data['timeout_sec'],
-            'next_run_at'  => $next,
+            'next_run_at'  => Services\ScheduleService::nextRunMin($triggers, $now),
             'updated_at'   => $now,
         ];
 
@@ -168,11 +163,12 @@ final class CronjobUtils {
                 'name' => $data['name'],
             ]);
         } else {
-            DB::table('cj_job')->insert($values + [
+            $id = (int) DB::table('cj_job')->insertGetId($values + [
                 'name'       => $data['name'],
                 'created_at' => $data['created_at'] ?? $now,
             ]);
         }
+        Services\ScheduleService::replaceJobTriggers($id, $triggers);
     }
 
     /**

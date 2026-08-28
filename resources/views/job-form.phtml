@@ -11,10 +11,10 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
  * @var \Schwendinger\Webtrees\Module\Cronjob\CronjobModule $module
  * @var object|null $job
  * @var array<string, array{command_type: string, source: string, description: string, params: list<array<string, mixed>>}> $command_catalog
- * @var array<int, string>|null $preview
  * @var string $cron_now
- * @var string $trigger_type
- * @var string $event_name
+ * @var list<string> $triggers_time
+ * @var list<string> $triggers_event
+ * @var array<int, array<int, string>|null> $cron_previews
  * @var bool $notify
  * @var string|null $copy_of
  * @var array<string, mixed>|null $form_values
@@ -46,9 +46,10 @@ $name_pattern = $is_offered
     : '[a-z0-9][a-z0-9_\-]{0,63}';
 
 // On a failed save the form is re-rendered with the submitted values.
+// (The trigger rows travel in $triggers_time/$triggers_event - the action
+// already merged the stash into them.)
 $name_v    = $fv['name'] ?? ($is_edit ? (string) $job->name : '');
 $title_v   = $fv['title'] ?? ($is_edit ? (string) $job->title : '');
-$cron_v    = $fv['cron'] ?? ($is_edit ? (string) $job->cron : '');
 $command_v = $fv['command'] ?? ($is_edit ? (string) $job->command : '');
 $args_v    = $fv['args'] ?? ($is_edit ? (string) $job->args : '');
 $timeout_v = $fv['timeout'] ?? ($is_edit ? (int) $job->timeout_sec : $module::TIMEOUT_STD);
@@ -121,54 +122,78 @@ if ($copy_of !== null) {
     </fieldset>
 
     <fieldset class="border rounded p-3 mb-3">
-        <legend><?= I18N::translate('Trigger / Schedule') ?></legend>
+        <legend><?= I18N::translate('Triggers') ?></legend>
+        <div class="form-text">
+            <?= I18N::translate('The job runs when any of its triggers fires: on one or more cron schedules (UTC) and/or on one or more named events. At least one trigger is required.') ?>
+        </div>
 
         <div class="mb-3">
-            <label for="cj_trigger_type" class="form-label"><?= I18N::translate('Trigger') ?></label>
-            <select class="form-select" id="cj_trigger_type" name="trigger_type">
-                <option value="time" <?= $trigger_type === 'time' ? 'selected' : '' ?>><?= I18N::translate('Time-based (cron schedule)') ?></option>
-                <option value="event" <?= $trigger_type === 'event' ? 'selected' : '' ?>><?= I18N::translate('Event (webhook or module push)') ?></option>
-            </select>
-        </div>
-
-        <div id="cj_time_fields" <?= $trigger_type === 'event' ? 'hidden' : '' ?>>
-            <div class="mb-3">
-                <label for="cj_cron" class="form-label"><?= I18N::translate('Cron expression (5 fields, UTC)') ?></label>
-                <input type="text" class="form-control" id="cj_cron" name="cron"
-                       placeholder="*/30 * * * *"
-                       value="<?= e($cron_v) ?>">
-                <div class="form-text"><?= I18N::translate('All times are UTC (webtrees server time). Current time (UTC): %s', $cron_now) ?></div>
+            <label class="form-label"><?= I18N::translate('Time triggers (cron schedule)') ?></label>
+            <div id="cj_time_rows">
+                <?php foreach ($triggers_time as $i => $cron_value): ?>
+                    <div class="input-group input-group-sm mb-1">
+                        <input type="text" class="form-control" name="triggers_time[]"
+                               placeholder="*/30 * * * *"
+                               value="<?= e($cron_value) ?>">
+                        <button type="button" class="btn btn-outline-secondary cj_remove_time" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
+                    </div>
+                    <?php if (isset($cron_previews[$i])): ?>
+                        <?php if ($cron_previews[$i] !== null): ?>
+                            <div class="text-muted mb-1 ms-2">
+                                <?= I18N::translate('Next runs (UTC):') ?>
+                                <?php foreach ($cron_previews[$i] as $run): ?>
+                                    <code><?= e($run) ?></code>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-danger mb-1 ms-2"><?= I18N::translate('Invalid cron expression (5 fields, UTC).') ?></div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                <?php endforeach; ?>
             </div>
-
-            <?php if ($preview !== null): ?>
-                <div class="mb-3">
-                    <span class="text-muted"><?= I18N::translate('Next runs (UTC):') ?></span>
-                    <ul class="mb-0">
-                        <?php foreach ($preview as $run): ?>
-                            <li><code><?= e($run) ?></code></li>
-                        <?php endforeach; ?>
-                    </ul>
+            <div class="form-text"><?= I18N::translate('All times are UTC (webtrees server time). Current time (UTC): %s', $cron_now) ?></div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cj_add_time"><?= I18N::translate('+ Add cron trigger') ?></button>
+            <template id="cj_time_row_template">
+                <div class="input-group input-group-sm mb-1">
+                    <input type="text" class="form-control" name="triggers_time[]" placeholder="*/30 * * * *">
+                    <button type="button" class="btn btn-outline-secondary cj_remove_time" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
                 </div>
-            <?php endif; ?>
+            </template>
         </div>
 
-        <div id="cj_event_fields" <?= $trigger_type === 'time' ? 'hidden' : '' ?>>
-            <div class="mb-3">
-                <label for="cj_event_name" class="form-label"><?= I18N::translate('Event name') ?></label>
-                <input type="text" class="form-control" id="cj_event_name" name="event_name"
-                       pattern="[a-z0-9][a-z0-9_\-]{0,63}(?::[a-z0-9_][a-z0-9_\-]{0,63})?"
-                       maxlength="64"
-                       list="cj_event_names"
-                       placeholder="cronjob:gedcom-changed"
-                       value="<?= e($event_name) ?>">
-                <datalist id="cj_event_names">
-                    <?php foreach ($event_catalog as $name => $entry): ?>
-                        <option value="<?= e((string) $name) ?>"><?= e($entry['description'] !== '' ? I18N::translate((string) $entry['description']) : ((string) $name . ' (' . $entry['source'] . ')')) ?></option>
-                    <?php endforeach; ?>
-                </datalist>
-                <div class="form-text"><?= I18N::translate('The job runs once for each queued event with this name (webhook, module push, built-in pseudo-event poller, or a route trigger).') ?></div>
-                <div class="form-text"><?= I18N::translate('Suggested: module-announced events, built-in pseudo-events (cronjob:…) and route events (_route:…). Plain slugs for your own events work too. The full list is in the event catalog on the admin page.') ?></div>
+        <div class="mb-3">
+            <label class="form-label"><?= I18N::translate('Event triggers') ?></label>
+            <div id="cj_event_rows">
+                <?php foreach ($triggers_event as $event_value): ?>
+                    <div class="input-group input-group-sm mb-1">
+                        <input type="text" class="form-control" name="triggers_event[]"
+                               pattern="[a-z0-9][a-z0-9_\-]{0,63}(?::[a-z0-9_][a-z0-9_\-]{0,63})?"
+                               maxlength="64"
+                               list="cj_event_names"
+                               placeholder="cronjob:gedcom-changed"
+                               value="<?= e($event_value) ?>">
+                        <button type="button" class="btn btn-outline-secondary cj_remove_event" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
+                    </div>
+                <?php endforeach; ?>
             </div>
+            <datalist id="cj_event_names">
+                <?php foreach ($event_catalog as $name => $entry): ?>
+                    <option value="<?= e((string) $name) ?>"><?= e($entry['description'] !== '' ? I18N::translate((string) $entry['description']) : ((string) $name . ' (' . $entry['source'] . ')')) ?></option>
+                <?php endforeach; ?>
+            </datalist>
+            <div class="form-text"><?= I18N::translate('The job runs once for each queued event with one of these names (webhook, module push, built-in pseudo-event poller, or a route trigger).') ?></div>
+            <div class="form-text"><?= I18N::translate('Suggested: module-announced events, built-in pseudo-events (cronjob:…) and route events (_route:…). Plain slugs for your own events work too. The full list is in the event catalog on the admin page.') ?></div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cj_add_event"><?= I18N::translate('+ Add event trigger') ?></button>
+            <template id="cj_event_row_template">
+                <div class="input-group input-group-sm mb-1">
+                    <input type="text" class="form-control" name="triggers_event[]"
+                           pattern="[a-z0-9][a-z0-9_\-]{0,63}(?::[a-z0-9_][a-z0-9_\-]{0,63})?"
+                           maxlength="64"
+                           list="cj_event_names"
+                           placeholder="cronjob:gedcom-changed">
+                    <button type="button" class="btn btn-outline-secondary cj_remove_event" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
+                </div>
+            </template>
         </div>
     </fieldset>
 
@@ -216,21 +241,34 @@ if ($copy_of !== null) {
 
 <script>
     (function () {
-        // Trigger type toggle (time vs event fields).
-        var sel = document.getElementById('cj_trigger_type');
-        var timeFields = document.getElementById('cj_time_fields');
-        var eventFields = document.getElementById('cj_event_fields');
-        var cron = document.getElementById('cj_cron');
-        var eventName = document.getElementById('cj_event_name');
-        function toggle() {
-            var isEvent = sel.value === 'event';
-            timeFields.hidden = isEvent;
-            eventFields.hidden = !isEvent;
-            cron.required = !isEvent;
-            eventName.required = isEvent;
+        // Multi-trigger rows (§13): add/remove cron and event trigger rows.
+        function wireRows(containerId, buttonId, templateId, removeClass) {
+            var container = document.getElementById(containerId);
+            var button = document.getElementById(buttonId);
+            var template = document.getElementById(templateId);
+            if (!container || !button || !template) {
+                return;
+            }
+            button.addEventListener('click', function () {
+                var clone = template.content.cloneNode(true);
+                var input = clone.querySelector('input');
+                if (input) {
+                    input.value = '';
+                }
+                container.appendChild(clone);
+            });
+            container.addEventListener('click', function (e) {
+                var target = e.target;
+                if (target && target.classList && target.classList.contains(removeClass)) {
+                    var row = target.closest('.input-group');
+                    if (row && row.parentElement === container) {
+                        row.remove();
+                    }
+                }
+            });
         }
-        sel.addEventListener('change', toggle);
-        toggle();
+        wireRows('cj_time_rows', 'cj_add_time', 'cj_time_row_template', 'cj_remove_time');
+        wireRows('cj_event_rows', 'cj_add_event', 'cj_event_row_template', 'cj_remove_event');
 
         // Dynamic hint: when the entered command matches an announced command,
         // list its available parameters under the field.

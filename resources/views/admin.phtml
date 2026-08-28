@@ -20,6 +20,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var bool $route_events
  * @var array<string, array{source: string, description: string, payload: list<string>}> $event_catalog
  * @var array<string, array{command_type: string, source: string, description: string, params: list<array<string, mixed>>}> $command_catalog
+ * @var array<int, list<array{type: string, cron: string, event: string}>> $triggers_by_job
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -68,7 +69,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
         <thead>
             <tr>
                 <th><?= I18N::translate('Job') ?></th>
-                <th><?= I18N::translate('Schedule') ?></th>
+                <th><?= I18N::translate('Triggers') ?></th>
                 <th><?= I18N::translate('Next Run (UTC)') ?></th>
                 <th><?= I18N::translate('Last Run') ?></th>
                 <th><?= I18N::translate('Enabled') ?></th>
@@ -104,17 +105,30 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     <?php endif; ?>
                 </td>
                 <td>
-                    <?php if ((string) $job->trigger_type === 'event'): ?>
-                        <span class="badge bg-info"><?= I18N::translate('event') ?></span>
-                        <code><?= e((string) $job->event_name) ?></code>
+                    <?php
+                    $triggers = $triggers_by_job[(int) $job->id] ?? [];
+                    if ($triggers === []):
+                    ?>
+                        <span class="badge bg-warning text-dark" title="<?= e(I18N::translate('This job has no usable trigger (pathological legacy row) - edit and save it to set one.')) ?>">
+                            <?= I18N::translate('no trigger') ?>
+                        </span>
                     <?php else: ?>
-                        <code><?= e($job->cron) ?></code>
-                        <?php
-                        $human = ScheduleService::humanizeCron((string) $job->cron);
-                        if ($human !== '' && $human !== (string) $job->cron):
-                        ?>
-                            <div class="text-muted"><?= e($human) ?></div>
-                        <?php endif; ?>
+                        <?php foreach ($triggers as $trigger): ?>
+                            <?php if ($trigger['type'] === 'event'): ?>
+                                <span class="badge bg-info"><?= I18N::translate('event') ?></span>
+                                <code><?= e($trigger['event']) ?></code>
+                                <?php if (count($triggers) > 1): ?><br><?php endif; ?>
+                            <?php else: ?>
+                                <code><?= e($trigger['cron']) ?></code>
+                                <?php
+                                $human = ScheduleService::humanizeCron($trigger['cron']);
+                                if ($human !== '' && $human !== $trigger['cron']):
+                                ?>
+                                    <div class="text-muted"><?= e($human) ?></div>
+                                <?php endif; ?>
+                                <?php if (count($triggers) > 1): ?><br><?php endif; ?>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                 </td>
                 <td><?= $job->next_run_at !== null ? e((string) $job->next_run_at) : '—' ?></td>
@@ -135,6 +149,9 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                             <?= e((string) $last->started_at) ?>
                             · <?= (int) $last->duration_ms ?> ms
                             · exit <?= (int) $last->exit_code ?>
+                            <?php if (isset($last->trigger_detail) && $last->trigger_detail !== null && (string) $last->trigger_detail !== ''): ?>
+                                <br><?= I18N::translate('triggered by') ?> <code><?= e((string) $last->trigger_detail) ?></code>
+                            <?php endif; ?>
                         </div>
                         <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobHistory', 'job' => (int) $job->id])) ?>">
                             <?= I18N::translate('History') ?>
@@ -167,7 +184,8 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobRunNow'])) ?>" class="d-inline">
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
-                        <button type="submit" class="btn btn-sm btn-info" title="<?= e(I18N::translate('Run at the next tick (within 60 seconds)')) ?>">
+                        <button type="submit" class="btn btn-sm btn-info"
+                                title="<?= e($enabled ? I18N::translate('Run at the next tick (within 60 seconds)') : I18N::translate('The job is disabled - the queued run happens at the next tick after it is (re-)enabled')) ?>">
                             <?= I18N::translate('Run now') ?>
                         </button>
                     </form>
