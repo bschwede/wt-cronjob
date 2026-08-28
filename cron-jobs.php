@@ -36,7 +36,7 @@ declare(strict_types=1);
  * It also announces its runnable CLI command(s) and their available
  * parameters (§12 command catalog) - here just pseudo-events.php. By
  * announcing, cronjob takes over curation of its own commands: the glob-based
- * discovery no longer lists its internal scripts (tick/watch/wrap/smoke-job),
+ * discovery no longer lists its internal scripts (tick/watch/wrap),
  * which must not be invoked directly as jobs.
  *
  * Pure data - the JobSpec / command-spec shapes, interpreted by cronjob's
@@ -70,5 +70,17 @@ return [
                 ],
             ],
         ],
+        [
+            'command'       => 'modules_v4/cronjob/cli/smoke-test.php',
+            'command_type'  => 'module',
+            'description'   => 'Acceptance-test job for the cronjob module. it only prints and exits 0.',
+            'params'        => [
+                [
+                    'name' => '--sleep=N',
+                    'optional' => true,
+                    'description' => 'keeps the process alive for N seconds (timeout testing)',
+                ],
+            ],
+        ],        
     ],
 ];
