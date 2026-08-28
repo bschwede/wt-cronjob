@@ -58,19 +58,23 @@ $crumbs = [
     route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
     $back_url => $module->title(),
 ];
+$header = "";
 if ($copy_of !== null) {
-    $crumbs[0] = I18N::translate('New Job (copy of %s)', $copy_of);
+    $header = I18N::translate('New Job (copy of %s)', $copy_of);    
+    $crumbs[0] = $header;
 } elseif ($is_edit) {
     $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = $job->title;
-    $crumbs[0] = I18N::translate('Edit Job');
+    $header = I18N::translate('Edit Job');
+    $crumbs[0] = $header;
 } else {
-    $crumbs[0] = I18N::translate('New Job');
+    $header = I18N::translate('New Job');
+    $crumbs[0] = $header;
 }
 
 ?>
 <?= view('components/breadcrumbs', ['links' => $crumbs]) ?>
 
-<h1><?= $copy_of !== null ? I18N::translate('New Job (copy of %s)', $copy_of) : ($is_edit ? I18N::translate('Edit Job') : I18N::translate('New Job')) ?></h1>
+<h1><?= $header ?></h1>
 
 <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobSave'])) ?>" class="needs-validation" novalidate>
     <?= csrf_field() ?>
