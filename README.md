@@ -223,6 +223,16 @@ wait a minute - the history page should show a green `ok` row.
 - **Kill switch:** disable the module in the module list - the tick then does nothing.
 - The tick is single-instance (flock on `data/cronjob-tick.lock`), and a job's child
   process is hard-killed after its timeout (`SIGKILL`).
+- **Event-queue coalescing (1.1.0).** A flood of identical events (e.g. many rapid
+  edits on a route event) cannot amplify into one job run per queued row: the tick
+  drains at most **one event per event name** (the newest) and drops the name's
+  superseded duplicates, and the event drain stops after a 60 s wall-clock budget -
+  a saturated queue then simply continues with the next tick. This relies on the
+  job-script convention (idempotent/incremental) stated above.
+- **Webhook token header-only (1.1.0).** The `?token=<token>` query fallback was
+  removed - a token in the URL would end up in access logs and proxy logs. Send the
+  token exclusively in the `X-Cronjob-Token` header (breaking change for senders
+  that used the query parameter).
 
 ## CLI scripts & maintenance (conventions for future job scripts)
 
@@ -451,8 +461,11 @@ job's working directory and arguments are unchanged too.
 
 Besides time-based schedules, a job can be triggered by an **event**. webtrees has no
 event system, so events are plain DB rows (a small `cj_event` queue) that the tick
-drains once a minute. An event-triggered job runs **once for each queued event** whose
-name matches its **Event name**.
+drains once a minute. An event-triggered job runs for a queued event whose name
+matches its **Event name** - **coalesced (1.1.0):** per tick at most the *newest*
+event of each name is drained (one run per name per tick), and the name's older
+pending duplicates are dropped - a burst of identical events never queues a burst of
+job runs (job scripts are idempotent/incremental by convention).
 
 **Naming scheme (analogous to job names).** Event names are slugs
 (`a-z 0-9 _ -`, max 64 chars total), optionally namespaced `<domain>:<slug>`:
@@ -469,11 +482,12 @@ Queuing an event has four sources:
 1. **Webhook (external systems).** GET the endpoint shown in the admin page
    (section "Event webhook"):
    `GET /module/_cronjob_/Event?event=<name>&data=<json>` with the token in the
-    `X-Cronjob-Token` header (or, less securely, as `?token=<token>`). `data` is an
-    optional JSON object, stored with the event. The endpoint requires the token, is
-    rate-limited (20/min per site), and only accepts events while the module is enabled.
-   It is a **GET**, not a POST: webtrees rejects POSTs without a session CSRF token,
-   which an external caller cannot send.
+    `X-Cronjob-Token` header (**header only** - since 1.1.0 the `?token=<token>`
+    query fallback is rejected, because a token in the URL ends up in access logs).
+    `data` is an optional JSON object, stored with the event. The endpoint requires
+    the token, is rate-limited (20/min per site), and only accepts events while the
+    module is enabled. It is a **GET**, not a POST: webtrees rejects POSTs without a
+    session CSRF token, which an external caller cannot send.
 2. **Direct call (your own modules).** From PHP code in another module:
    `\Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue::push('index-dirty', ['tree' => 'X']);`
    - this requires the cronjob module to be installed; guard it with
@@ -492,7 +506,10 @@ Queuing an event has four sources:
 The tick matches each pending event against the enabled jobs that carry an event
 trigger for that name (a job can have several event triggers, or none at all), runs
 them, then marks the event handled (consumed once - even on failure, so a failing job
-does not re-run the same event forever). Every consuming run is additionally linked to
+does not re-run the same event forever). The drain is bounded: it takes the newest
+event per name (coalescing, see above) and stops after a 60 s wall-clock budget, so a
+saturated queue cannot starve the rest of the tick - the remaining events simply
+continue with the next tick. Every consuming run is additionally linked to
 the event in the `cj_event_run` cross table (an event can trigger several jobs), and
 the run history shows which event triggered a run. Handled events are purged after
 7 days (their `cj_event_run` links are removed by the FK cascade); events with no
@@ -757,7 +774,10 @@ routes now require `{xref}` in the path and use the extended mutating prefixes
 renumber, search-replace, data fixes and bulk accept/reject - 38 events; orphaned
 `_route:*` triggers of jobs are flagged with an "unknown route event" badge), and
 **event payload in the child process** (event runs set `CRONJOB_EVENT` and, when the
-event carried one, `CRONJOB_EVENT_PAYLOAD` (JSON) in the job script's environment).
+event carried one, `CRONJOB_EVENT_PAYLOAD` (JSON) in the job script's environment),
+plus the **security hardening of 1.1.0** (event-queue coalescing + 60 s event-drain
+budget, webhook token header-only, output escaping in the job views, safe
+`confirm()` dialogs, and the corrected smoke-test catalog entry).
 See the sections above.
 
 Still open:
@@ -776,6 +796,7 @@ php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-
 php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event+command spec validators, manifest loading (jobs/events/commands), event naming, command-catalog merge, W1 payload confinement, multi-trigger (normalizeTriggers/triggersKey/nextRunMin/dueTriggerDetails, specDiff) (standalone)
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
 php modules_v4/cronjob/tests/test-route-events.php   # route events: map builder (record-route rule, tree-level allowlist, filters, collision suffixes, fallback), orphaned-event detection, success gate, payload builder, payload-key derivation from path (standalone)
+php modules_v4/cronjob/tests/test-event-queue.php    # event-queue coalescing: newest per event name, name cap, ordering (standalone)
 ```
 
 ## License

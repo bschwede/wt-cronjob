@@ -29,6 +29,8 @@ use Fisharebest\Webtrees\DB;
 use InvalidArgumentException;
 use PDOException;
 
+use function array_slice;
+use function array_values;
 use function date;
 use function is_array;
 use function json_decode;
@@ -38,6 +40,7 @@ use function strlen;
 use function strtotime;
 use function substr;
 use function trim;
+use function usort;
 
 use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
@@ -113,6 +116,65 @@ final class EventQueue {
         }
 
         return $query->get()->all();
+    }
+
+    /**
+     * The newest (highest id) pending row per event_name, capped at $limit
+     * distinct names - a flood of identical events therefore coalesces into
+     * one drain per name per tick instead of one job run per queued row
+     * (§16, F1). Pure (standalone-testable): $rows may arrive in any order;
+     * the result is ordered by id ascending (oldest first), like pending().
+     *
+     * @param list<object> $rows rows with ->id and ->event_name
+     *
+     * @return list<object>
+     */
+    public static function coalesceRows(array $rows, int $limit = 100): array {
+        $best = [];
+        foreach ($rows as $row) {
+            $name = (string) $row->event_name;
+            if (!isset($best[$name]) || (int) $row->id > (int) $best[$name]->id) {
+                $best[$name] = $row;
+            }
+        }
+
+        $kept = array_values($best);
+        usort($kept, static fn (object $a, object $b): int => (int) $a->id <=> (int) $b->id);
+
+        return array_slice($kept, 0, max(1, $limit));
+    }
+
+    /**
+     * Pending events, coalesced (§16, F1): at most one row per event_name
+     * (the newest). Rows beyond $fetch_cap (only reachable after the newer
+     * backlog is drained) wait for a later tick - with the superseded rows of
+     * drained names being dropped (forgetSuperseded), the queue stays bounded
+     * under a sustained flood.
+     *
+     * @return list<object>
+     */
+    public static function pendingCoalesced(int $limit = 100, int $fetch_cap = 1000): array {
+        $rows = DB::table('cj_event')
+            ->whereNull('handled_run_id')
+            ->orderByDesc('id')
+            ->limit($fetch_cap)
+            ->get()
+            ->all();
+
+        return self::coalesceRows($rows, $limit);
+    }
+
+    /**
+     * Drop the superseded pending duplicates of one coalesced event: the older
+     * pending rows of the same name. The coalesced event carries the name's
+     * state into the run, and job scripts are idempotent by convention.
+     */
+    public static function forgetSuperseded(string $event_name, int $keep_id): void {
+        DB::table('cj_event')
+            ->whereNull('handled_run_id')
+            ->where('event_name', '=', $event_name)
+            ->where('id', '<', $keep_id)
+            ->delete();
     }
 
     /**

@@ -203,7 +203,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     </a>
                     <?php if (isset($offered[$job->name])): ?>
                         <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobReset'])) ?>" class="d-inline"
-                              onsubmit="return confirm('<?= e(I18N::translate('Reset this job to the module defaults? Your changes (title, schedule, command, arguments, enabled state) will be lost; the notification setting is kept.')) ?>');">
+                              onsubmit='return confirm(<?= json_encode(I18N::translate('Reset this job to the module defaults? Your changes (title, schedule, command, arguments, enabled state) will be lost; the notification setting is kept.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);'>
                             <?= csrf_field() ?>
                             <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                             <button type="submit" class="btn btn-sm btn-warning"
@@ -213,7 +213,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         </form>
                     <?php endif; ?>
                     <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobDelete'])) ?>" class="d-inline"
-                          onsubmit="return confirm('<?= e(I18N::translate('Delete this job and its run history?')) ?>');">
+                          onsubmit='return confirm(<?= json_encode(I18N::translate('Delete this job and its run history?'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);'>
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                         <button type="submit" class="btn btn-sm btn-danger">
@@ -355,7 +355,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                         <input type="text" class="form-control" id="cj_webhook_url" readonly
                             value="<?= e(route('module', ['module' => $module->name(), 'action' => 'Event'])) ?>">
                         <div class="form-text">
-                            <?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header (or, less secure, as ?token=…).') ?>
+                            <?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header (never in the URL - it would end up in access logs).') ?>
                         </div>
                     </div>
                     <div class="mb-2">

@@ -63,6 +63,13 @@ use const JSON_UNESCAPED_UNICODE;
  */
 final class TickCommand extends Command {
 
+    /**
+     * Wall-clock budget for the event drain (§16, F1): a saturated queue must
+     * not starve the rest of the tick (or hold the tick lock past the next
+     * minute). Remaining events stay pending for the next tick.
+     */
+    private const DRAIN_BUDGET_SECONDS = 60;
+
     protected function configure(): void {
         $this->setName('cron:tick')
             ->setDescription('Run the due jobs of the webtrees cronjob module')
@@ -268,17 +275,29 @@ final class TickCommand extends Command {
     }
 
     /**
-     * Drain the event queue: for each pending event run its matching
-     * event-triggered jobs once, then mark the event handled (consumed).
-     * Events with no matching job are discarded so the queue does not grow.
+     * Drain the event queue: for each pending event (coalesced - at most one
+     * per event name, see EventQueue::pendingCoalesced()) run its matching
+     * event-triggered jobs once, then mark the event handled (consumed) and
+     * drop the name's superseded duplicates. Events with no matching job are
+     * discarded so the queue does not grow. The drain stops after its wall-
+     * clock budget (§16, F1): a saturated queue must not starve the rest of
+     * the tick - the remaining events stay pending for the next tick (this is
+     * NOT a failure for --strict).
      *
      * @return int number of failed runs
      */
     private function drainEvents(InputInterface $input, OutputInterface $output): int {
         $dry_run  = (bool) $input->getOption('dry-run');
         $failures = 0;
+        $started  = microtime(true);
 
-        foreach (EventQueue::pending() as $event) {
+        foreach (EventQueue::pendingCoalesced() as $event) {
+            if (microtime(true) - $started >= self::DRAIN_BUDGET_SECONDS) {
+                $output->writeln('event drain budget (' . self::DRAIN_BUDGET_SECONDS . ' s) reached - remaining events stay pending for the next tick');
+
+                break;
+            }
+
             $name    = (string) $event->event_name;
             $payload = EventQueue::decodePayload($event);
             $matched = ScheduleService::eventJobs($name);
@@ -302,6 +321,7 @@ final class TickCommand extends Command {
 
             if (!$dry_run) {
                 EventQueue::markHandled((int) $event->id, $run_id);
+                EventQueue::forgetSuperseded($name, (int) $event->id);
             }
         }
 

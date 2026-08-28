@@ -164,7 +164,7 @@ class CronjobModule extends AbstractModule
     }
 
     public function customModuleVersion(): string {
-        return '1.0.0';
+        return '1.1.0';
     }
 
     /**
@@ -789,7 +789,9 @@ class CronjobModule extends AbstractModule
 
     /**
      * GET /module/_cronjob_/Event?event=<name>&data=<json>
-     * (token in the X-Cronjob-Token header, or as ?token=<token>).
+     * (token in the X-Cronjob-Token header ONLY - never the query string, so
+     * it cannot end up in access logs; the ?token= fallback was removed in
+     * 1.1.0, see the module README, section "Event webhook").
      *
      * Queues an event for the tick to dispatch to matching event-triggered
      * jobs. Fails closed: a missing/empty token is always rejected.
@@ -808,9 +810,6 @@ class CronjobModule extends AbstractModule
 
         $expected = $this->getPreference(self::PREF_EVENT_TOKEN);
         $provided = $request->getHeaderLine('X-Cronjob-Token');
-        if ($provided === '') {
-            $provided = Validator::queryParams($request)->string('token', '');
-        }
         if ($expected === '' || !hash_equals($expected, $provided)) {
             return $factory->response(['ok' => false, 'error' => 'unauthorized'], 401);
         }

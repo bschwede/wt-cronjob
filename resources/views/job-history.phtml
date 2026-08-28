@@ -22,7 +22,8 @@ $crumbs = [
     route('module', ['module' => $module->name(), 'action' => 'Admin']) => $module->title(),
 ];
 if ($job !== null) {
-    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = $job->title;
+    // The breadcrumb component renders labels unescaped (§16, F3).
+    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e($job->title);
 }
 $crumbs[0] = I18N::translate('History');
 

@@ -72,7 +72,7 @@ return [
             ],
         ],
         [
-            'command'       => 'modules_v4/cronjob/cli/smoke-test.php',
+            'command'       => 'modules_v4/cronjob/cli/smoke-job.php',
             'command_type'  => 'module',
             'description'   => 'Acceptance-test job for the cronjob module. it only prints and exits 0.',
             'params'        => [

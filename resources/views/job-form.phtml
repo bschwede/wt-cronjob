@@ -59,12 +59,15 @@ $crumbs = [
     route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
     $back_url => $module->title(),
 ];
+// The breadcrumb component renders labels unescaped, and I18N::translate()
+// does not escape its arguments - so admin-editable values (job titles) must
+// be escaped exactly once, here, at the source (§16, F3).
 $header = "";
 if ($copy_of !== null) {
-    $header = I18N::translate('New Job (copy of %s)', $copy_of);    
+    $header = I18N::translate('New Job (copy of %s)', e($copy_of));
     $crumbs[0] = $header;
 } elseif ($is_edit) {
-    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = $job->title;
+    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e($job->title);
     $header = I18N::translate('Edit Job');
     $crumbs[0] = $header;
 } else {
