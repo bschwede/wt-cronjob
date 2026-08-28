@@ -35,6 +35,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Throwable;
 
+use function array_key_exists;
 use function array_values;
 use function implode;
 use function is_bool;
@@ -44,6 +45,7 @@ use function is_object;
 use function is_string;
 use function preg_match;
 use function preg_match_all;
+use function str_contains;
 use function str_starts_with;
 use function strpos;
 use function substr;
@@ -57,18 +59,29 @@ use function substr;
  * has been handled successfully, it queues a matching event for the tick's
  * event drain.
  *
- * The map is RULE-BASED (not a hand-curated list) and built once per process
- * from the live webtrees route table:
- *   - path starts with /tree/{tree}/
- *   - POST only (the GET page routes of the same actions are not mapped)
- *   - handler in the webtrees RequestHandlers namespace whose class name
- *     starts with Edit / Delete / Add / Create
- * The event name is the third path segment, namespaced `_route:<segment>`
- * (the §11 naming scheme). When several mapped routes share a segment
- * (e.g. `delete/{xref}` and `delete/{xref}/{fact_id}`), the following path
- * parameters are appended, hyphen-separated (`_route:delete-xref`,
- * `_route:delete-xref-fact_id`). Core updates that add/remove/rename routes
- * are picked up automatically.
+ * The map is built once per process from the live webtrees route table by
+ * two rules (a route is mapped when it matches either):
+ *   - record routes (rule-based, auto-picked-up by core updates):
+ *       path starts with /tree/{tree}/, contains {xref} (record specificity),
+ *       POST only (the GET page routes of the same actions are not mapped),
+ *       handler in the webtrees RequestHandlers namespace whose class name
+ *       starts with Edit / Delete / Add / Create / Link / Paste / Reorder /
+ *       Pending. The event name is the third path segment, namespaced
+ *       `_route:<segment>` (the §11 naming scheme). When several mapped
+ *       routes share a segment (e.g. `delete/{xref}` and
+ *       `delete/{xref}/{fact_id}`), the following path parameters are
+ *       appended, hyphen-separated (`_route:delete-xref`,
+ *       `_route:delete-xref-fact_id`).
+ *   - tree-level routes (curated allowlist, TREE_LEVEL_ROUTES):
+ *       tree-wide mutations that have no record parameter in the URL (import,
+ *       load, merge, renumber, search-replace, data-fix, bulk accept/reject,
+ *       change-family-members). Each allowlist entry carries its explicit
+ *       event name.
+ *
+ * Breaking change vs. the original rule: record routes without {xref} in the
+ * URL (all create-* routes, add-unlinked-individual) are no longer mapped -
+ * jobs listening to those events must be re-pointed (the admin table marks
+ * such orphaned events, see orphanedEvents()).
  *
  * Why this is safe to run in the per-request middleware (unlike the removed
  * polling detection): it does no heavy work - a free in-memory map lookup, and
@@ -92,8 +105,37 @@ final class RouteEventService {
     /** Path prefix that marks the per-tree editor routes. */
     private const TREE_PREFIX = '/tree/{tree}/';
 
+    /** Path placeholder that marks a record-specific route. */
+    private const XREF = '{xref}';
+
     /** Handler class-name prefixes that mark a mutating action. */
-    private const HANDLER_PREFIXES = ['Edit', 'Delete', 'Add', 'Create'];
+    private const HANDLER_PREFIXES = ['Edit', 'Delete', 'Add', 'Create', 'Link', 'Paste', 'Reorder', 'Pending'];
+
+    /**
+     * Tree-level mutating routes without a record parameter (curated
+     * allowlist): path relative to /tree/{tree}/ => explicit event name.
+     *
+     * These are the significant tree-wide mutations that no rule can capture
+     * (they carry no {xref}), e.g. the chunked-import continuation (load) and
+     * the data fixes. Exact full-path matching on purpose: it keeps the
+     * no-op DataFixSelect (POST /data-fix) out while taking in
+     * DataFixUpdate / DataFixUpdateAll.
+     *
+     * @var array<string, string>
+     */
+    private const TREE_LEVEL_ROUTES = [
+        'import'                         => '_route:import',
+        'load'                           => '_route:load',
+        'merge-step1'                    => '_route:merge-step1',
+        'merge-step2'                    => '_route:merge-step2',
+        'search-replace'                 => '_route:search-replace',
+        'renumber'                       => '_route:renumber',
+        'data-fix/{data_fix}/update'     => '_route:data-fix-update',
+        'data-fix/{data_fix}/update-all' => '_route:data-fix-update-all',
+        'accept'                         => '_route:accept',
+        'reject'                         => '_route:reject',
+        'change-family-members'          => '_route:change-family-members',
+    ];
 
     private const HANDLER_NS = 'Fisharebest\Webtrees\Http\RequestHandlers\\';
 
@@ -197,6 +239,34 @@ final class RouteEventService {
     }
 
     /**
+     * The given event names that look like route events (_route:*) but have
+     * no counterpart in the live map any more - e.g. because a core update
+     * removed or renamed the route, or because this module changed its
+     * mapping rules. Used by the admin table to flag orphaned job triggers.
+     * Pure apart from the (per-process cached) map.
+     *
+     * @param list<string> $names
+     *
+     * @return list<string>
+     */
+    public static function orphanedEvents(array $names): array {
+        $known = [];
+        foreach (self::map() as $entry) {
+            $known[$entry['event']] = true;
+        }
+
+        $orphaned = [];
+        foreach ($names as $name) {
+            $name = (string) $name;
+            if ($name !== '' && str_starts_with($name, self::DOMAIN . ':') && !isset($known[$name])) {
+                $orphaned[] = $name;
+            }
+        }
+
+        return $orphaned;
+    }
+
+    /**
      * Pure map builder (standalone-testable): derives the curated route-event
      * map from route triples. See the class docblock for the rules.
      *
@@ -211,6 +281,12 @@ final class RouteEventService {
             if (!self::isMappedRoute((string) $route['path'], (array) $route['allows'], (string) $route['handler'])) {
                 continue;
             }
+            // Tree-level allowlist routes carry an explicit event name and do
+            // not take part in the segment collision logic below.
+            if (self::treeLevelEvent((string) $route['path']) !== null) {
+                $mapped[] = $route;
+                continue;
+            }
             $segment = self::segment((string) $route['path']);
             if ($segment === '') {
                 continue;
@@ -221,13 +297,16 @@ final class RouteEventService {
 
         $map = [];
         foreach ($mapped as $route) {
-            $path    = (string) $route['path'];
-            $segment = self::segment($path);
-            $event   = self::DOMAIN . ':' . $segment;
-            if (count($by_segment[$segment]) > 1) {
-                $params = self::trailingParams($path);
-                if ($params !== []) {
-                    $event .= '-' . implode('-', $params);
+            $path  = (string) $route['path'];
+            $event = self::treeLevelEvent($path);
+            if ($event === null) {
+                $segment = self::segment($path);
+                $event   = self::DOMAIN . ':' . $segment;
+                if (count($by_segment[$segment]) > 1) {
+                    $params = self::trailingParams($path);
+                    if ($params !== []) {
+                        $event .= '-' . implode('-', $params);
+                    }
                 }
             }
             $map[(string) $route['handler']] = [
@@ -273,18 +352,27 @@ final class RouteEventService {
     }
 
     /**
-     * Whether the given route triple is a mapped mutating route.
+     * Whether the given route triple is a mapped mutating route: a
+     * record-specific route (see the class docblock) or a curated
+     * tree-level allowlist route.
      *
      * @param list<string> $allows
      */
     private static function isMappedRoute(string $path, array $allows, string $handler): bool {
-        if (!str_starts_with($path, self::TREE_PREFIX)) {
-            return false;
-        }
         if ($allows !== ['POST']) {
             return false;
         }
         if (!str_starts_with($handler, self::HANDLER_NS)) {
+            return false;
+        }
+        $tail = self::treeTail($path);
+        if ($tail === '') {
+            return false;
+        }
+        if (array_key_exists($tail, self::TREE_LEVEL_ROUTES)) {
+            return true;
+        }
+        if (!str_contains($tail, self::XREF)) {
             return false;
         }
         $class = substr($handler, strlen(self::HANDLER_NS));
@@ -295,6 +383,31 @@ final class RouteEventService {
         }
 
         return false;
+    }
+
+    /**
+     * The part of the path after the tree prefix, or '' when the path does
+     * not start with it.
+     */
+    private static function treeTail(string $path): string {
+        if (!str_starts_with($path, self::TREE_PREFIX)) {
+            return '';
+        }
+
+        return substr($path, strlen(self::TREE_PREFIX));
+    }
+
+    /**
+     * The explicit event name of a tree-level allowlist route, or null when
+     * the path is not in the allowlist.
+     */
+    private static function treeLevelEvent(string $path): ?string {
+        $tail = self::treeTail($path);
+        if ($tail === '') {
+            return null;
+        }
+
+        return self::TREE_LEVEL_ROUTES[$tail] ?? null;
     }
 
     /**

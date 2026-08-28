@@ -237,6 +237,26 @@ class CronjobModule extends AbstractModule
             $offered[$short . ':' . (string) $entry['spec']['name']] = $short;
         }
 
+        // Triggers grouped by job id (§13) - one query for the whole table.
+        $triggers_by_job = ScheduleService::allJobTriggers();
+
+        // Route events assigned to a job that no longer exist in the live
+        // route map (core update / mapping-rule change) - flagged per job
+        // in the table, so silently-dead triggers are visible.
+        $orphaned_triggers = [];
+        foreach ($triggers_by_job as $job_id => $triggers) {
+            $names = [];
+            foreach ($triggers as $trigger) {
+                if ($trigger['type'] === 'event') {
+                    $names[] = (string) $trigger['event'];
+                }
+            }
+            $orphaned = RouteEventService::orphanedEvents($names);
+            if ($orphaned !== []) {
+                $orphaned_triggers[(int) $job_id] = $orphaned;
+            }
+        }
+
         return $this->viewResponse($this->name() . '::admin', [
             'title'       => $this->title(),
             'module'      => $this,
@@ -251,8 +271,8 @@ class CronjobModule extends AbstractModule
             'route_events'  => $this->getPreference(RouteEventService::SETTING, '') === '1',
             'event_catalog' => EventCatalogService::listCatalog(),
             'command_catalog' => CommandCatalogService::listCatalog(),
-            // Triggers grouped by job id (§13) - one query for the whole table.
-            'triggers_by_job' => ScheduleService::allJobTriggers(),
+            'triggers_by_job' => $triggers_by_job,
+            'orphaned_triggers' => $orphaned_triggers,
         ]);
     }
 

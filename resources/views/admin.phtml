@@ -21,6 +21,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var array<string, array{source: string, description: string, payload: list<string>}> $event_catalog
  * @var array<string, array{command_type: string, source: string, description: string, params: list<array<string, mixed>>}> $command_catalog
  * @var array<int, list<array{type: string, cron: string, event: string}>> $triggers_by_job
+ * @var array<int, list<string>> $orphaned_triggers
  */
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
@@ -117,6 +118,12 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                             <?php if ($trigger['type'] === 'event'): ?>
                                 <span class="badge bg-info"><?= I18N::translate('event') ?></span>
                                 <code><?= e($trigger['event']) ?></code>
+                                <?php if (in_array($trigger['event'], $orphaned_triggers[(int) $job->id] ?? [], true)): ?>
+                                    <span class="badge bg-warning text-dark"
+                                          title="<?= e(I18N::translate('This route event no longer exists in the webtrees route map (core update or mapping change) - the job can never fire on it. Edit the job and pick a current event.')) ?>">
+                                        <?= I18N::translate('unknown route event') ?>
+                                    </span>
+                                <?php endif; ?>
                                 <?php if (count($triggers) > 1): ?><br><?php endif; ?>
                             <?php else: ?>
                                 <code><?= e($trigger['cron']) ?></code>

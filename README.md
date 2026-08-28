@@ -547,34 +547,58 @@ mutating route** has been handled successfully (2xx/3xx), it queues the matching
 event into the same `cj_event` queue — a listening event job then reacts at the next
 tick (~60 s), with no polling latency.
 
-**Which routes are mapped** (rule-based, derived from the live webtrees route table —
-no manual list, so core updates are picked up automatically):
+**Which routes are mapped** — two rules, both derived from the live webtrees route
+table. Common prerequisites: path starts with `/tree/{tree}/`, HTTP **POST** only
+(the GET page routes of the same actions are not mapped), handler in webtrees'
+`RequestHandlers` namespace.
 
-- path starts with `/tree/{tree}/`
-- HTTP **POST** only (the GET page routes of the same actions are not mapped)
-- handler in webtrees' `RequestHandlers` namespace whose class name starts with
-  `Edit`, `Delete`, `Add` or `Create` (this excludes non-mutating POSTs like
-  `SelectNewFact` / `CopyFact` / `PasteFact` and `Link*` / `Reorder*` / `Change*`)
+1. **Record routes** (rule-based — core updates are picked up automatically): the
+   path contains `{xref}` (the target record) *and* the handler class name starts
+   with `Edit`, `Delete`, `Add`, `Create`, `Link`, `Paste`, `Reorder` or `Pending`.
+   The event name is the third path segment, namespaced `_route:<segment>`; when
+   several mapped routes share a segment (`delete`, `edit-raw`, `accept`, `reject`),
+   the following path parameters are appended, hyphen-separated.
+2. **Tree-level routes** (small curated allowlist): the significant tree-wide
+   mutations that carry no `{xref}` in the URL (import, merge, renumber, …). Each
+   allowlist entry has an explicit event name. New tree-wide mutations in a core
+   update need a module update (the record-route rule stays fully automatic).
 
-**Event names.** The third path segment, namespaced `_route:<segment>`. When two
-mapped routes share a segment (currently `delete` and `edit-raw`), the following path
-parameters are appended, hyphen-separated:
-
-| Event | Route | Payload |
+| Event | Route (under `/tree/{tree}/`) | Payload |
 | :--- | :--- | :--- |
-| `_route:edit-note-object` | POST `/tree/{tree}/edit-note-object/{xref}` | `tree`, `xref` |
-| `_route:update-record` | POST `/tree/{tree}/update-record/{xref}` | `tree`, `xref` |
-| `_route:update-fact` | POST `/tree/{tree}/update-fact/{xref}{/fact_id}` | `tree`, `xref` (, `fact_id`) |
-| `_route:delete-xref` | POST `/tree/{tree}/delete/{xref}` | `tree`, `xref` |
-| `_route:delete-xref-fact_id` | POST `/tree/{tree}/delete/{xref}/{fact_id}` | `tree`, `xref`, `fact_id` |
-| `_route:edit-raw-xref` / `_route:edit-raw-xref-fact_id` | POST `/tree/{tree}/edit-raw/…` | same |
-| … 17 more | all remaining POST `edit…/delete…/add…/create…` routes | the route's parameters |
+| `_route:edit-note-object` | POST `edit-note-object/{xref}` | `tree`, `xref` |
+| `_route:update-record` | POST `update-record/{xref}` | `tree`, `xref` |
+| `_route:update-fact` | POST `update-fact/{xref}{/fact_id}` | `tree`, `xref` (, `fact_id`) |
+| `_route:delete-xref` / `_route:delete-xref-fact_id` | POST `delete/{xref}{/fact_id}` | `tree`, `xref` (, `fact_id`) |
+| `_route:edit-raw-xref` / `_route:edit-raw-xref-fact_id` | POST `edit-raw/{xref}{/fact_id}` | `tree`, `xref` (, `fact_id`) |
+| `_route:add-child-to-family`, `_route:add-spouse-to-family`, `_route:add-media-file` | POST `add-…/{xref}` | `tree`, `xref` |
+| `_route:add-child-to-individual`, `_route:add-parent-to-individual`, `_route:add-spouse-to-individual` | POST `add-…/{xref}` | `tree`, `xref` |
+| `_route:paste-fact` | POST `paste-fact/{xref}` | `tree`, `xref` |
+| `_route:link-media-to-record` | POST `link-media-to-record/{xref}` | `tree`, `xref` — the **media** object; the target record is a form field, not in the URL |
+| `_route:link-child-to-family`, `_route:link-spouse-to-individual` | POST `link-…/{xref}` | `tree`, `xref` |
+| `_route:reorder-children`, `_route:reorder-spouses`, `_route:reorder-media`, `_route:reorder-media-files`, `_route:reorder-names` | POST `reorder-…/{xref}` | `tree`, `xref` |
+| `_route:accept-xref` / `_route:accept-xref-change` | POST `accept/{xref}{/change}` | `tree`, `xref` (, `change`) |
+| `_route:reject-xref` / `_route:reject-xref-change` | POST `reject/{xref}{/change}` | `tree`, `xref` (, `change`) |
+| `_route:import` | POST `import` | `tree` |
+| `_route:load` | POST `load` | `tree` — the chunked import continuation fires **once per chunk** |
+| `_route:merge-step1` / `_route:merge-step2` | POST `merge-step1` / `merge-step2` | `tree` |
+| `_route:search-replace` | POST `search-replace` | `tree` |
+| `_route:renumber` | POST `renumber` | `tree` |
+| `_route:data-fix-update` / `_route:data-fix-update-all` | POST `data-fix/{data_fix}/update[-all]` | `tree`, `data_fix` |
+| `_route:accept` / `_route:reject` | POST `accept` / `reject` (bulk) | `tree` |
+| `_route:change-family-members` | POST `change-family-members` | `tree` — the family xref is a form field |
 
-In total 23 events: every family/individual/spouse/child addition (`_route:add-*`),
-record creation (`_route:create-*`, incl. notes, repositories, sources, media,
-locations, submitters, submissions), the record/fact/media/note/raw edits above and
-the two deletes. The payload always contains `tree` (id) + `tree_name` plus all
-matched route parameters (`xref`, `fact_id`, …).
+In total 38 events (27 record routes + 11 tree-level routes). The payload always
+contains `tree` (id) + `tree_name` plus all matched route parameters.
+
+> **Breaking change (this version).** Record routes *without* `{xref}` in the URL —
+> all `_route:create-*` events plus `_route:add-unlinked-individual` — are no longer
+> mapped: they carry no target record. Jobs listening to those events will never
+> fire again; the admin table flags such triggers with an **unknown route event**
+> badge (a generic check over all jobs' `_route:*` triggers against the live map),
+> so re-pointing them is visible instead of silent.
+>
+> `_route:accept*` / `_route:reject*` fire when a *pending change* is accepted or
+> rejected — accepting a pending deletion is when the record is actually removed.
 
 **How it works**
 
@@ -592,7 +616,10 @@ matched route parameters (`xref`, `fact_id`, …).
 - **Robust to core upgrades.** The map is rebuilt from the route table (keyed by
   handler class *strings*, no `::class`), so a renamed/removed handler simply stops
   matching instead of fatalling. If the route table is not available (e.g. CLI), a
-  static fallback map with the note route keeps the pilot working.
+  static fallback map with the note route keeps the pilot working. The record-route
+  rule is fully automatic; only the small tree-level allowlist is curated (see
+  above), and jobs pointing at a route event that no longer exists are flagged in
+  the admin table (**unknown route event** badge).
 
 To act on one, create an event-triggered job whose **Event name** matches (e.g.
 `_route:update-record`) and enable the "Route events" toggle. Note the overlap with
@@ -681,8 +708,11 @@ manifest job** on update, **failure notification** to the administrator accounts
 job** via the create form, the **client-side DataTable** (filter/sort/paging)
 for the job table, **Notify/Timeout table columns**, editable **module-offered
 job names**, the **event naming scheme** (`<domain>:<slug>`, `_route:*` /
-`cronjob:*` / `<module>:*`), **rule-based route events** (all POST
-`edit…/delete…/add…/create…` routes under `/tree/{tree}/`, opt-in toggle), the
+`cronjob:*` / `<module>:*`), **route events** (record routes: POST + `{xref}` in
+the path + mutating handler prefix `Edit/Delete/Add/Create/Link/Paste/Reorder/
+Pending` under `/tree/{tree}/`, plus a curated tree-level allowlist for import,
+merge, renumber, search-replace, data fixes and bulk accept/reject — 38 events,
+opt-in toggle, orphaned-event warning for dead triggers), the
 **event catalog** (module announcements + built-ins + route events + listened
 names, in `cj_event_catalog`), the **`cj_event_run` cross table** with triggering
 events shown in the run history, **PRG form handling** (a failed save redirects
@@ -712,7 +742,7 @@ php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron desc
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
 php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event+command spec validators, manifest loading (jobs/events/commands), event naming, command-catalog merge, W1 payload confinement, multi-trigger (normalizeTriggers/triggersKey/nextRunMin/dueTriggerDetails, specDiff) (standalone)
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
-php modules_v4/cronjob/tests/test-route-events.php   # route events: rule-based map builder (filters, collision suffixes, fallback), success gate, payload builder, payload-key derivation from path (standalone)
+php modules_v4/cronjob/tests/test-route-events.php   # route events: map builder (record-route rule, tree-level allowlist, filters, collision suffixes, fallback), orphaned-event detection, success gate, payload builder, payload-key derivation from path (standalone)
 ```
 
 ## License
