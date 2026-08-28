@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 
 /**
@@ -57,7 +58,7 @@ $timeout_v = $fv['timeout'] ?? ($is_edit ? (int) $job->timeout_sec : $module::TI
 $enabled_v = $fv['enabled'] ?? ($is_edit ? ((int) $job->enabled === 1) : true);
 
 $crumbs = [
-    route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
+    route(ControlPanel::class) => MoreI18N::xlate('Control panel'),
     $back_url => $module->title(),
 ];
 // The breadcrumb component renders labels unescaped, and I18N::translate()
@@ -87,7 +88,7 @@ if ($copy_of !== null) {
     <input type="hidden" name="copy_of" value="<?= e($copy_of ?? '') ?>">
 
     <fieldset class="border rounded p-3 mb-3">
-        <legend><?= /*I18N: webtrees.pot */ I18N::translate('General') ?></legend>
+        <legend><?= MoreI18N::xlate('General') ?></legend>
 
         <div class="mb-3">
             <label for="cj_name" class="form-label"><?= I18N::translate('Name (slug)') ?></label>
@@ -104,7 +105,7 @@ if ($copy_of !== null) {
         </div>
 
         <div class="mb-3">
-            <label for="cj_title" class="form-label"><?= /*I18N: webtrees.pot */ I18N::translate('Title') ?></label>
+            <label for="cj_title" class="form-label"><?= MoreI18N::xlate('Title') ?></label>
             <input type="text" class="form-control" id="cj_title" name="title" required
                    maxlength="128"
                    value="<?= e($title_v) ?>"
@@ -114,7 +115,7 @@ if ($copy_of !== null) {
         <div class="mb-3 form-check">
             <input type="checkbox" class="form-check-input" id="cj_enabled" name="enabled" value="1"
                    <?= $enabled_v ? 'checked' : '' ?>>
-            <label class="form-check-label" for="cj_enabled"><?= I18N::translate('Enabled') ?></label>
+            <label class="form-check-label" for="cj_enabled"><?= MoreI18N::xlate('Enabled') ?></label>
         </div>
 
         <div class="mb-3 form-check">
@@ -139,7 +140,7 @@ if ($copy_of !== null) {
                         <input type="text" class="form-control" name="triggers_time[]"
                                placeholder="*/30 * * * *"
                                value="<?= e($cron_value) ?>">
-                        <button type="button" class="btn btn-outline-secondary cj_remove_time" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
+                        <button type="button" class="btn btn-outline-secondary cj_remove_time" title="<?= e(MoreI18N::xlate('Remove')) ?>">&times;</button>
                     </div>
                     <?php if (isset($cron_previews[$i])): ?>
                         <?php if ($cron_previews[$i] !== null): ?>
@@ -160,7 +161,7 @@ if ($copy_of !== null) {
             <template id="cj_time_row_template">
                 <div class="input-group input-group-sm mb-1">
                     <input type="text" class="form-control" name="triggers_time[]" placeholder="*/30 * * * *">
-                    <button type="button" class="btn btn-outline-secondary cj_remove_time" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
+                    <button type="button" class="btn btn-outline-secondary cj_remove_time" title="<?= e(MoreI18N::xlate('Remove')) ?>">&times;</button>
                 </div>
             </template>
         </div>
@@ -176,7 +177,7 @@ if ($copy_of !== null) {
                                list="cj_event_names"
                                placeholder="cronjob:gedcom-changed"
                                value="<?= e($event_value) ?>">
-                        <button type="button" class="btn btn-outline-secondary cj_remove_event" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
+                        <button type="button" class="btn btn-outline-secondary cj_remove_event" title="<?= e(MoreI18N::xlate('Remove')) ?>">&times;</button>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -195,7 +196,7 @@ if ($copy_of !== null) {
                            maxlength="64"
                            list="cj_event_names"
                            placeholder="cronjob:gedcom-changed">
-                    <button type="button" class="btn btn-outline-secondary cj_remove_event" title="<?= e(I18N::translate('Remove')) ?>">&times;</button>
+                    <button type="button" class="btn btn-outline-secondary cj_remove_event" title="<?= e(MoreI18N::xlate('Remove')) ?>">&times;</button>
                 </div>
             </template>
         </div>
@@ -239,7 +240,7 @@ if ($copy_of !== null) {
 
     <div class="btn-group mb-3">
         <button type="submit" class="btn btn-primary"><?= I18N::translate('Save Job') ?></button>
-        <a href="<?= e($back_url) ?>" class="btn btn-secondary"><?= /*I18N: webtrees.pot */ I18N::translate('Cancel') ?></a>
+        <a href="<?= e($back_url) ?>" class="btn btn-secondary"><?= I18N::translate('Cancel') ?></a>
     </div>
 </form>
 

@@ -25,7 +25,7 @@
 declare(strict_types=1);
 
 // Standalone test for the manifest i18n pipeline:
-//   a) I18nMark::translate() is a pure identity (extraction marker only),
+//   a) MoreI18N::translate() is a pure identity (extraction marker only),
 //   b) cron-jobs.php still returns the exact English literals and shape,
 //   c) CronjobUtils::translateJobTitle() guards '%' titles (I18N::translate()
 //      applies sprintf() to its result - a bare '%' in an admin-renamed
@@ -54,7 +54,7 @@ namespace {
     require __DIR__ . '/../src/CronjobUtils.php';
 
     use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
-    use Schwendinger\Webtrees\Module\Cronjob\I18nMark;
+    use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 
     $failures = 0;
 
@@ -68,10 +68,10 @@ namespace {
         }
     }
 
-    // 1. I18nMark is a pure identity (plain, unicode, '%' chars)
-    check('marker identity (plain)', I18nMark::translate('Cronjob: Pseudo-Events (state-poll detectors)') === 'Cronjob: Pseudo-Events (state-poll detectors)');
-    check('marker identity (unicode)', I18nMark::translate('Überprüfung äöü') === 'Überprüfung äöü');
-    check('marker identity (percent)', I18nMark::translate('100%') === '100%');
+    // 1. MoreI18N is a pure identity (plain, unicode, '%' chars)
+    check('marker identity (plain)', MoreI18N::translate('Cronjob: Pseudo-Events (state-poll detectors)') === 'Cronjob: Pseudo-Events (state-poll detectors)');
+    check('marker identity (unicode)', MoreI18N::translate('Überprüfung äöü') === 'Überprüfung äöü');
+    check('marker identity (percent)', MoreI18N::translate('100%') === '100%');
 
     // 2. The manifest is still pure data: exact English literals, intact shape
     $manifest = include __DIR__ . '/../cron-jobs.php';

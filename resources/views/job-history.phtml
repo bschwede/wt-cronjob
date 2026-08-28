@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 
 /**
  * @var string $title
@@ -19,7 +20,7 @@ use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
  */
 
 $crumbs = [
-    route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
+    route(ControlPanel::class) => MoreI18N::xlate('Control panel'),
     route('module', ['module' => $module->name(), 'action' => 'Admin']) => $module->title(),
 ];
 if ($job !== null) {
@@ -63,8 +64,8 @@ $crumbs[0] = I18N::translate('History');
                 <tr>
                     <th><?= I18N::translate('Started (UTC)') ?></th>
                     <th><?= I18N::translate('Trigger') ?></th>
-                    <th><?= I18N::translate('Event') ?></th>
-                    <th><?= I18N::translate('Status') ?></th>
+                    <th><?= MoreI18N::xlate('Event') ?></th>
+                    <th><?= MoreI18N::xlate('Status') ?></th>
                     <th><?= I18N::translate('Exit') ?></th>
                     <th><?= I18N::translate('Duration') ?></th>
                     <th><?= I18N::translate('Output') ?></th>
@@ -105,7 +106,7 @@ $crumbs[0] = I18N::translate('History');
                     <td class="text-start">
                         <?php if ($run->output !== null && $run->output !== ''): ?>
                             <details>
-                                <summary><?= /*I18N: webtrees.pot */ I18N::translate('Show') ?></summary>
+                                <summary><?= MoreI18N::xlate('Show') ?></summary>
                                 <pre class="bg-light p-2 rounded mt-2 mb-0" style="max-height: 300px; text-wrap: wrap; overflow: auto;"><?= e((string) $run->output) ?></pre>
                             </details>
                         <?php else: ?>

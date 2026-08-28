@@ -2,9 +2,15 @@
 # I18N - Update PO-/POT-files from source code (cronjob module)
 #
 # Translatable literals in cron-jobs.php are wrapped in
-# I18nMark::translate() (identity marker - the last qualified name component
+# MoreI18N::translate() (identity marker - the last qualified name component
 # "translate" matches --keyword=translate below, so xgettext extracts them
 # without translating at manifest load time).
+#
+# Strings already covered by the webtrees core POT are NOT extracted: the
+# code wraps them in MoreI18N::xlate() (same runtime behaviour, different
+# name -> invisible to xgettext). After a core update, compare
+# resources/lang/messages.all.pot with the core POT and mask any newly
+# covered msgids with MoreI18N::xlate() in the code.
 SCRIPTDIR=$(dirname "$(realpath -s "${BASH_SOURCE:-$0}")")
 
 PROJECT_ROOT=$(realpath "${SCRIPTDIR}/..")
@@ -25,49 +31,16 @@ xgettext -L PHP \
   --add-comments=I18N \
   --from-code=utf-8 \
   --output="$POT_FILE_ALL" \
-  $(find . -not -path "./util/*" -not -path "./vendor/*" \( -name "*.php" -o -name "*.phtml" \))
+  $(find . -not -path "./util/*" -not -path "./vendor/*" -not -path "./tests/*" \( -name "*.php" -o -name "*.phtml" \))
 
 echo "✅ POT-file created."
 
 
-awk '
-BEGIN {
-  in_block = 0;
-  skip_block = 0;
-  block = "";
-}
-# blank line marks end of block
-/^$/ {
-  if (!skip_block) {
-    printf "%s\n", block;
-  }
-  block = "";
-  in_block = 0;
-  skip_block = 0;
-  next;
-}
-{
-  # begin of new block
-  if (!in_block) {
-    in_block = 1;
-    block = "";
-  }
-
-  # check if specific filter comment is present - we do not need to translate standard webtrees entries again
-  if ($0 ~ /^#. I18N: webtrees.pot/) {
-    skip_block = 1;
-  }
-
-  # add line to block
-  block = block $0 "\n";
-}
-END {
-  # Letzter Block ohne abschließende Leerzeile behandeln
-  if (in_block && !skip_block) {
-    printf "%s\n", block;
-  }
-}
-' "$POT_FILE_ALL" > "$POT_FILE_FILTERED"
+# Core-dedupe happens in the code (MoreI18N::xlate masks core-covered
+# msgids), so the filtered POT is a plain copy of the full extraction.
+# messages.all.pot is kept as the comparison artifact for future core
+# updates (see header).
+cp "$POT_FILE_ALL" "$POT_FILE_FILTERED"
 POT_FILE="$POT_FILE_FILTERED"
 
 exit 0

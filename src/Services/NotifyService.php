@@ -31,6 +31,7 @@ use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Services\MessageService;
 use Fisharebest\Webtrees\Services\UserService;
 use Fisharebest\Webtrees\SiteUser;
+use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 use Throwable;
 
 use function array_slice;
@@ -98,7 +99,7 @@ final class NotifyService {
             I18N::translate('A scheduled cronjob job failed. Details:'),
             '',
             I18N::translate('Job') . ': ' . $job->title . ' (' . $job->name . ')',
-            I18N::translate('Status') . ': ' . $status,
+            MoreI18N::xlate('Status') . ': ' . $status,
             I18N::translate('Exit code') . ': ' . $exit_code,
             I18N::translate('Duration') . ': ' . $duration_ms . ' ms',
             I18N::translate('Started (UTC)') . ': ' . $started_at,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 
 /**
@@ -30,7 +31,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 ?>
 <?= view('components/breadcrumbs', [
     'links' => [
-        route(ControlPanel::class) => /*I18N: webtrees.pot */ I18N::translate('Control panel'),
+        route(ControlPanel::class) => MoreI18N::xlate('Control panel'),
         $admin_url => $module->title(),
     ]
 ]) ?>
@@ -74,7 +75,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                 <th><?= I18N::translate('Triggers') ?></th>
                 <th><?= I18N::translate('Next Run (UTC)') ?></th>
                 <th><?= I18N::translate('Last Run') ?></th>
-                <th><?= I18N::translate('Enabled') ?></th>
+                <th><?= MoreI18N::xlate('Enabled') ?></th>
                 <th><?= I18N::translate('Notify') ?></th>
                 <th><?= I18N::translate('Timeout') ?></th>
                 <th></th>
@@ -218,7 +219,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                         <button type="submit" class="btn btn-sm btn-danger">
-                            <?= /*I18N: webtrees.pot */ I18N::translate('Delete') ?>
+                            <?= MoreI18N::xlate('Delete') ?>
                         </button>
                     </form>
                 </td>
@@ -283,7 +284,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
             </p>
 
             <details>
-                <summary><?= /*I18N: webtrees.pot */ I18N::translate('Details'); ?></summary>
+                <summary><?= MoreI18N::xlate('Details'); ?></summary>
                 <div class="bg-light p-2 rounded mt-2 mb-0">
                     <h6><?= I18N::translate('Option A: classic cron (every minute)') ?>
                     </h6>
@@ -307,7 +308,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
   <div class="accordion-item">
     <h2 class="accordion-header" id="acc-event-head">
       <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#acc-event" aria-expanded="false" aria-controls="acc-event">
-        <strong><?= I18N::translate('Events') ?></strong>
+        <strong><?= MoreI18N::xlate('Events') ?></strong>
       </button>
     </h2>
     <div id="acc-event" class="accordion-collapse collapse" aria-labelledby="acc-event-head">
@@ -347,7 +348,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 </p>
 
                 <details>
-                    <summary><?= /*I18N: webtrees.pot */ I18N::translate('Details'); ?></summary>
+                    <summary><?= MoreI18N::xlate('Details'); ?></summary>
                     <div>
                     <div class="mb-2">
                         <label class="form-label" for="cj_webhook_url">
@@ -390,9 +391,9 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                    data-columns='[{},{},{},{}]'>
                 <thead>
                     <tr>
-                        <th><?= I18N::translate('Event') ?></th>
-                        <th><?= I18N::translate('Source') ?></th>
-                        <th><?= I18N::translate('Description') ?></th>
+                        <th><?= MoreI18N::xlate('Event') ?></th>
+                        <th><?= MoreI18N::xlate('Source') ?></th>
+                        <th><?= MoreI18N::xlate('Description') ?></th>
                         <th><?= I18N::translate('Payload') ?></th>
                     </tr>
                 </thead>
@@ -422,9 +423,9 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 <thead>
                     <tr>
                         <th><?= I18N::translate('Command') ?></th>
-                        <th><?= I18N::translate('Type') ?></th>
-                        <th><?= I18N::translate('Source') ?></th>
-                        <th><?= I18N::translate('Description') ?></th>
+                        <th><?= MoreI18N::xlate('Type') ?></th>
+                        <th><?= MoreI18N::xlate('Source') ?></th>
+                        <th><?= MoreI18N::xlate('Description') ?></th>
                         <th><?= I18N::translate('Parameters') ?></th>
                     </tr>
                 </thead>

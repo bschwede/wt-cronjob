@@ -38,6 +38,7 @@ use Fisharebest\Webtrees\Webtrees;
 use InvalidArgumentException;
 use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 use Throwable;
 
 use function array_filter;
@@ -440,13 +441,13 @@ final class ScheduleService {
      */
     private static function dowNames(string $dow): string {
         $names = [
-            I18N::translate('Sunday'),
-            I18N::translate('Monday'),
-            I18N::translate('Tuesday'),
-            I18N::translate('Wednesday'),
-            I18N::translate('Thursday'),
-            I18N::translate('Friday'),
-            I18N::translate('Saturday'),
+            MoreI18N::xlate('Sunday'),
+            MoreI18N::xlate('Monday'),
+            MoreI18N::xlate('Tuesday'),
+            MoreI18N::xlate('Wednesday'),
+            MoreI18N::xlate('Thursday'),
+            MoreI18N::xlate('Friday'),
+            MoreI18N::xlate('Saturday'),
         ];
         $name  = fn (int $d): string => $names[(((int) $d) % 7 + 7) % 7];
 

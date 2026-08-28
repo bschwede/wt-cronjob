@@ -59,6 +59,19 @@ composer update --no-dev
 then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 (`src/` plus its own `composer.json`) into the module.
 
+### Release archive
+
+`util/create-archive.sh` builds the installable zip `dist/cronjob_v<version>.zip`
+(needs `rsync` + `zip`). The version is read from
+`CronjobModule::customModuleVersion()` - no separate version file to keep in
+sync. The script fails fast when the bundled cron library is missing (it is
+`.gitignore`'d in the module repo, so a fresh clone must have it restored
+first). Development artifacts are excluded: `util/`, `tests/`, `composer.json`,
+`vendor/composer/`, `vendor/autoload.php` (the bundled library
+`vendor/dragonmantank/` ships). Translation PO files are **not** included in
+the archive - drop them into `resources/lang/` separately if needed
+(`CronjobModule::customTranslations()` picks them up at runtime).
+
 ## Usage
 
 ### Creating a job
@@ -285,7 +298,7 @@ return [
 ```
 
 Translatable `title` / `description` literals in a manifest should be wrapped in
-`I18nMark::translate()` (identity marker, see [Translation (i18n)](#translation-i18n))
+`MoreI18N::translate()` (identity marker, see [Translation (i18n)](#translation-i18n))
 so `xgettext` picks them up - translation happens at render time, never at manifest
 load.
 
@@ -720,20 +733,28 @@ announced command shows its parameters as a hint under the field.
 
 All user-facing strings are extracted with `xgettext` - no manual PO entries:
 
-- View strings use `I18N::translate()` as usual. Generic strings that already exist
-  in the core `webtrees.pot` are marked with a `/* I18N: webtrees.pot */` comment, so
-  the module-local POT excludes them (dedupe).
+- View strings use `I18N::translate()` as usual. Generic strings that are already
+  provided by webtrees **core** (e.g. `Details`, `Delete`, the day names) are wrapped
+  in `MoreI18N::xlate()` instead: functionally identical at runtime, but the
+  different call name is invisible to xgettext - so they are never extracted into
+  the module POT and their translations come from the core POT. (This replaces
+  linkenhancer's `/* I18N: webtrees.pot */` comment + shell-filter approach.)
+- **Workflow after a core update:** compare `resources/lang/messages.all.pot`
+  (the full extraction) with the current core POT; every msgid that core now covers
+  gets masked with `MoreI18N::xlate()` in the code.
 - **Manifest literals** (`cron-jobs.php` is pure data, loaded in tick/CLI context -
-  `I18N::translate()` must not run there) are wrapped in `I18nMark::translate()`, an
+  `I18N::translate()` must not run there) are wrapped in `MoreI18N::translate()`, an
   *identity* marker whose last qualified-name component matches xgettext's
   `--keyword=translate`. Nothing is translated at manifest load time.
-- **Pipeline:** `util/update-po-files.sh` generates `resources/lang/messages.pot`
-  (from `messages.all.pot`, core-pot entries filtered out) - PO files are maintained
-  via Weblate and land in `resources/lang/<language>.po|.php`. The module's
+- **Pipeline:** `util/update-po-files.sh` runs xgettext over the module
+  (`util/`/`vendor/`/`tests/` excluded) into `resources/lang/messages.all.pot` and
+  copies it to `resources/lang/messages.pot` (no filter step - the core dedupe lives
+  in the code via `MoreI18N::xlate`). PO files are maintained via Weblate and land
+  in `resources/lang/<language>.po|.php`; the module's
   `CronjobModule::customTranslations()` feeds them into webtrees' `I18N::init()`, so
-  the views' `I18N::translate()` calls find the translations **at render time**.
+  the views' translation calls find them **at render time**.
 - **Job titles** are admin-editable DB values, translated at render time through
-  `CronbookUtils::translateJobTitle()` (job table, breadcrumbs, history header): the
+  `CronjobUtils::translateJobTitle()` (job table, breadcrumbs, history header): the
   default title from a manifest appears in the UI language, renamed jobs stay as-is
   (gettext miss). Titles containing `%` are deliberately **not** translated -
   `I18N::translate()` applies `sprintf()` to its result, where a bare `%` would be an
@@ -827,7 +848,7 @@ php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+e
 php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
 php modules_v4/cronjob/tests/test-route-events.php   # route events: map builder (record-route rule, tree-level allowlist, filters, collision suffixes, fallback), orphaned-event detection, success gate, payload builder, payload-key derivation from path (standalone)
 php modules_v4/cronjob/tests/test-event-queue.php    # event-queue coalescing: newest per event name, name cap, ordering (standalone)
-php modules_v4/cronjob/tests/test-i18n-mark.php      # i18n: I18nMark identity, manifest literals/shape unchanged, translateJobTitle % guard (standalone)
+php modules_v4/cronjob/tests/test-i18n-mark.php      # i18n: MoreI18N::translate identity, manifest literals/shape unchanged, translateJobTitle % guard (standalone)
 ```
 
 ## License

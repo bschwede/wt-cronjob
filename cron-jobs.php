@@ -24,6 +24,7 @@
 
 declare(strict_types=1);
 
+use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 /**
  * cronjob's own job manifest (self-registration, §6.3 / §12).
  *
@@ -40,9 +41,9 @@ declare(strict_types=1);
  * which must not be invoked directly as jobs.
  *
  * Pure data - the JobSpec / command-spec shapes, interpreted by cronjob's
- * validators. Translatable literals are wrapped in I18nMark::translate()
+ * validators. Translatable literals are wrapped in MoreI18N::translate()
  * (identity marker for xgettext extraction; no translation at load time -
- * see src/I18nMark.php).
+ * see src/MoreI18N.php).
  */
 
 return [
@@ -50,7 +51,7 @@ return [
         [
             'name'         => 'pseudo-events',
             /* I18N: default title of the pseudo-events job (job list in the cronjob admin) */
-            'title'        => \Schwendinger\Webtrees\Module\Cronjob\I18nMark::translate('Cronjob: Pseudo-Events (state-poll detectors)'),
+            'title'        => MoreI18N::translate('Cronjob: Pseudo-Events (state-poll detectors)'),
             'triggers'     => [
                 ['type' => 'time', 'cron' => '*/5 * * * *'],
             ],
@@ -66,13 +67,13 @@ return [
             'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
             'command_type' => 'module',
             /* I18N: command description for pseudo-events.php (command catalog in the cronjob admin) */
-            'description'  => \Schwendinger\Webtrees\Module\Cronjob\I18nMark::translate('Poll the built-in pseudo-event detectors (GEDCOM change, new media, new user) and queue any detected transitions for the tick.'),
+            'description'  => MoreI18N::translate('Poll the built-in pseudo-event detectors (GEDCOM change, new media, new user) and queue any detected transitions for the tick.'),
             'params'       => [
                 [
                     'name'        => '--force',
                     'optional'    => true,
                     /* I18N: parameter description for --force (command catalog in the cronjob admin) */
-                    'description' => \Schwendinger\Webtrees\Module\Cronjob\I18nMark::translate('Bypass the 5-minute cooldown (a manual run).'),
+                    'description' => MoreI18N::translate('Bypass the 5-minute cooldown (a manual run).'),
                 ],
             ],
         ],
@@ -80,13 +81,13 @@ return [
             'command'       => 'modules_v4/cronjob/cli/smoke-job.php',
             'command_type'  => 'module',
             /* I18N: command description for smoke-job.php (command catalog in the cronjob admin) */
-            'description'   => \Schwendinger\Webtrees\Module\Cronjob\I18nMark::translate('Acceptance-test job for the cronjob module. it only prints and exits 0.'),
+            'description'   => MoreI18N::translate('Acceptance-test job for the cronjob module. it only prints and exits 0.'),
             'params'        => [
                 [
                     'name' => '--sleep=N',
                     'optional' => true,
                     /* I18N: parameter description for --sleep=N (command catalog in the cronjob admin) */
-                    'description' => \Schwendinger\Webtrees\Module\Cronjob\I18nMark::translate('keeps the process alive for N seconds (timeout testing)'),
+                    'description' => MoreI18N::translate('keeps the process alive for N seconds (timeout testing)'),
                 ],
             ],
         ],        
