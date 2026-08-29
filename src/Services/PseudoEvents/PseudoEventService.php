@@ -27,6 +27,7 @@ namespace Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents;
 
 use Fisharebest\Webtrees\DB;
 use Fisharebest\Webtrees\Webtrees;
+use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
@@ -94,13 +95,13 @@ final class PseudoEventService {
      */
     public static function detectors(): array {
         return [
-            new LogRowDetector('cronjob:log-auth-failed', 'Failed login attempts (log type auth, message prefix "Login failed")', 'auth', ['Login failed']),
-            new LogRowDetector('cronjob:log-auth-login', 'Successful logins (log type auth, message prefix "Login: ")', 'auth', ['Login: ']),
-            new LogRowDetector('cronjob:log-auth-logout', 'Logouts (log type auth, message prefix "Logout: ")', 'auth', ['Logout: ']),
-            new LogRowDetector('cronjob:log-error', 'Application errors (log type error - the message is the exception trace)', 'error'),
-            new LogRowDetector('cronjob:log-edit-update', 'Record updates (log type edit, message prefix "Update: ")', 'edit', ['Update: ']),
-            new LogRowDetector('cronjob:log-edit-delete', 'Record deletions (log type edit, message prefix "Delete: ")', 'edit', ['Delete: ']),
-            new LogRowDetector('cronjob:log-search', 'Searches (log type search - one log row per searched tree)', 'search'),
+            new LogRowDetector('cronjob:log-auth-failed', MoreI18N::translate('Failed login attempts (log type auth, message prefix "Login failed")'), 'auth', ['Login failed']),
+            new LogRowDetector('cronjob:log-auth-login', MoreI18N::translate('Successful logins (log type auth, message prefix "Login: ")'), 'auth', ['Login: ']),
+            new LogRowDetector('cronjob:log-auth-logout', MoreI18N::translate('Logouts (log type auth, message prefix "Logout: ")'), 'auth', ['Logout: ']),
+            new LogRowDetector('cronjob:log-error', MoreI18N::translate('Application errors (log type error - the message is the exception trace)'), 'error'),
+            new LogRowDetector('cronjob:log-edit-update', MoreI18N::translate('Record updates (log type edit, message prefix "Update: ")'), 'edit', ['Update: ']),
+            new LogRowDetector('cronjob:log-edit-delete', MoreI18N::translate('Record deletions (log type edit, message prefix "Delete: ")'), 'edit', ['Delete: ']),
+            new LogRowDetector('cronjob:log-search', MoreI18N::translate('Searches (log type search - one log row per searched tree)'), 'search'),
         ];
     }
 

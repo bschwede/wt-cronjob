@@ -92,6 +92,14 @@ class CronjobModule extends AbstractModule
     use ModuleConfigTrait;
     use ModuleCustomTrait;
 
+    public const CUSTOM_MODULE = 'wt-cronjob';
+    public const CUSTOM_AUTHOR = 'Bernd Schwendinger';
+    public const GITHUB_USER = 'bschwede';
+    public const CUSTOM_WEBSITE = 'https://github.com/' . self::GITHUB_USER . '/' . self::CUSTOM_MODULE . '/';
+    public const CUSTOM_VERSION = '1.0.0-RC1';
+    public const CUSTOM_LAST = 'https://raw.githubusercontent.com/' . self::GITHUB_USER . '/' .
+        self::CUSTOM_MODULE . '/main/latest-version.txt';
+
     public const SCHEMA_TARGET_VERSION = 1;
 
     /** Module preference key holding the webhook token (§6.1). */
@@ -160,12 +168,32 @@ class CronjobModule extends AbstractModule
     // =========================================================================
 
     public function customModuleAuthorName(): string {
-        return 'Schwendinger';
+        return self::CUSTOM_AUTHOR;
     }
 
     public function customModuleVersion(): string {
-        return '1.2.0';
+        return self::CUSTOM_VERSION;
     }
+
+    /**
+     * A URL that will provide the latest version of this module.
+     *
+     * @return string
+     */
+    public function customModuleLatestVersionUrl(): string
+    {
+        return self::CUSTOM_LAST;
+    }
+
+    /**
+     * Where to get support for this module.  Perhaps a github repository?
+     *
+     * @return string
+     */
+    public function customModuleSupportUrl(): string
+    {
+        return self::CUSTOM_WEBSITE;
+    }    
 
     /**
      * Translation loader (linkenhancer pattern): loads

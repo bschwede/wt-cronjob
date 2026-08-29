@@ -358,13 +358,13 @@ final class ScheduleService {
 
         // Standard macros (the same set the cron library accepts).
         $macros = [
-            '@minutely'  => I18N::translate('every minute'),
-            '@minute'    => I18N::translate('every minute'),
+            '@minutely'  => I18N::plural('every minute', 'every %1$d minutes', 1, 1),
+            '@minute'    => I18N::plural('every minute', 'every %1$d minutes', 1, 1),
             '@hourly'    => I18N::translate('hourly'),
-            '@daily'     => I18N::translate('daily at 00:00'),
-            '@midnight'  => I18N::translate('daily at 00:00'),
+            '@daily'     => I18N::translate('daily at %1$s', '00:00'),
+            '@midnight'  => I18N::translate('daily at %1$s', '00:00'),
             '@weekly'    => I18N::translate('weekly on Sunday at 00:00'),
-            '@monthly'   => I18N::translate('monthly on day 1 at 00:00'),
+            '@monthly'   => I18N::translate('on day %1$d of each month at %2$s', '1', '00:00'),
             '@yearly'    => I18N::translate('yearly on January 1 at 00:00'),
             '@annually'  => I18N::translate('yearly on January 1 at 00:00'),
         ];

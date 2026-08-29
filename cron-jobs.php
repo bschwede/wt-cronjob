@@ -81,7 +81,7 @@ return [
             'command'       => 'modules_v4/cronjob/cli/smoke-job.php',
             'command_type'  => 'module',
             /* I18N: command description for smoke-job.php (command catalog in the cronjob admin) */
-            'description'   => MoreI18N::translate('Acceptance-test job for the cronjob module. it only prints and exits 0.'),
+            'description'   => MoreI18N::translate('Acceptance-test job for the cronjob module. It only prints and exits 0.'),
             'params'        => [
                 [
                     'name' => '--sleep=N',

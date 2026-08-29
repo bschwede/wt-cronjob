@@ -157,7 +157,7 @@ if ($copy_of !== null) {
                 <?php endforeach; ?>
             </div>
             <div class="form-text"><?= I18N::translate('All times are UTC (webtrees server time). Current time (UTC): %s', $cron_now) ?></div>
-            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cj_add_time"><?= I18N::translate('+ Add cron trigger') ?></button>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cj_add_time">+ <?= I18N::translate('Add cron trigger') ?></button>
             <template id="cj_time_row_template">
                 <div class="input-group input-group-sm mb-1">
                     <input type="text" class="form-control" name="triggers_time[]" placeholder="*/30 * * * *">
@@ -188,7 +188,7 @@ if ($copy_of !== null) {
             </datalist>
             <div class="form-text"><?= I18N::translate('The job runs once for each queued event with one of these names (webhook, module push, built-in pseudo-event poller, or a route trigger).') ?></div>
             <div class="form-text"><?= I18N::translate('Suggested: module-announced events, built-in pseudo-events (cronjob:…) and route events (_route:…). Plain slugs for your own events work too. The full list is in the event catalog on the admin page.') ?></div>
-            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cj_add_event"><?= I18N::translate('+ Add event trigger') ?></button>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-1" id="cj_add_event">+ <?= I18N::translate('Add event trigger') ?></button>
             <template id="cj_event_row_template">
                 <div class="input-group input-group-sm mb-1">
                     <input type="text" class="form-control" name="triggers_event[]"
