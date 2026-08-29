@@ -5,9 +5,9 @@ SCRIPTDIR=$(dirname "$(realpath -s "${BASH_SOURCE:-$0}")")
 SRCDIR=$(realpath -m "$SCRIPTDIR/..")
 DSTDIR=$(realpath -m "$SCRIPTDIR/../dist/cronjob")
 
-# Version: single source of truth is CronjobModule::customModuleVersion()
-VER=$(grep -A1 "function customModuleVersion" "$SRCDIR/src/CronjobModule.php" \
-  | grep -oP "return '\K[0-9]+\.[0-9]+\.[0-9]+" || true)
+# Version: single source of truth is CronjobModule::CUSTOM_VERSION
+VER=$(grep -A1 "public const CUSTOM_VERSION" "$SRCDIR/src/CronjobModule.php" \
+  | grep -oP "= '\K[0-9]+\.[0-9]+\.[0-9]+[\-A-Za-z0-9]*" || true)
 [[ -n "$VER" ]] || { echo "ERROR: version not found in src/CronjobModule.php"; exit 1; }
 
 # The bundled cron library must be present (vendor/* is .gitignore'd in the

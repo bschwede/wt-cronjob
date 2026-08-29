@@ -3,6 +3,21 @@
     "description": "webtrees custom module: cron job scheduler service (time-based maintenance jobs with admin UI, run history and manual trigger)",
     "type": "project",
     "license": "GPL-3.0-or-later",
+    "keywords": [
+        "webtrees",
+        "custom module"
+    ],
+    "authors": [
+        {
+            "name": "Bernd Schwendinger",
+            "homepage": "https://github.com/bschwede",
+            "role": "Developer"
+        }
+    ],
+    "homepage": "https://github.com/bschwede/wt-cronjob",
+    "support": {
+        "issues": "https://github.com/bschwede/wt-cronjob/issues"
+    },    
     "require": {
         "php": ">=8.3",
         "dragonmantank/cron-expression": "^3.4"
@@ -11,5 +26,8 @@
         "platform": {
             "php": "8.3.0"
         }
-    }
+    },
+    "conflict": {
+        "fisharebest/webtrees": ">2.2"
+    }    
 }
