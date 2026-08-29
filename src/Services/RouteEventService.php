@@ -85,10 +85,18 @@ use function substr;
  *
  * Why this is safe to run in the per-request middleware (unlike the removed
  * polling detection): it does no heavy work - a free in-memory map lookup, and
- * at most two tiny indexed reads for the rare mapped route - and
- * EventQueue::push() is a plain DB insert in the SAME transaction as the
+ * at most three tiny indexed reads for the rare mapped route (the module
+ * setting, the listener, and - on record routes - the change-table flag) -
+ * and EventQueue::push() is a plain DB insert in the SAME transaction as the
  * mutation, so the queued event commits or rolls back together with the
  * change (no drift).
+ *
+ * Record-route payloads additionally carry change_pending (bool): whether the
+ * change is still pending in the change table after this request (the user's
+ * auto-accept preference is off) or already applied (auto-accept on). A
+ * pending change is applied later by an admin accepting it - which fires its
+ * own events (_route:accept*, _route:reject*). Tree-level routes write
+ * directly (no change rows) and carry no such flag.
  *
  * Gated by a module setting (default off) AND by a listening event-triggered
  * job: an unmapped request costs nothing, and a mapped one writes a row only
@@ -218,13 +226,28 @@ final class RouteEventService {
             return;
         }
 
-        // Two tiny indexed reads, only for the rare mapped + successful route.
+        // Tiny indexed reads only, and only for the rare mapped + successful
+        // route (the module setting and the listener gate below).
         if (!self::isEnabled() || !self::hasListener($entry['event'])) {
             return;
         }
 
-        $payload = self::buildPayload(self::flattenAttributes($request, $route));
-        EventQueue::push($entry['event'], $payload);
+        $flat = self::flattenAttributes($request, $route);
+
+        // Record routes carry the target xref: whether the change is still
+        // pending in the change table after this request (auto-accept off) or
+        // already applied (auto-accept on). One more tiny indexed read - and
+        // it runs in the SAME transaction, so it sees the request's final
+        // state. Tree-level routes carry no xref and no change rows.
+        if (isset($flat['tree'], $flat['xref'])) {
+            $flat['change_pending'] = DB::table('change')
+                ->where('gedcom_id', '=', (int) $flat['tree'])
+                ->where('xref', '=', (string) $flat['xref'])
+                ->where('status', '=', 'pending')
+                ->exists();
+        }
+
+        EventQueue::push($entry['event'], self::buildPayload($flat));
     }
 
     /**
@@ -443,10 +466,12 @@ final class RouteEventService {
      * The payload key names a mapped route would produce, derived purely from
      * the route path (standalone-testable, no webtrees dependency).
      *
-     * Mirrors flattenAttributes(): the `{tree}` placeholder expands to
-     * `tree` and `tree_name` (the Tree object contributes id + name); every
-     * other `{param}` placeholder contributes its own name. Keys are returned
-     * in the order the placeholders appear in the path.
+     * Mirrors flattenAttributes() + maybeFire(): the `{tree}` placeholder
+     * expands to `tree` and `tree_name` (the Tree object contributes id +
+     * name); every other `{param}` placeholder contributes its own name; keys
+     * are in the order the placeholders appear in the path. Tree-scoped paths
+     * carrying a `{xref}` additionally end with `change_pending` (the
+     * change-table flag, see maybeFire()).
      *
      * @return list<string>
      */
@@ -461,6 +486,9 @@ final class RouteEventService {
                     $keys[] = $param;
                 }
             }
+        }
+        if (str_contains($path, self::TREE_PREFIX) && str_contains($path, self::XREF)) {
+            $keys[] = 'change_pending';
         }
 
         return $keys;

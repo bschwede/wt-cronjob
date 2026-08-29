@@ -24,8 +24,10 @@
 
 declare(strict_types=1);
 
-// Standalone tests for the phase-2 pseudo-events building blocks that are
-// free of webtrees/DB: the detectors' pure compare() transition logic,
+// Standalone tests for the pseudo-events building blocks that are free of
+// webtrees/DB: the LogRowDetector's pure compare() transition logic
+// (checkpoint, backpressure cap, reset, payload shape, truncation), the
+// detector registry / orphan / state-pruning helpers,
 // ScheduleService::specDiff() and the PseudoEventService file-based state /
 // cooldown handling. A minimal Webtrees constant stub stands in for the core
 // class (same convention as test-watch-service.php); state files live in a
@@ -47,10 +49,8 @@ namespace {
 
     require __DIR__ . '/../autoload.php';
 
-    use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\GedcomFileDetector;
-    use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\MediaFileCountDetector;
+    use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\LogRowDetector;
     use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
-    use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\UserMaxIdDetector;
     use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 
     $failures = 0;
@@ -72,51 +72,151 @@ namespace {
         @unlink($file);
     }
 
-    // --- detectors: event names --------------------------------------------
-    check('gedcom detector event name', (new GedcomFileDetector())->eventName() === 'cronjob:gedcom-changed');
-    check('media detector event name', (new MediaFileCountDetector())->eventName() === 'cronjob:media-added');
-    check('user detector event name', (new UserMaxIdDetector())->eventName() === 'cronjob:user-registered');
+    // --- registry -------------------------------------------------------------------
+    $list  = PseudoEventService::detectors();
+    $names = [];
+    foreach ($list as $detector) {
+        $names[] = $detector->eventName();
+    }
+    $expected = [
+        'cronjob:log-auth-failed',
+        'cronjob:log-auth-login',
+        'cronjob:log-auth-logout',
+        'cronjob:log-error',
+        'cronjob:log-edit-update',
+        'cronjob:log-edit-delete',
+        'cronjob:log-search',
+    ];
+    check('registry: seven detectors in order', $names === $expected);
+    check('registry: old events gone',
+        array_intersect(['cronjob:gedcom-changed', 'cronjob:media-added', 'cronjob:user-registered'], $names) === []);
 
-    // --- GedcomFileDetector::compare ----------------------------------------
-    $ged = new GedcomFileDetector();
-    $tree1 = [1 => ['mtime' => 100, 'size' => 10, 'name' => 'tree1']];
+    foreach ($list as $detector) {
+        check('catalog: description set for ' . $detector->eventName(), $detector->description() !== '');
+    }
+    $keys = [];
+    foreach ($list as $detector) {
+        $keys[] = $detector->payloadKeys();
+    }
+    check('catalog: payloadKeys identical for all',
+        count(array_unique(array_map('json_encode', $keys))) === 1
+        && $keys[0] === ['log_id', 'log_time', 'log_message', 'gedcom_id', 'user_id']);
 
-    $baseline = $ged->compare(null, $tree1);
-    check('gedcom: first run is baseline (not detected)', $baseline['detected'] === false);
-    check('gedcom: baseline state kept', $baseline['state'] === $tree1);
+    // --- LogRowDetector::truncateMessage ---------------------------------------------
+    check('truncate: short message untouched', LogRowDetector::truncateMessage('abc', 250) === 'abc');
+    check('truncate: exactly max untouched', LogRowDetector::truncateMessage(str_repeat('x', 250), 250) === str_repeat('x', 250));
+    check('truncate: long ascii cut to max', strlen(LogRowDetector::truncateMessage(str_repeat('x', 300), 250)) === 250);
+    // 250 bytes + 1: the cut splits the 2-byte sequence (C3 A4) after its lead byte.
+    $two = str_repeat('a', 249) . "\xC3\xA4";
+    check('truncate: split 2-byte sequence dropped', LogRowDetector::truncateMessage($two, 250) === str_repeat('a', 249));
+    // 251 bytes: the cut splits the 3-byte sequence (E4 B8 AD) after lead + 1 continuation.
+    $three = str_repeat('a', 248) . "\xE4\xB8\xAD";
+    check('truncate: split 3-byte sequence dropped', LogRowDetector::truncateMessage($three, 250) === str_repeat('a', 248));
+    // 251 bytes: the cut splits the 4-byte sequence (F0 9F 98 80) after lead + 2 continuations.
+    $four = str_repeat('a', 247) . "\xF0\x9F\x98\x80";
+    check('truncate: split 4-byte sequence dropped', LogRowDetector::truncateMessage($four, 250) === str_repeat('a', 247));
+    // 252 bytes: a complete sequence at the boundary stays, the split one after it drops.
+    $boundary = str_repeat('a', 248) . "\xC3\xA4\xC3\xBC";
+    check('truncate: complete boundary sequence kept', LogRowDetector::truncateMessage($boundary, 250) === str_repeat('a', 248) . "\xC3\xA4");
 
-    check('gedcom: unchanged -> not detected', $ged->compare($tree1, $tree1)['detected'] === false);
+    // --- LogRowDetector::compare -------------------------------------------------------
+    $det = new LogRowDetector('cronjob:log-auth-failed', 'd', 'auth', ['Login failed']);
+    $row = static function (int $id, string $msg, ?int $uid = 5, ?int $gid = 3): array {
+        return ['log_id' => $id, 'log_time' => '2026-08-29 10:00:00', 'log_message' => $msg, 'user_id' => $uid, 'gedcom_id' => $gid];
+    };
+    $cur = static function (array $rows, int $max): array {
+        return ['rows' => $rows, 'max_id' => $max];
+    };
 
-    $mtime = $ged->compare($tree1, [1 => ['mtime' => 200, 'size' => 10, 'name' => 'tree1']]);
-    check('gedcom: mtime change -> detected', $mtime['detected'] === true);
-    check('gedcom: changed payload lists tree', $mtime['payload']['changed'] === ['tree1']);
+    $baseline = $det->compare(null, $cur([$row(1, 'Login failed (x): u')], 1));
+    check('log: first run is baseline (no events)', $baseline['events'] === []);
+    check('log: baseline state = max_id', $baseline['state'] === 1);
 
-    $size = $ged->compare($tree1, [1 => ['mtime' => 100, 'size' => 999, 'name' => 'tree1']]);
-    check('gedcom: size change -> detected', $size['detected'] === true);
+    $none = $det->compare(10, $cur([], 10));
+    check('log: no new rows -> no events, state kept', $none['events'] === [] && $none['state'] === 10);
 
-    $added = $ged->compare($tree1, [1 => ['mtime' => 100, 'size' => 10, 'name' => 'tree1'], 2 => ['mtime' => 5, 'size' => 5, 'name' => 'tree2']]);
-    check('gedcom: new tree -> detected', $added['detected'] === true);
-    check('gedcom: new tree in payload', in_array('tree2', $added['payload']['changed'], true));
+    $two_rows = $det->compare(10, $cur([
+        $row(11, 'Login failed (incorrect password): bob'),
+        $row(12, 'Login failed (no such user): ann'),
+    ], 12));
+    check('log: one event per matching row', count($two_rows['events']) === 2);
+    check('log: payload key order', array_keys($two_rows['events'][0]) === ['log_id', 'log_time', 'log_message', 'gedcom_id', 'user_id']);
+    check('log: payload values', $two_rows['events'][0] === [
+        'log_id'      => 11,
+        'log_time'    => '2026-08-29 10:00:00',
+        'log_message' => 'Login failed (incorrect password): bob',
+        'gedcom_id'   => 3,
+        'user_id'     => 5,
+    ]);
+    check('log: caught up -> state = max_id', $two_rows['state'] === 12);
 
-    check('gedcom: removed tree -> detected', $ged->compare($tree1, [])['detected'] === true);
+    $nulls = $det->compare(0, $cur([$row(1, 'Login failed (x): u', null, null)], 1));
+    check('log: null gedcom_id/user_id omitted', $nulls['events'][0] === [
+        'log_id'      => 1,
+        'log_time'    => '2026-08-29 10:00:00',
+        'log_message' => 'Login failed (x): u',
+    ]);
 
-    // --- MediaFileCountDetector::compare ------------------------------------
-    $media = new MediaFileCountDetector();
-    check('media: baseline not detected', $media->compare(null, 42)['detected'] === false);
-    check('media: unchanged not detected', $media->compare(42, 42)['detected'] === false);
-    $inc = $media->compare(42, 50);
-    check('media: increase detected', $inc['detected'] === true);
-    check('media: added payload', $inc['payload'] === ['added' => 8, 'total' => 50]);
-    check('media: decrease not detected', $media->compare(50, 40)['detected'] === false);
+    $prefix = $det->compare(10, $cur([
+        $row(11, 'Login: bob/Bob'),
+        $row(12, 'Login failed (x): u'),
+    ], 12));
+    check('log: non-matching prefix not fired', count($prefix['events']) === 1 && $prefix['events'][0]['log_id'] === 12);
+    check('log: non-matching prefix, caught up -> state = max_id', $prefix['state'] === 12);
 
-    // --- UserMaxIdDetector::compare -----------------------------------------
-    $user = new UserMaxIdDetector();
-    check('user: baseline not detected', $user->compare(null, 7)['detected'] === false);
-    check('user: unchanged not detected', $user->compare(7, 7)['detected'] === false);
-    $up = $user->compare(7, 9);
-    check('user: new max detected', $up['detected'] === true);
-    check('user: payload', $up['payload'] === ['new_user_id' => 9, 'added' => 2]);
-    check('user: max decrease not detected', $user->compare(9, 5)['detected'] === false);
+    $nomatch = $det->compare(10, $cur([$row(11, 'Login: bob/Bob')], 11));
+    check('log: zero matches -> no events, state = max_id', $nomatch['events'] === [] && $nomatch['state'] === 11);
+
+    $shrank = $det->compare(50, $cur([], 30));
+    check('log: table shrank -> reset, no events', $shrank['events'] === [] && $shrank['state'] === 30);
+
+    $many = [];
+    for ($i = 1; $i <= 210; $i++) {
+        $many[] = $row($i, 'Login failed (x): u' . $i);
+    }
+    $capped = $det->compare(0, $cur($many, 210));
+    check('log: cap 200 events per run', count($capped['events']) === 200);
+    check('log: cap -> checkpoint = last fired row (backpressure)', $capped['state'] === 200);
+    $rest = $det->compare(200, $cur(array_slice($many, 200), 210));
+    check('log: rest fired on the next run', count($rest['events']) === 10 && $rest['state'] === 210);
+
+    $window = [];
+    for ($i = 1; $i <= 500; $i++) {
+        $window[] = $row($i, 'Login: bob/Bob' . $i);
+    }
+    $full_nomatch = $det->compare(0, $cur($window, 9999));
+    check('log: full window, no match -> no events, checkpoint = window end',
+        $full_nomatch['events'] === [] && $full_nomatch['state'] === 500);
+
+    $window_match = [];
+    for ($i = 1; $i <= 500; $i++) {
+        $window_match[] = $row($i, 'Login failed (x): u' . $i);
+    }
+    $full_match = $det->compare(0, $cur($window_match, 9999));
+    check('log: full window, all match -> 200 events, checkpoint = 200th',
+        count($full_match['events']) === 200 && $full_match['state'] === 200);
+
+    $err = new LogRowDetector('cronjob:log-error', 'd', 'error');
+    $err_run = $err->compare(0, $cur([$row(1, 'Some exception trace')], 1));
+    check('log: no-prefix detector fires any row of the type', count($err_run['events']) === 1 && $err_run['state'] === 1);
+
+    // --- PseudoEventService::orphanedEvents (removed built-in detectors) --------------
+    check('orphaned: known detector names kept',
+        PseudoEventService::orphanedEvents(['cronjob:log-auth-failed', 'cronjob:log-error']) === []);
+    check('orphaned: removed detector flagged',
+        PseudoEventService::orphanedEvents(['cronjob:gedcom-changed']) === ['cronjob:gedcom-changed']);
+    check('orphaned: foreign domains ignored',
+        PseudoEventService::orphanedEvents(['_route:foo', 'linkenhancer:x']) === []);
+    check('orphaned: mixed list',
+        PseudoEventService::orphanedEvents(['cronjob:gedcom-changed', 'cronjob:log-search', '_route:bar', 'cronjob:media-added'])
+        === ['cronjob:gedcom-changed', 'cronjob:media-added']);
+    check('orphaned: empty input', PseudoEventService::orphanedEvents([]) === []);
+
+    // --- PseudoEventService::pruneState (stale detector state after an update) --------
+    check('pruneState: stale keys dropped',
+        PseudoEventService::pruneState(['cronjob:gedcom-changed' => 1, 'cronjob:media-added' => 2, 'cronjob:log-auth-failed' => 5])
+        === ['cronjob:log-auth-failed' => 5]);
+    check('pruneState: empty stays empty', PseudoEventService::pruneState([]) === []);
 
     // --- ScheduleService::specDiff (§13: triggers_key) -----------------------
     $spec = [
@@ -160,7 +260,7 @@ namespace {
     check('specDiff: multiple changes in manifest order', ScheduleService::specDiff($multi, $spec) === ['title', 'args']);
 
     $ev_spec = $spec;
-    $ev_spec['triggers'] = [['type' => 'event', 'cron' => '', 'event' => 'cronjob:gedcom-changed']];
+    $ev_spec['triggers'] = [['type' => 'event', 'cron' => '', 'event' => 'cronjob:log-edit-update']];
     $ev_diff = ScheduleService::specDiff($identical, $ev_spec);
     check('specDiff: time->event job flags triggers_key only', $ev_diff === ['triggers_key']);
 
@@ -174,17 +274,9 @@ namespace {
     check('service: cooldown elapsed after the interval', PseudoEventService::cooldownElapsed() === true);
 
     check('service: loadState default when no file', PseudoEventService::loadState() === ['last_run_at' => 0, 'detectors' => []]);
-    PseudoEventService::saveState(['last_run_at' => 12345, 'detectors' => ['cronjob:media-added' => 5, 'cronjob:user-registered' => 7]]);
+    PseudoEventService::saveState(['last_run_at' => 12345, 'detectors' => ['cronjob:log-auth-failed' => 5, 'cronjob:log-error' => 7]]);
     $loaded = PseudoEventService::loadState();
-    check('service: state round-trip', $loaded === ['last_run_at' => 12345, 'detectors' => ['cronjob:media-added' => 5, 'cronjob:user-registered' => 7]]);
-
-    $list  = PseudoEventService::detectors();
-    $names = [];
-    foreach ($list as $detector) {
-        $names[] = $detector->eventName();
-    }
-    check('service: three detectors registered in order',
-        count($list) === 3 && $names === ['cronjob:gedcom-changed', 'cronjob:media-added', 'cronjob:user-registered']);
+    check('service: state round-trip', $loaded === ['last_run_at' => 12345, 'detectors' => ['cronjob:log-auth-failed' => 5, 'cronjob:log-error' => 7]]);
 
     // Cleanup
     foreach (glob($data . 'cronjob-pseudo-events*') ?: [] as $file) {

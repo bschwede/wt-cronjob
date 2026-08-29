@@ -9,7 +9,7 @@ has to call one small script once per minute.
 - **Admin UI** (control panel): job list, create/edit form, run history, run now, enable/disable, delete
 - **Isolated execution**: every job runs as a separate child PHP process (`proc_open`, no shell), with per-job timeout and captured output
 - **Self-registration**: other modules can advertise their jobs (a `cron-jobs.php` manifest or a `getCronJobs()` method); they appear here, created disabled and ready to enable
-- **Event-driven jobs**: jobs can fire on events instead of a schedule - queued by a token-protected **webhook**, by a direct `EventQueue::push()` call from other modules, or by the built-in **pseudo-event** pollers (GEDCOM change, new media, new user)
+- **Event-driven jobs**: jobs can fire on events instead of a schedule - queued by a token-protected **webhook**, by a direct `EventQueue::push()` call from other modules, by the built-in **pseudo-event** pollers (the webtrees log table: failed logins, logins, logouts, errors, record edits, searches) or by **route events** (curated mutating editor routes)
 - **Failure notification**: per-job opt-in to alert the site's administrator accounts (internal message and/or e-mail, per each admin's own preference) when a job fails
 - **Offline awareness**: while `data/offline.txt` exists (e.g. during a webtrees update) the tick is skipped *before any database access* - no child process starts while migrations and code are in flux
 - **No core changes, no changes to other modules**
@@ -350,7 +350,7 @@ return [
 - An announced event is namespaced **`<module>:<name>`** (like the offered job keys).
 - An event trigger's `event` value that carries no colon is auto-namespaced
   `<module>:<event>`; a name that already has a colon (e.g.
-  `cronjob:gedcom-changed`) is kept as-is.
+  `cronjob:log-edit-update`) is kept as-is.
 - Equivalent marker method: `getModuleEvents(): array` (same event-spec shape).
 
 **Event spec fields**
@@ -491,7 +491,7 @@ job runs (job scripts are idempotent/incremental by convention).
 | Form | Meaning |
 | :--- | :--- |
 | plain slug (e.g. `index-dirty`) | your own events - webhook or direct `EventQueue::push()` |
-| `cronjob:<slug>` | built-in pseudo-events (state pollers) |
+| `cronjob:<slug>` | built-in pseudo-events (log-table pollers) |
 | `_route:<slug>` | route-triggered events (see below) |
 | `<module>:<slug>` | events announced by a module (see "Announcing events") |
 
@@ -510,11 +510,12 @@ Queuing an event has four sources:
    `\Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue::push('index-dirty', ['tree' => 'X']);`
    - this requires the cronjob module to be installed; guard it with
      `class_exists('Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue')`.
-3. **Pseudo-events (built-in pollers).** webtrees core actions (a GEDCOM import,
-   new media, a new user) cannot be hooked without a core change, so they are
-   *observed by polling*. Enable the offered `cronjob:pseudo-events` job and the
-   module checks the state below at most every 5 minutes, queueing an event on each
-   transition. See "Pseudo-events (state polling)".
+3. **Pseudo-events (built-in pollers).** webtrees has no event bus, so core
+   actions (logins, failed logins, logouts, record edits, errors, searches) are
+   *observed by polling* the webtrees log table. Enable the offered
+   `cronjob:pseudo-events` job and the module reads the new log entries at most
+   every 5 minutes, queueing one event per entry. See
+   "Pseudo-events (log-table polling)".
  4. **Route events (built-in, request-triggered).** A curated set of mutating
     editor routes under `/tree/{tree}/` (record-specific routes with `{xref}` in
     the path, plus a small tree-level allowlist) queues its event immediately,
@@ -540,7 +541,7 @@ validated arguments):
 | Variable | Set when | Value |
 | :--- | :--- | :--- |
 | `CRONJOB_EVENT` | every event run | the event name (doubles as the "this is an event run" marker) |
-| `CRONJOB_EVENT_PAYLOAD` | event run **with** a non-empty payload | the event payload as JSON (route parameters, pseudo-event state, webhook `data`) |
+| `CRONJOB_EVENT_PAYLOAD` | event run **with** a non-empty payload | the event payload as JSON (route parameters, log-table entries, webhook `data`) |
 
 ```php
 $event   = getenv('CRONJOB_EVENT');                       // false on schedule / manual runs
@@ -558,20 +559,31 @@ $xref    = $payload['xref'] ?? '';                        // e.g. from a _route:
 - The payload is also visible in the run history (event detail), independent of the
   child process.
 
-## Pseudo-events (state polling)
+## Pseudo-events (log-table polling)
 
-webtrees has no event bus, so core actions you cannot hook into (a standard GEDCOM
-import, media being added, a user registering) are detected by **polling state** and
-firing an event when the state transitions. It is **off by default**: nothing runs
-until you enable the offered `cronjob:pseudo-events` job.
+webtrees has no event bus, so core actions (logins, failed logins, logouts, record
+edits, errors, searches) are detected by **polling the webtrees log table**
+(`app/Log.php`, table `log`) and firing an event per new matching log entry. It is
+**off by default**: nothing runs until you enable the offered `cronjob:pseudo-events`
+job.
 
-**Built-in detectors** (each emits a matching event for an event-triggered job):
+**Built-in events** (one `cj_event` per new log row, payload = the row):
 
-| Event | Fires when | State polled |
+| Event | Log filter (log_type, message prefix) | Fires when |
 | :--- | :--- | :--- |
-| `cronjob:gedcom-changed` | a GEDCOM file in `data/` changed (mtime or size) — i.e. a standard import/export re-wrote it | per-tree file mtime + size |
-| `cronjob:media-added` | the `media_file` row count increased | `COUNT(media_file)` |
-| `cronjob:user-registered` | `MAX(user_id)` grew (a new user signed up) | `MAX(user.user_id)` |
+| `cronjob:log-auth-failed` | `auth`, `Login failed` | a login attempt failed (wrong password, unknown user, unverified, not approved, no session cookies) |
+| `cronjob:log-auth-login` | `auth`, `Login: ` | a user logged in |
+| `cronjob:log-auth-logout` | `auth`, `Logout: ` | a user logged out |
+| `cronjob:log-error` | `error`, – | an exception was caught and logged (the message is the trace) |
+| `cronjob:log-edit-update` | `edit`, `Update: ` | a record was updated (`GedcomRecord::updateRecord()`) |
+| `cronjob:log-edit-delete` | `edit`, `Delete: ` | a record was deleted (`GedcomRecord::deleteRecord()`) |
+| `cronjob:log-search` | `search`, – | a search ran (**one log row per searched tree**) |
+
+**Payload:** `log_id`, `log_time`, `log_message` (truncated to 250 characters,
+UTF-8-safe) plus `gedcom_id` / `user_id` when the log row carries them. The message
+prefixes are the hard-coded English strings of the current core; a core update that
+changes them silently stops the matching event (no fallback by design) — the event
+catalog descriptions and the `test-pseudo-events` suite pin the current mapping.
 
 **How it runs**
 
@@ -581,24 +593,39 @@ until you enable the offered `cronjob:pseudo-events` job.
   detector can never block or slow down a page load. A 5-minute cooldown (a `data/`
   mtime marker) plus a lock keep repeated runs cheap and idempotent; the cooldown
   also caps a more frequent job cron.
-- **Enabled by the job.** Enabling the `cronjob:pseudo-events` job is what turns
-  detection on (there is no separate switch — the tick only runs enabled jobs).
-  Detection additionally no-ops while no enabled event-triggered job is listening,
-  so it never polls for nothing.
-- **Baseline on first run.** The first detection only records the current state and
-  fires nothing, so enabling the job does not retroactively fire on existing data.
+- **Enabled by the job, gated per event.** Enabling the `cronjob:pseudo-events` job
+  turns detection on (there is no separate switch — the tick only runs enabled jobs).
+  A detector whose event no enabled event-triggered job listens for is skipped
+  entirely — no query, no push.
+- **Checkpoint + backpressure.** Each detector remembers the highest `log_id` it
+  processed (state file). At most 200 rows are fired per run per detector; the
+  checkpoint advances only as far as the last fired row, so a flood is drained over
+  several runs — no data loss, only latency.
+- **Baseline on first run.** The first detection only records the current max
+  `log_id` and fires nothing, so enabling the job does not retroactively fire on
+  existing data. (Re-listening to a previously unlistened event catches up its
+  backlog, capped as above.)
+- **Reset, not re-fire, on table shrink.** If the table shrank below a checkpoint
+  (TRUNCATE / DB restore — plain row deletions cannot do this, MySQL auto-increment
+  continues after deletes), the detector re-baselines silently.
 - **Offline-safe & isolated.** Skipped while `data/offline.txt` exists; a broken
   detector never breaks the others; detection is serialized (flock) and state is
   persisted atomically to `data/cronjob-pseudo-events.json`.
 
+The **log table is the source of truth**: under a flood the tick's coalescing (§16,
+F1) runs a job once per event name per tick with the newest payload — older rows are
+not re-delivered, but they stay in the log table, and `log_id` in the payload lets a
+job that needs completeness re-read the range itself.
+
+> **Breaking change (1.2.0).** The former built-in detectors
+> `cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered` are
+> removed. Jobs listening to them can never fire again; the admin table flags such
+> triggers with the **unknown event** badge.
+
 Detected events go into the same `cj_event` queue as webhooks and are consumed by the
 tick's normal event drain. To act on one, create an event-triggered job whose
-**Event name** matches (e.g. re-run the linkenhancer index on
-`cronjob:gedcom-changed`).
-
-> The GEDCOM detector watches the file in `data/`, so it reflects imports/exports that
-> rewrite that file. It is a polling heuristic (~5 min latency), not a true hook — a
-> hook would require a core change (out of scope).
+**Event name** matches (e.g. alert on `cronjob:log-auth-failed`, re-index on
+`cronjob:log-edit-update`).
 
 ## Route events (request-triggered)
 
@@ -649,7 +676,12 @@ table. Common prerequisites: path starts with `/tree/{tree}/`, HTTP **POST** onl
 | `_route:change-family-members` | POST `change-family-members` | `tree` — the family xref is a form field |
 
 In total 38 events (27 record routes + 11 tree-level routes). The payload always
-contains `tree` (id) + `tree_name` plus all matched route parameters.
+contains `tree` (id) + `tree_name` plus all matched route parameters. **Record
+routes** (with `{xref}`) additionally carry `change_pending` (bool): whether the
+change is still pending in the `change` table after this request (the user's
+auto-accept preference is off) or already applied (auto-accept on). A pending change
+is applied when an admin accepts it — which fires its own `_route:accept*` events.
+Tree-level routes write directly (no `change` rows) and carry no such flag.
 
 > **Breaking change (this version).** Record routes *without* `{xref}` in the URL —
 > all `_route:create-*` events plus `_route:add-unlinked-individual` — are no longer
@@ -676,18 +708,20 @@ contains `tree` (id) + `tree_name` plus all matched route parameters.
   can never alter the response.
 - **Robust to core upgrades.** The map is rebuilt from the route table (keyed by
   handler class *strings*, no `::class`), so a renamed/removed handler simply stops
-  matching instead of fatalling. If the route table is not available (e.g. CLI), a
-  static fallback map with the note route keeps the pilot working. The record-route
-  rule is fully automatic; only the small tree-level allowlist is curated (see
-  above), and jobs pointing at a route event that no longer exists are flagged in
-  the admin table (**unknown route event** badge).
+   matching instead of fatalling. If the route table is not available (e.g. CLI), a
+   static fallback map with the note route keeps the pilot working. The record-route
+   rule is fully automatic; only the small tree-level allowlist is curated (see
+   above), and jobs pointing at an event that no longer exists — a removed route
+   event or a removed built-in pseudo-event — are flagged in the admin table
+   (**unknown event** badge).
 
 To act on one, create an event-triggered job whose **Event name** matches (e.g.
 `_route:update-record`) and enable the "Route events" toggle. Note the overlap with
-the `cronjob:gedcom-changed` poller: an editor save rewrites the GEDCOM file, so a
-`cronjob:gedcom-changed` event follows at the next poll as well — pick the mechanism
-whose latency/precision fits the job (route events are near-instant and precise per
-object; pollers are coarser but also catch changes made outside the web UI).
+the `cronjob:log-edit-update` / `cronjob:log-edit-delete` pollers: every record
+edit/delete is also written to the log table, so the matching log event follows at
+the next poll as well — pick the mechanism whose latency/precision fits the job
+(route events are near-instant and precise per object, and carry `change_pending`;
+log pollers lag ~5 min but also catch changes made outside the web UI).
 
 ## Event catalog
 
@@ -706,9 +740,10 @@ Each entry carries its source, a description (stored as a translation key, trans
 at render time only) and the known payload parameter names. For **route events** the
 payload is **derived from the route path**: the `{param}` placeholders in the order
 they appear, with `{tree}` expanding to `tree` + `tree_name` (mirroring what the live
-event payload carries). The full list is also what the "Event name" datalist in the job
-form offers. The catalog is rendered as a client-side **DataTables** (sort/filter/
-paging) in the Events section.
+event payload carries). For **pseudo-events** both come from the detector
+(`description()` / `payloadKeys()`). The full list is also what the "Event name"
+datalist in the job form offers. The catalog is rendered as a client-side
+**DataTables** (sort/filter/paging) in the Events section.
 
 ## Command catalog
 
@@ -784,17 +819,20 @@ beyond the text. A notification problem never breaks the tick.
 | Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | time `0 3 * * 0` |
 | Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | time `0 4 * * *` |
 | Re-index on change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `linkenhancer:index-dirty` (announced by the linkenhancer manifest; queued by its code or a webhook) |
-| Re-index on GEDCOM change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `cronjob:gedcom-changed` |
+| Re-index on record edit (event, log poller) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `cronjob:log-edit-update` (~5 min latency) |
 | Re-index on any record edit (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `_route:update-record` (route events must be enabled) |
-| Pseudo-events poll (offered job) | `modules_v4/cronjob/cli/pseudo-events.php` | time `*/5 * * * *` (fires `cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered`) |
+| Failed-login alert (event) | a small CLI script (your own) | event `cronjob:log-auth-failed` |
+| Pseudo-events poll (offered job) | `modules_v4/cronjob/cli/pseudo-events.php` | time `*/5 * * * *` (fires the `cronjob:log-*` events, see above) |
 
 ## Roadmap (phase 2)
 
 Implemented so far: **job self-registration** (manifest / marker method, incl.
 **event announcements**), the **W1 wrapper**, **event-driven jobs** (webhook +
-`cj_event` queue + `EventQueue::push()`), **pseudo-events** (state pollers:
-`cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered`, driven
-by the offered `cronjob:pseudo-events` job), **forced re-sync of the module's own
+`cj_event` queue + `EventQueue::push()`), **pseudo-events** (originally state
+pollers: `cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered`;
+replaced in 1.2.0 by **log-table pollers**: the `cronjob:log-*` events — one event
+per new log row, see "Pseudo-events (log-table polling)", driven by the offered
+`cronjob:pseudo-events` job), **forced re-sync of the module's own
 manifest job** on update, **failure notification** to the administrator accounts, a
 **human-readable schedule** shown next to each cron expression in the admin table
 (translatable via `I18N`; the exact cron string is always shown too), the
@@ -828,7 +866,17 @@ renumber, search-replace, data fixes and bulk accept/reject - 38 events; orphane
 event carried one, `CRONJOB_EVENT_PAYLOAD` (JSON) in the job script's environment),
 plus the **security hardening of 1.1.0** (event-queue coalescing + 60 s event-drain
 budget, webhook token header-only, output escaping in the job views, safe
-`confirm()` dialogs, and the corrected smoke-test catalog entry).
+`confirm()` dialogs, and the corrected smoke-test catalog entry) and the
+**log-table pseudo-events of 1.2.0** (the built-in pollers now read the webtrees
+log table - `cronjob:log-auth-failed` / `-login` / `-logout`, `cronjob:log-error`,
+`cronjob:log-edit-update` / `-delete`, `cronjob:log-search`; one event per log row
+with the row as payload; checkpoint + 200-row backpressure cap per run; reset, not
+re-fire, on table shrink; the former `cronjob:gedcom-changed` / `cronjob:media-added`
+/ `cronjob:user-registered` are removed and dead triggers of those names are flagged
+with the **unknown event** badge), **pseudo-events in the event catalog**
+(description + payload keys from the detector), the **`change_pending` flag** on
+record-route payloads (pending change table: auto-accept off vs on), and the
+**per-event-name consumer gate** for the pollers.
 See the sections above.
 
 Still open:
@@ -845,8 +893,8 @@ php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cl
 php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron descriptions (standalone)
 php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
 php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event+command spec validators, manifest loading (jobs/events/commands), event naming, command-catalog merge, W1 payload confinement, multi-trigger (normalizeTriggers/triggersKey/nextRunMin/dueTriggerDetails, specDiff) (standalone)
-php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: detector transition logic, specDiff, state/cooldown (standalone)
-php modules_v4/cronjob/tests/test-route-events.php   # route events: map builder (record-route rule, tree-level allowlist, filters, collision suffixes, fallback), orphaned-event detection, success gate, payload builder, payload-key derivation from path (standalone)
+php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: log-row detector (registry, catalog info, truncation, checkpoint/backpressure/reset, payload shape), orphan/prune helpers, specDiff, state/cooldown (standalone)
+php modules_v4/cronjob/tests/test-route-events.php   # route events: map builder (record-route rule, tree-level allowlist, filters, collision suffixes, fallback), orphaned-event detection, success gate, payload builder, payload-key derivation from path incl. change_pending (standalone)
 php modules_v4/cronjob/tests/test-event-queue.php    # event-queue coalescing: newest per event name, name cap, ordering (standalone)
 php modules_v4/cronjob/tests/test-i18n-mark.php      # i18n: MoreI18N::translate identity, manifest literals/shape unchanged, translateJobTitle % guard (standalone)
 ```

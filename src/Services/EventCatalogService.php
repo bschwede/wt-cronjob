@@ -93,8 +93,8 @@ final class EventCatalogService {
             }
             $catalog[$name] = [
                 'source'      => 'cronjob',
-                'description' => $detector->label(),
-                'payload'     => [],
+                'description' => $detector->description(),
+                'payload'     => $detector->payloadKeys(),
             ];
         }
 

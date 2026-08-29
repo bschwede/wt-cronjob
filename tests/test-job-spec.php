@@ -241,7 +241,7 @@ check('cmdSpec: required + default kept', $r['spec']['params'][0] === ['name' =>
 check('eventName: plain slug valid', CronjobUtils::isValidEventName('index-dirty') === true);
 check('eventName: namespaced valid', CronjobUtils::isValidEventName('linkenhancer:index-dirty') === true);
 check('eventName: route domain valid', CronjobUtils::isValidEventName('_route:edit-note-object') === true);
-check('eventName: pseudo domain valid', CronjobUtils::isValidEventName('cronjob:gedcom-changed') === true);
+check('eventName: pseudo domain valid', CronjobUtils::isValidEventName('cronjob:log-auth-failed') === true);
 check('eventName: double colon rejected', CronjobUtils::isValidEventName('a:b:c') === false);
 check('eventName: leading colon rejected', CronjobUtils::isValidEventName(':x') === false);
 check('eventName: trailing colon rejected', CronjobUtils::isValidEventName('x:') === false);

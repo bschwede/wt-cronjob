@@ -798,7 +798,7 @@ final class ScheduleService {
                 $spec = $result['spec'];
                 // Announced module events are namespaced <module>:<event>, like
                 // the offered job keys. A name that already carries a colon
-                // (e.g. a listener for cronjob:gedcom-changed) is kept as-is.
+                // (e.g. a listener for cronjob:log-edit-update) is kept as-is.
                 foreach ($spec['triggers'] as $i => $trigger) {
                     if ($trigger['type'] === self::TRIGGER_EVENT && !str_contains($trigger['event'], ':')) {
                         $spec['triggers'][$i]['event'] = $short . ':' . $trigger['event'];

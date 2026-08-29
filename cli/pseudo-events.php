@@ -24,8 +24,9 @@
 
 declare(strict_types=1);
 
-// Poll the built-in pseudo-event detectors (GEDCOM change, new media, new
-// user) and queue any detected transitions for the tick's event drain.
+// Poll the webtrees log table (app/Log.php) and queue one event per new
+// matching log entry (failed logins, logins, logouts, errors, record edits,
+// searches) for the tick's event drain.
 //
 // This is cronjob's own manifest job (`cronjob:pseudo-events`). It is offered
 // by modules_v4/cronjob/cron-jobs.php and is the trigger for the polling

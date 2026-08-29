@@ -217,13 +217,16 @@ check('buildPayload: drops null', !array_key_exists('nothing', $payload));
 check('buildPayload: empty in -> empty out', RouteEventService::buildPayload([]) === []);
 
 // --- payloadKeys (§12: catalog payload derived from the route path) --------------
-check('payloadKeys: tree + one param', RouteEventService::payloadKeys('/tree/{tree}/edit-note-object/{xref}') === ['tree', 'tree_name', 'xref']);
-check('payloadKeys: optional segment param', RouteEventService::payloadKeys('/tree/{tree}/update-fact/{xref}{/fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id']);
-check('payloadKeys: two trailing params', RouteEventService::payloadKeys('/tree/{tree}/delete/{xref}/{fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id']);
+check('payloadKeys: record route ends with change_pending', RouteEventService::payloadKeys('/tree/{tree}/edit-note-object/{xref}') === ['tree', 'tree_name', 'xref', 'change_pending']);
+check('payloadKeys: optional segment param + change_pending', RouteEventService::payloadKeys('/tree/{tree}/update-fact/{xref}{/fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id', 'change_pending']);
+check('payloadKeys: two trailing params + change_pending', RouteEventService::payloadKeys('/tree/{tree}/delete/{xref}/{fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id', 'change_pending']);
 check('payloadKeys: only tree (tree + tree_name)', RouteEventService::payloadKeys('/tree/{tree}/create-note-object') === ['tree', 'tree_name']);
-check('payloadKeys: path order preserved', RouteEventService::payloadKeys('/tree/{tree}/edit-raw/{xref}/{fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id']);
-check('payloadKeys: non-tree params kept as-is', RouteEventService::payloadKeys('/tree/{tree}/edit-media-file/{xref}/{fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id']);
+check('payloadKeys: path order preserved', RouteEventService::payloadKeys('/tree/{tree}/edit-raw/{xref}/{fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id', 'change_pending']);
+check('payloadKeys: non-tree params kept as-is', RouteEventService::payloadKeys('/tree/{tree}/edit-media-file/{xref}/{fact_id}') === ['tree', 'tree_name', 'xref', 'fact_id', 'change_pending']);
 check('payloadKeys: no placeholders -> empty', RouteEventService::payloadKeys('/tree/xref/edit') === []);
+// tree-level allowlist routes carry no xref -> no change_pending
+check('payloadKeys: tree-level import without change_pending', RouteEventService::payloadKeys('/tree/{tree}/import') === ['tree', 'tree_name']);
+check('payloadKeys: tree-level data-fix without change_pending', RouteEventService::payloadKeys('/tree/{tree}/data-fix/{data_fix}/update') === ['tree', 'tree_name', 'data_fix']);
 
 echo $failures === 0 ? "All route-events tests passed.\n" : "{$failures} route-events test(s) FAILED.\n";
 exit($failures === 0 ? 0 : 1);

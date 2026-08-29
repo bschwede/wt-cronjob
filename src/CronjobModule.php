@@ -138,7 +138,7 @@ class CronjobModule extends AbstractModule
      * admin has enabled it and it died (cheap, one file check). After the handler:
      * fire a route-triggered event for a curated, successful mutation
      * (RouteEventService - free on the common path, transactional). Neither throws
-     * nor blocks the request. (Polling pseudo-event detection runs in the tick's
+     * nor blocks the request. (Log-table pseudo-event polling runs in the tick's
      * child process, not here - see the offered `cronjob:pseudo-events` job.)
      */
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface {
@@ -164,7 +164,7 @@ class CronjobModule extends AbstractModule
     }
 
     public function customModuleVersion(): string {
-        return '1.1.0';
+        return '1.2.0';
     }
 
     /**
@@ -240,9 +240,10 @@ class CronjobModule extends AbstractModule
         // Triggers grouped by job id (§13) - one query for the whole table.
         $triggers_by_job = ScheduleService::allJobTriggers();
 
-        // Route events assigned to a job that no longer exist in the live
-        // route map (core update / mapping-rule change) - flagged per job
-        // in the table, so silently-dead triggers are visible.
+        // Event triggers assigned to a job that no longer exist (a route
+        // event vanished from the live route map, a built-in pseudo-event
+        // detector was removed by an update) - flagged per job in the table,
+        // so silently-dead triggers are visible.
         $orphaned_triggers = [];
         foreach ($triggers_by_job as $job_id => $triggers) {
             $names = [];
@@ -251,7 +252,10 @@ class CronjobModule extends AbstractModule
                     $names[] = (string) $trigger['event'];
                 }
             }
-            $orphaned = RouteEventService::orphanedEvents($names);
+            $orphaned = array_merge(
+                RouteEventService::orphanedEvents($names),
+                PseudoEventService::orphanedEvents($names)
+            );
             if ($orphaned !== []) {
                 $orphaned_triggers[(int) $job_id] = $orphaned;
             }

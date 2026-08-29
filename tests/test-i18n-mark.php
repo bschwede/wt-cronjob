@@ -69,7 +69,7 @@ namespace {
     }
 
     // 1. MoreI18N is a pure identity (plain, unicode, '%' chars)
-    check('marker identity (plain)', MoreI18N::translate('Cronjob: Pseudo-Events (state-poll detectors)') === 'Cronjob: Pseudo-Events (state-poll detectors)');
+    check('marker identity (plain)', MoreI18N::translate('Cronjob: Pseudo-Events (log-table pollers)') === 'Cronjob: Pseudo-Events (log-table pollers)');
     check('marker identity (unicode)', MoreI18N::translate('Überprüfung äöü') === 'Überprüfung äöü');
     check('marker identity (percent)', MoreI18N::translate('100%') === '100%');
 
@@ -80,12 +80,12 @@ namespace {
     check('one job, one pseudo-events', count($manifest['jobs']) === 1 && $manifest['jobs'][0]['name'] === 'pseudo-events');
     check(
         'job title literal unchanged',
-        $manifest['jobs'][0]['title'] === 'Cronjob: Pseudo-Events (state-poll detectors)'
+        $manifest['jobs'][0]['title'] === 'Cronjob: Pseudo-Events (log-table pollers)'
     );
     check('two announced commands', count($manifest['commands']) === 2);
     check(
         'command description literal unchanged',
-        $manifest['commands'][0]['description'] === 'Poll the built-in pseudo-event detectors (GEDCOM change, new media, new user) and queue any detected transitions for the tick.'
+        $manifest['commands'][0]['description'] === 'Poll the webtrees log table (failed logins, logins, logouts, errors, record edits, searches) and queue one event per new matching log entry for the tick.'
     );
     check(
         'param description literal unchanged',
@@ -113,7 +113,7 @@ namespace {
     \Fisharebest\Webtrees\I18N::$calls = 0;
     check(
         'title without %% -> translated at render time',
-        CronjobUtils::translateJobTitle('Cronjob: Pseudo-Events (state-poll detectors)') === 'TR:Cronjob: Pseudo-Events (state-poll detectors)' && \Fisharebest\Webtrees\I18N::$calls === 1
+        CronjobUtils::translateJobTitle('Cronjob: Pseudo-Events (log-table pollers)') === 'TR:Cronjob: Pseudo-Events (log-table pollers)' && \Fisharebest\Webtrees\I18N::$calls === 1
     );
 
     if ($failures > 0) {

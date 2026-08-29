@@ -122,8 +122,8 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                                 <code><?= e($trigger['event']) ?></code>
                                 <?php if (in_array($trigger['event'], $orphaned_triggers[(int) $job->id] ?? [], true)): ?>
                                     <span class="badge bg-warning text-dark"
-                                          title="<?= e(I18N::translate('This route event no longer exists in the webtrees route map (core update or mapping change) - the job can never fire on it. Edit the job and pick a current event.')) ?>">
-                                        <?= I18N::translate('unknown route event') ?>
+                                          title="<?= e(I18N::translate('This event no longer exists (core update, mapping change or removed built-in detector) - the job can never fire on it. Edit the job and pick a current event.')) ?>">
+                                        <?= I18N::translate('unknown event') ?>
                                     </span>
                                 <?php endif; ?>
                                 <?php if (count($triggers) > 1): ?><br><?php endif; ?>
@@ -322,9 +322,9 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
         <div class="row mt-2 gx-2 gy-2">
             <div class="col-lg-4">
                 <fieldset class="border rounded p-3 h-100">
-                    <legend><?= I18N::translate('Pseudo-Events (state polling)') ?></legend>
+                    <legend><?= I18N::translate('Pseudo-Events (log-table polling)') ?></legend>
                     <p class="text-muted">
-                        <?= I18N::translate('webtrees has no event bus, so core actions are observed by polling. The module checks the states below at most every 5 minutes and queues an event when something changes; an event-triggered job then acts on it. The first run only records a baseline and does not fire.') ?>
+                        <?= I18N::translate('webtrees has no event bus, so core actions are observed by polling. The module reads new log-table entries (failed logins, logins, logouts, errors, record edits, searches) at most every 5 minutes and queues one event per entry; an event-triggered job then acts on it. The first run only records a baseline and does not fire.') ?>
                         <?= I18N::translate('To activate, enable the "cronjob:pseudo-events" job in the table above. It runs in the tick child process - isolated from any web request and bounded by its timeout.') ?>
                     </p>
                 </fieldset>

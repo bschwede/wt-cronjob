@@ -51,7 +51,7 @@ return [
         [
             'name'         => 'pseudo-events',
             /* I18N: default title of the pseudo-events job (job list in the cronjob admin) */
-            'title'        => MoreI18N::translate('Cronjob: Pseudo-Events (state-poll detectors)'),
+            'title'        => MoreI18N::translate('Cronjob: Pseudo-Events (log-table pollers)'),
             'triggers'     => [
                 ['type' => 'time', 'cron' => '*/5 * * * *'],
             ],
@@ -67,7 +67,7 @@ return [
             'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
             'command_type' => 'module',
             /* I18N: command description for pseudo-events.php (command catalog in the cronjob admin) */
-            'description'  => MoreI18N::translate('Poll the built-in pseudo-event detectors (GEDCOM change, new media, new user) and queue any detected transitions for the tick.'),
+            'description'  => MoreI18N::translate('Poll the webtrees log table (failed logins, logins, logouts, errors, record edits, searches) and queue one event per new matching log entry for the tick.'),
             'params'       => [
                 [
                     'name'        => '--force',
