@@ -92,7 +92,7 @@ class CronjobModule extends AbstractModule
     use ModuleConfigTrait;
     use ModuleCustomTrait;
 
-    public const SCHEMA_TARGET_VERSION = 6;
+    public const SCHEMA_TARGET_VERSION = 1;
 
     /** Module preference key holding the webhook token (§6.1). */
     public const PREF_EVENT_TOKEN = 'event_token';
@@ -453,7 +453,7 @@ class CronjobModule extends AbstractModule
             // Source strings; unknown keys are returned unchanged by I18N.
             $errors[] = I18N::translate($error);
         }
-        // DB column widths (Migration0/1): title 128, args 255.
+        // DB column widths (Migration0): title 128, args 255.
         if (mb_strlen($title) > 128) {
             $errors[] = I18N::translate('Job title must be at most %d characters.', 128);
         }

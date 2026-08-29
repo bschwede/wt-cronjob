@@ -63,7 +63,7 @@ final class CronjobUtils {
     private const MODULE_SCRIPT_PATTERN = '#^modules_v4/[a-z0-9_\-]+/cli/[a-z0-9_\-]+\.php$#';
 
     /**
-     * Apply Migrate# class files (zero based) until target_version - 1.
+     * Apply Migration# class files (zero based) until target_version - 1.
      *
      * Same approach as linkenhancer's LinkEnhancerUtils::updateSchema():
      * DDL runs outside the request transaction (MySQL implicit commits).
