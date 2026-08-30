@@ -63,7 +63,7 @@ then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 
 `util/create-archive.sh` builds the installable zip `dist/cronjob_v<version>.zip`
 (needs `rsync` + `zip`). The version is read from
-`CronjobModule::customModuleVersion()` - no separate version file to keep in
+`CronjobModule::CUSTOM_VERSION` - no separate version file to keep in
 sync. The script fails fast when the bundled cron library is missing (it is
 `.gitignore`'d in the module repo, so a fresh clone must have it restored
 first). Development artifacts are excluded: `util/`, `tests/`, `composer.json`,
@@ -236,16 +236,13 @@ wait a minute - the history page should show a green `ok` row.
 - **Kill switch:** disable the module in the module list - the tick then does nothing.
 - The tick is single-instance (flock on `data/cronjob-tick.lock`), and a job's child
   process is hard-killed after its timeout (`SIGKILL`).
-- **Event-queue coalescing (1.1.0).** A flood of identical events (e.g. many rapid
+- **Event-queue coalescing.** A flood of identical events (e.g. many rapid
   edits on a route event) cannot amplify into one job run per queued row: the tick
   drains at most **one event per event name** (the newest) and drops the name's
   superseded duplicates, and the event drain stops after a 60 s wall-clock budget -
   a saturated queue then simply continues with the next tick. This relies on the
   job-script convention (idempotent/incremental) stated above.
-- **Webhook token header-only (1.1.0).** The `?token=<token>` query fallback was
-  removed - a token in the URL would end up in access logs and proxy logs. Send the
-  token exclusively in the `X-Cronjob-Token` header (breaking change for senders
-  that used the query parameter).
+- **Webhook token header-only.** Send the token exclusively in the `X-Cronjob-Token` header.
 
 ## CLI scripts & maintenance (conventions for future job scripts)
 
@@ -480,7 +477,7 @@ job's working directory and arguments are unchanged too.
 Besides time-based schedules, a job can be triggered by an **event**. webtrees has no
 event system, so events are plain DB rows (a small `cj_event` queue) that the tick
 drains once a minute. An event-triggered job runs for a queued event whose name
-matches its **Event name** - **coalesced (1.1.0):** per tick at most the *newest*
+matches its **Event name** - **coalesced:** per tick at most the *newest*
 event of each name is drained (one run per name per tick), and the name's older
 pending duplicates are dropped - a burst of identical events never queues a burst of
 job runs (job scripts are idempotent/incremental by convention).
@@ -500,8 +497,7 @@ Queuing an event has four sources:
 1. **Webhook (external systems).** GET the endpoint shown in the admin page
    (section "Event webhook"):
    `GET /module/_cronjob_/Event?event=<name>&data=<json>` with the token in the
-    `X-Cronjob-Token` header (**header only** - since 1.1.0 the `?token=<token>`
-    query fallback is rejected, because a token in the URL ends up in access logs).
+    `X-Cronjob-Token` header.
     `data` is an optional JSON object, stored with the event. The endpoint requires
     the token, is rate-limited (20/min per site), and only accepts events while the
     module is enabled. It is a **GET**, not a POST: webtrees rejects POSTs without a
@@ -617,10 +613,7 @@ F1) runs a job once per event name per tick with the newest payload — older ro
 not re-delivered, but they stay in the log table, and `log_id` in the payload lets a
 job that needs completeness re-read the range itself.
 
-> **Breaking change (1.2.0).** The former built-in detectors
-> `cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered` are
-> removed. Jobs listening to them can never fire again; the admin table flags such
-> triggers with the **unknown event** badge.
+> If an event name vanishes, the admin table flags such triggers with the **unknown event** badge.
 
 Detected events go into the same `cj_event` queue as webhooks and are consumed by the
 tick's normal event drain. To act on one, create an event-triggered job whose
@@ -864,19 +857,17 @@ renumber, search-replace, data fixes and bulk accept/reject - 38 events; orphane
 `_route:*` triggers of jobs are flagged with an "unknown route event" badge), and
 **event payload in the child process** (event runs set `CRONJOB_EVENT` and, when the
 event carried one, `CRONJOB_EVENT_PAYLOAD` (JSON) in the job script's environment),
-plus the **security hardening of 1.1.0** (event-queue coalescing + 60 s event-drain
+plus the **security hardening** (event-queue coalescing + 60 s event-drain
 budget, webhook token header-only, output escaping in the job views, safe
 `confirm()` dialogs, and the corrected smoke-test catalog entry) and the
-**log-table pseudo-events of 1.2.0** (the built-in pollers now read the webtrees
+**log-table pseudo-events** (the built-in pollers now read the webtrees
 log table - `cronjob:log-auth-failed` / `-login` / `-logout`, `cronjob:log-error`,
 `cronjob:log-edit-update` / `-delete`, `cronjob:log-search`; one event per log row
 with the row as payload; checkpoint + 200-row backpressure cap per run; reset, not
-re-fire, on table shrink; the former `cronjob:gedcom-changed` / `cronjob:media-added`
-/ `cronjob:user-registered` are removed and dead triggers of those names are flagged
-with the **unknown event** badge), **pseudo-events in the event catalog**
-(description + payload keys from the detector), the **`change_pending` flag** on
-record-route payloads (pending change table: auto-accept off vs on), and the
-**per-event-name consumer gate** for the pollers.
+re-fire, on table shrink; dead triggers are flagged with the **unknown event** badge),
+**pseudo-events in the event catalog** (description + payload keys from the detector),
+the **`change_pending` flag** on record-route payloads (pending change table:
+auto-accept off vs on), and the **per-event-name consumer gate** for the pollers.
 See the sections above.
 
 Still open:
