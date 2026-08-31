@@ -18,17 +18,17 @@ has to call one small script once per minute.
 
 - webtrees 2.2.x (PHP 8.3+)
 - PHP CLI with `proc_open` available (standard)
-- A trigger: classic cron, a systemd timer, **or** the built-in watch daemon
-  (no OS timer needed - see "Trigger installation")
+- A trigger: classic cron, a systemd timer, a Windows Task Scheduler task,
+  **or** the built-in watch daemon (no OS timer needed - see "Trigger installation")
 
 ## Installation
 
 1. Copy the module folder to `modules_v4/cronjob/` (ZIP install works too).
    The cron library ships inside the module - nothing to fetch.
 2. Open webtrees once (any page as an admin) so the module's `boot()` creates its tables.
-3. Install the trigger (classic cron **or** systemd timer) - the module's admin page
-   (`Control panel → Cron Job Scheduler`) generates both with the paths of *this*
-   installation already filled in.
+3. Install the trigger (classic cron, systemd timer, or Windows Task Scheduler -
+   the module's admin page (`Control panel → Cron Job Scheduler`) generates the
+   block for your OS with the paths of *this* installation already filled in).
 4. Create your first job in the admin UI.
 
 ### Bundled dependency
@@ -112,7 +112,7 @@ values kept (plus the error messages) - nothing you typed is lost.
 ### Trigger installation (once)
 
 Pick **one** of the options shown in the module's admin page (classic cron, a
-systemd timer, or the built-in watch daemon):
+systemd timer, a Windows Task Scheduler task, or the built-in watch daemon):
 
 **Option A - classic cron** (one line in the web server user's crontab, runs every
 minute):
@@ -157,7 +157,67 @@ sudo systemctl enable --now cronjob-tick.timer
 **Option C - watch daemon** (no OS timer at all): click *Start watch* on the
 admin page. A resident process then runs the tick every 60 seconds, and a
 page-load watchdog respawns it if it dies. Use it when the host has no cron and
-no systemd access.
+no systemd access — on Windows hosts this is the simplest option.
+
+**Option D - Windows Task Scheduler** (Windows hosts, no cron/systemd): the
+admin page generates the XML below with the paths of this installation already
+filled in (example with placeholder paths). Save it as `wt-cronjob-tick.xml`
+(UTF-8) and run `schtasks /Create /F /XML wt-cronjob-tick.xml` once in an
+elevated prompt (or use Task Scheduler → Actions → *Import Task…*):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>webtrees cronjob module tick (runs due maintenance jobs)</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2026-01-01T00:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByRun>true</ScheduleByRun>
+      <RepeatedTask>
+        <Interval>PT1M</Interval>
+        <Duration>PT0H</Duration>
+      </RepeatedTask>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0H</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>cmd.exe</Command>
+      <Arguments>/c "cd /d C:\webtrees &amp;&amp; if not exist data\cronjob mkdir data\cronjob &amp;&amp; "C:\php\php.exe" modules_v4\cronjob\cli\tick.php cron:tick &gt;&gt; data\cronjob\tick.log 2&gt;&amp;1"</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+```
+
+The task then runs the tick every minute as the logged-on user
+(`InteractiveToken`, no password needed for the import); for a server running
+without a logged-in session, set the task to *run whether the user is logged on
+or not* (task properties → General, requires the password). `IgnoreNew` plus
+the module's own `data/cronjob/tick.lock` keep runs from overlapping;
+`StartWhenAvailable` fires one tick after a sleep/off gap (the tick is
+idempotent, so that is safe). Output goes to `data\cronjob\tick.log`.
 
 <details>
 <summary>How the watch daemon works</summary>

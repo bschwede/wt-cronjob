@@ -284,16 +284,26 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 <fieldset class="border rounded p-3 h-100">
                     <legend><?= I18N::translate('Trigger Installation') ?></legend>
                     <p class="text-muted">
-                        <?= I18N::translate('The module itself does not start. One OS timer (classic cron or systemd) must call the tick once per minute. Pick one of the two options below - the paths are already filled in for this installation.') ?>
+                        <?= I18N::translate('The module itself does not start. One OS trigger (a per-minute timer) or the built-in watch daemon must call the tick once per minute. Pick the option for your OS below - the paths are already filled in for this installation.') ?>
                     </p>
 
                     <details>
                         <summary><?= MoreI18N::xlate('Details'); ?></summary>
                         <div class="bg-light p-2 rounded mt-2 mb-0">
+                            <?php if (PHP_OS_FAMILY === 'Windows'): ?>
+                            <h6><?= I18N::translate('Option: Windows Task Scheduler (every minute)') ?></h6>
+                            <h7>wt-cronjob-tick.xml</h7>
+                            <pre class="bg-light p-2 rounded"><?= e($install['windows_task_xml']) ?></pre>
+                            <h7><?= I18N::translate('Install command') ?></h7>
+                            <pre class="bg-light p-2 rounded"><?= e($install['windows_import']) ?></pre>
+                            <p class="text-muted mb-0">
+                                <?= I18N::translate('Alternatively: the watch daemon (left fieldset) runs the tick with no OS trigger at all. For a server that runs without a logged-in user, set the task to "run whether the user is logged on or not" (task properties -> General, requires a password).') ?>
+                            </p>
+                            <?php else: ?>
                             <h6><?= I18N::translate('Option A: classic cron (every minute)') ?>
                             </h6>
                             <pre class="bg-light p-2 rounded"><?= e($install['cron_line']) ?></pre>
-                            
+
                             <h6>
                                 <?= I18N::translate('Option B: systemd timer') ?>
                             </h6>
@@ -303,6 +313,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                             <pre class="bg-light p-2 rounded"><?= e($install['timer_unit']) ?></pre>
                             <h7><?= I18N::translate('Install commands') ?></h7>
                             <pre class="bg-light p-2 rounded"><?= e($install['install_commands']) ?></pre>
+                            <?php endif; ?>
                         </div>
                     </details>
                 </fieldset>

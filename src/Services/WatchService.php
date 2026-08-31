@@ -223,17 +223,37 @@ final class WatchService {
             return PHP_BINARY;
         }
 
-        $dirs = array_values(array_unique(array_merge([PHP_BINDIR], explode(':', (string) getenv('PATH')))));
+        // PATH is ':'-separated on Unix and ';' on Windows - accept both
+        // (bogus entries are filtered by is_dir()).
+        $path = (string) getenv('PATH');
+        $dirs = array_values(array_unique(array_merge(
+            [PHP_BINDIR],
+            explode(':', $path),
+            explode(';', $path),
+        )));
 
         $names = ['php'];
         if (preg_match('/^(\d+)\.(\d+)/', PHP_VERSION, $m) === 1) {
             $names = ['php', 'php' . $m[1] . $m[2], 'php' . $m[1] . '.' . $m[2]];
         }
+
+        return self::findCliPhp($dirs, $names);
+    }
+
+    /**
+     * The first CLI php found in $dirs (checked in order), trying $names in
+     * order per directory (version-specific names first). Pure and
+     * standalone-testable.
+     *
+     * @param list<string> $dirs
+     * @param list<string> $names
+     */
+    private static function findCliPhp(array $dirs, array $names): string {
         foreach ($dirs as $dir) {
             if ($dir === '' || !is_dir($dir)) {
                 continue;
             }
-            $dir = rtrim($dir, '/');
+            $dir = rtrim($dir, '/\\');
             foreach ($names as $name) {
                 $candidate = $dir . '/' . $name;
                 if (self::isCliPhp($candidate)) {

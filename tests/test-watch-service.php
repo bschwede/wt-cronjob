@@ -126,6 +126,27 @@ namespace {
     check('phpBinary() resolves a non-empty path', is_string($binary) && $binary !== '');
     check('phpBinary() result is a usable CLI php', $rm_is->invoke(null, $binary) === true);
 
+    // 8. findCliPhp: the pure PATH-directory search (version-specific names
+    //    tried per directory, fpm-named / non-executable binaries rejected).
+    $rm_find = new \ReflectionMethod(WatchService::class, 'findCliPhp');
+    check('findCliPhp: finds the fake php', $rm_find->invoke(null, [$fakes], ['php']) === $fakes . '/php');
+    check('findCliPhp: rejects fpm-named binary', $rm_find->invoke(null, [$fakes], ['php-fpm8.3']) === '');
+    check('findCliPhp: empty when nothing found', $rm_find->invoke(null, [$fakes . '/nope', ''], ['php']) === '');
+
+    // 9. triggerInstallBlocks: the Windows Task Scheduler XML is structural.
+    $blocks = \Schwendinger\Webtrees\Module\Cronjob\CronjobUtils::triggerInstallBlocks();
+    check('install blocks: windows keys present', isset($blocks['windows_task_xml'], $blocks['windows_import']));
+    $xml = (string) $blocks['windows_task_xml'];
+    check('win xml: task root + namespace', str_contains($xml, '<Task version="1.2"') && str_contains($xml, 'schemas.microsoft.com/windows/2004/02/mit/task'));
+    check('win xml: repeat every minute', str_contains($xml, '<Interval>PT1M</Interval>'));
+    check('win xml: ignore new instances', str_contains($xml, '<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'));
+    check('win xml: no scheduler time limit', str_contains($xml, '<ExecutionTimeLimit>PT0H</ExecutionTimeLimit>'));
+    check('win xml: cmd wrapper with mkdir self-heal', str_contains($xml, '<Command>cmd.exe</Command>') && str_contains($xml, 'if not exist data\cronjob mkdir data\cronjob'));
+    check('win xml: escaped redirect to tick.log', str_contains($xml, '&gt;&gt; data\cronjob\tick.log 2&gt;&amp;1'));
+    check('win xml: tick script in args', str_contains($xml, 'modules_v4\\cronjob\\cli\\tick.php cron:tick'));
+    check('win xml: start boundary is ISO', (bool) preg_match('/<StartBoundary>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}<\/StartBoundary>/', $xml));
+    check('win import: schtasks /Create /F /XML', str_contains($blocks['windows_import'], 'schtasks /Create /F /XML wt-cronjob-tick.xml'));
+
     // Cleanup
     foreach (glob($data . 'cronjob/*') ?: [] as $file) {
         @unlink($file);
