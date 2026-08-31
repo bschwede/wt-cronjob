@@ -17,6 +17,14 @@ VER=$(grep -A1 "public const CUSTOM_VERSION" "$SRCDIR/src/CronjobModule.php" \
   exit 1;
 }
 
+# Compile PO translations into the PHP runtime fast path and keep
+# latest-version.txt in sync with CronjobModule::CUSTOM_VERSION.
+command -v php >/dev/null 2>&1 || {
+  echo "ERROR: php CLI required (util/compile-po.php)";
+  exit 1;
+}
+php "$SRCDIR/util/compile-po.php" "$SRCDIR"
+
 [[ ! -d "$DSTDIR" ]] && mkdir -p "$DSTDIR"
 
 exclude_file=$(mktemp)
@@ -28,6 +36,7 @@ dist
 util
 tests
 composer.json
+latest-version.txt
 vendor/autoload.php
 vendor/composer
 resources/lang/*.po*

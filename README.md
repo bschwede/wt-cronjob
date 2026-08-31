@@ -62,15 +62,19 @@ then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
 ### Release archive
 
 `util/create-archive.sh` builds the installable zip `dist/cronjob_v<version>.zip`
-(needs `rsync` + `zip`). The version is read from
-`CronjobModule::CUSTOM_VERSION` - no separate version file to keep in
-sync. The script fails fast when the bundled cron library is missing (it is
-`.gitignore`'d in the module repo, so a fresh clone must have it restored
-first). Development artifacts are excluded: `util/`, `tests/`, `composer.json`,
-`vendor/composer/`, `vendor/autoload.php` (the bundled library
-`vendor/dragonmantank/` ships). Translation PO files are **not** included in
-the archive - drop them into `resources/lang/` separately if needed
-(`CronjobModule::customTranslations()` picks them up at runtime).
+(needs `rsync` + `zip` + `php`). The version is read from
+`CronjobModule::CUSTOM_VERSION`. The script fails fast when the bundled cron
+library is missing (it is `.gitignore`'d in the module repo, so a fresh clone
+must have it restored first). Development artifacts are excluded: `util/`,
+`tests/`, `composer.json`, `vendor/composer/`, `vendor/autoload.php` (the
+bundled library `vendor/dragonmantank/` ships) and `latest-version.txt`.
+
+Before packaging, the script runs `util/compile-po.php`: it compiles any
+`resources/lang/*.po` into the `*.php` runtime fast path (the compiled files
+ship in the archive, the PO sources stay excluded) and - only when
+`CronjobModule::CUSTOM_VERSION` changed - updates `latest-version.txt` in the
+repo root, the plain-version file that webtrees' module update check fetches
+(see `CronjobModule::CUSTOM_LAST`).
 
 ## Usage
 
@@ -842,9 +846,12 @@ All user-facing strings are extracted with `xgettext` - no manual PO entries:
   (`util/`/`vendor/`/`tests/` excluded) into `resources/lang/messages.all.pot` and
   copies it to `resources/lang/messages.pot` (no filter step - the core dedupe lives
   in the code via `MoreI18N::xlate`). PO files are maintained via Weblate and land
-  in `resources/lang/<language>.po|.php`; the module's
-  `CronjobModule::customTranslations()` feeds them into webtrees' `I18N::init()`, so
-  the views' translation calls find them **at render time**.
+  in `resources/lang/<language>.po`; `util/compile-po.php` then compiles them to
+  `*.php` (same output as the core `compile-po-files` command, standalone without
+  the webtrees bootstrap - `create-archive.sh` calls it). The module's
+  `CronjobModule::customTranslations()` feeds the compiled `*.php` (preferred) or
+  `*.po` files into webtrees' `I18N::init()`, so the views' translation calls find
+  them **at render time**.
 - **Job titles** are admin-editable DB values, translated at render time through
   `CronjobUtils::translateJobTitle()` (job table, breadcrumbs, history header): the
   default title from a manifest appears in the UI language, renamed jobs stay as-is
