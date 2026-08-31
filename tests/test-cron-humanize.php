@@ -70,7 +70,7 @@ namespace {
     check('@hourly', hz('@hourly') === 'hourly');
     check('@minutely', hz('@minutely') === 'every minute');
     check('@weekly', hz('@weekly') === 'weekly on Sunday at 00:00');
-    check('@monthly', hz('@monthly') === 'monthly on day 1 at 00:00');
+    check('@monthly', hz('@monthly') === 'on day 1 of each month at 00:00');
 
     // every N minutes / every minute
     check('every minute (wildcard)', hz('* * * * *') === 'every minute');

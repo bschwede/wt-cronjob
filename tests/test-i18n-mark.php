@@ -93,7 +93,7 @@ namespace {
     );
     check(
         'second command description literal unchanged',
-        $manifest['commands'][1]['description'] === 'Acceptance-test job for the cronjob module. it only prints and exits 0.'
+        $manifest['commands'][1]['description'] === 'Acceptance-test job for the cronjob module. It only prints and exits 0.'
     );
     check(
         'second param description literal unchanged',
