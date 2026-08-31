@@ -150,7 +150,7 @@ final class CliBootstrap {
      *                       is already running
      */
     public static function acquireTickLock() {
-        $lock_file = Webtrees::DATA_DIR . 'cronjob-tick.lock';
+        $lock_file = DataFiles::path('tick.lock');
         $lock      = fopen($lock_file, 'c');
 
         if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {

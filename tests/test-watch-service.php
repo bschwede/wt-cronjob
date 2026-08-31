@@ -62,8 +62,8 @@ namespace {
 
     $base = __DIR__ . '/.watchtest';
     $data = $base . '/data/';
-    @mkdir($data, 0777, true);
-    foreach (glob($data . 'cronjob-watch*') ?: [] as $file) {
+    @mkdir($data . 'cronjob/', 0777, true);
+    foreach (glob($data . 'cronjob/*') ?: [] as $file) {
         @unlink($file);
     }
 
@@ -82,7 +82,7 @@ namespace {
     check('status last_tick is 0', $status['last_tick'] === 0);
 
     // 3. Liveness inversion: holding the lock means a daemon is alive.
-    $lock = fopen($data . 'cronjob-watch.lock', 'c');
+    $lock = fopen($data . 'cronjob/watch.lock', 'c');
     flock($lock, LOCK_EX);
     check('daemon alive while lock is held', WatchService::daemonAlive() === true);
     flock($lock, LOCK_UN);
@@ -90,7 +90,7 @@ namespace {
     check('daemon not alive after lock released', WatchService::daemonAlive() === false);
 
     // 4. Respawn cooldown is active right after a spawn attempt.
-    touch($data . 'cronjob-watch-spawn');
+    touch($data . 'cronjob/watch-spawn');
     check('cooldown active right after spawn', WatchService::spawnCooldownElapsed() === false);
 
     // 5. Fingerprint (private) is a non-empty, stable string.
@@ -127,7 +127,7 @@ namespace {
     check('phpBinary() result is a usable CLI php', $rm_is->invoke(null, $binary) === true);
 
     // Cleanup
-    foreach (glob($data . 'cronjob-watch*') ?: [] as $file) {
+    foreach (glob($data . 'cronjob/*') ?: [] as $file) {
         @unlink($file);
     }
     foreach (glob($fakes . '/*') ?: [] as $file) {
@@ -136,6 +136,7 @@ namespace {
     @unlink($fakes . '/noexec/php');
     @rmdir($fakes . '/noexec');
     @rmdir($fakes);
+    @rmdir($data . 'cronjob/');
     @rmdir($data);
     @rmdir($base);
 

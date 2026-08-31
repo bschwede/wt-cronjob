@@ -118,7 +118,7 @@ systemd timer, or the built-in watch daemon):
 minute):
 
 ```
-* * * * * cd /path/to/webtrees && php modules_v4/cronjob/cli/tick.php >> /path/to/webtrees/data/cronjob-tick.log 2>&1
+* * * * * cd /path/to/webtrees && mkdir -p data/cronjob && php modules_v4/cronjob/cli/tick.php >> /path/to/webtrees/data/cronjob/tick.log 2>&1
 ```
 
 **Option B - systemd timer** (two unit files, also shown in the admin page):
@@ -164,13 +164,17 @@ no systemd access.
 
 - **Opt-in:** nothing runs until you click *Start watch*; *Stop watch* removes it
   (the daemon exits within about a minute and is not respawned).
-- **Liveness:** the daemon holds `data/cronjob-watch.lock` for its whole life.
+- **Liveness:** the daemon holds `data/cronjob/watch.lock` for its whole life.
   The watchdog (a per-request module middleware, on every page load) respawns it only
   when that lock is free, the watch is enabled, the site is online, and at
   least 5 minutes have passed since the last spawn attempt. With the watch
   disabled the watchdog costs a single `file_exists()` per page load.
 - **Idle & offline:** while the site is offline it stays idle (no tick);
-  otherwise it ticks every 60 s. All state lives in `data/cronjob-watch.*`.
+  otherwise it ticks every 60 s. All state lives in `data/cronjob/`.
+- **Data files:** every file the module creates (locks, state, logs, opt-in
+  markers) lives in `data/cronjob/`. Flat `data/cronjob-*` files left over from
+  earlier development versions are ignored and may be deleted (the watch opt-in
+  then has to be confirmed once).
 - **Self-update:** if the module is re-deployed the daemon detects the changed
   files and exits, so a fresh daemon picks up the new code.
 - **Works under php-fpm / mod_php:** the daemon is spawned with a resolved PHP
@@ -234,7 +238,7 @@ wait a minute - the history page should show a green `ok` row.
 - **UI actions** are all named `*Admin*` (admin-only, CSRF-protected like every
   webtrees form).
 - **Kill switch:** disable the module in the module list - the tick then does nothing.
-- The tick is single-instance (flock on `data/cronjob-tick.lock`), and a job's child
+- The tick is single-instance (flock on `data/cronjob/tick.lock`), and a job's child
   process is hard-killed after its timeout (`SIGKILL`).
 - **Event-queue coalescing.** A flood of identical events (e.g. many rapid
   edits on a route event) cannot amplify into one job run per queued row: the tick
@@ -606,7 +610,7 @@ catalog descriptions and the `test-pseudo-events` suite pin the current mapping.
   continues after deletes), the detector re-baselines silently.
 - **Offline-safe & isolated.** Skipped while `data/offline.txt` exists; a broken
   detector never breaks the others; detection is serialized (flock) and state is
-  persisted atomically to `data/cronjob-pseudo-events.json`.
+  persisted atomically to `data/cronjob/pseudo-events.json`.
 
 The **log table is the source of truth**: under a flood the tick's coalescing (§16,
 F1) runs a job once per event name per tick with the newest payload — older rows are

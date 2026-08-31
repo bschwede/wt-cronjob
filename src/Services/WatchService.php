@@ -77,30 +77,30 @@ use function unlink;
  * the module's boot() respawns it if it dies. It is strictly opt-in: nothing
  * runs unless an admin clicks "Start".
  *
- * State (all in data/):
- *   cronjob-watch.enabled    opt-in marker (Start creates it, Stop removes it)
- *   cronjob-watch.lock       liveness - the daemon holds it for its lifetime
- *   cronjob-watch.heartbeat  mtime = last loop iteration
- *   cronjob-watch-spawn      mtime = last spawn attempt (respawn cooldown)
- *   cronjob-watch.log        one supervisor line per tick (never job output)
+ * State (all in data/cronjob/, see DataFiles):
+ *   watch.enabled    opt-in marker (Start creates it, Stop removes it)
+ *   watch.lock       liveness - the daemon holds it for its lifetime
+ *   watch.heartbeat  mtime = last loop iteration
+ *   watch-spawn      mtime = last spawn attempt (respawn cooldown)
+ *   watch.log        one supervisor line per tick (never job output)
  */
 final class WatchService {
 
     public const SPAWN_COOLDOWN = 300; // seconds between respawn attempts
     public const TICK_TIMEOUT   = 300; // seconds a single tick may take
 
-    private const FEATURE_FILE   = 'cronjob-watch.enabled';
-    private const LOCK_FILE      = 'cronjob-watch.lock';
-    private const HEARTBEAT_FILE = 'cronjob-watch.heartbeat';
-    private const SPAWN_FILE     = 'cronjob-watch-spawn';
-    private const LOG_FILE       = 'cronjob-watch.log';
+    private const FEATURE_FILE   = 'watch.enabled';
+    private const LOCK_FILE      = 'watch.lock';
+    private const HEARTBEAT_FILE = 'watch.heartbeat';
+    private const SPAWN_FILE     = 'watch-spawn';
+    private const LOG_FILE       = 'watch.log';
     private const LOG_MAX_BYTES  = 1048576;
 
     /**
-     * Absolute path of a state file in the data/ directory.
+     * Absolute path of a state file in the module's data/cronjob/ directory.
      */
     private static function path(string $name): string {
-        return Webtrees::DATA_DIR . $name;
+        return DataFiles::path($name);
     }
 
     /**

@@ -67,8 +67,8 @@ namespace {
 
     $base = __DIR__ . '/.pevents';
     $data = $base . '/data/';
-    @mkdir($data, 0777, true);
-    foreach (glob($data . 'cronjob-pseudo-events*') ?: [] as $file) {
+    @mkdir($data . 'cronjob/', 0777, true);
+    foreach (glob($data . 'cronjob/pseudo-events*') ?: [] as $file) {
         @unlink($file);
     }
 
@@ -266,10 +266,10 @@ namespace {
 
     // --- PseudoEventService file-based logic --------------------------------
     check('service: cooldown elapsed when no last file', PseudoEventService::cooldownElapsed() === true);
-    touch($data . 'cronjob-pseudo-events-last');
+    touch($data . 'cronjob/pseudo-events-last');
     clearstatcache();
     check('service: cooldown active right after a run', PseudoEventService::cooldownElapsed() === false);
-    touch($data . 'cronjob-pseudo-events-last', time() - 400);
+    touch($data . 'cronjob/pseudo-events-last', time() - 400);
     clearstatcache();
     check('service: cooldown elapsed after the interval', PseudoEventService::cooldownElapsed() === true);
 
@@ -279,9 +279,10 @@ namespace {
     check('service: state round-trip', $loaded === ['last_run_at' => 12345, 'detectors' => ['cronjob:log-auth-failed' => 5, 'cronjob:log-error' => 7]]);
 
     // Cleanup
-    foreach (glob($data . 'cronjob-pseudo-events*') ?: [] as $file) {
+    foreach (glob($data . 'cronjob/pseudo-events*') ?: [] as $file) {
         @unlink($file);
     }
+    @rmdir($data . 'cronjob/');
     @rmdir($data);
     @rmdir($base);
 

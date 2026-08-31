@@ -41,7 +41,7 @@ declare(strict_types=1);
 //   - records every run in the cj_run table (visible in the admin UI)
 //
 // System trigger (pick one, once):
-//   cron:    * * * * * cd /path/to/webtrees && php modules_v4/cronjob/cli/tick.php >> /path/to/webtrees/data/cronjob-tick.log 2>&1
+//   cron:    * * * * * cd /path/to/webtrees && mkdir -p data/cronjob && php modules_v4/cronjob/cli/tick.php >> /path/to/webtrees/data/cronjob/tick.log 2>&1
 //   systemd: see the generated units in the module's admin page
 //
 // Conventions: see README.md ("CLI scripts & maintenance").

@@ -26,16 +26,15 @@ declare(strict_types=1);
 namespace Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents;
 
 use Fisharebest\Webtrees\DB;
-use Fisharebest\Webtrees\Webtrees;
 use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Module\Cronjob\Services\DataFiles;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 use Throwable;
 
 use function array_flip;
 use function array_intersect_key;
-use function dirname;
 use function file_get_contents;
 use function filemtime;
 use function file_put_contents;
@@ -44,11 +43,9 @@ use function flock;
 use function fclose;
 use function getmypid;
 use function in_array;
-use function is_dir;
 use function is_file;
 use function json_decode;
 use function json_encode;
-use function mkdir;
 use function rename;
 use function str_starts_with;
 use function time;
@@ -75,16 +72,16 @@ use const JSON_UNESCAPED_UNICODE;
  * Gated by that job being enabled, by a listener for each event name (a
  * detector whose event no job listens for is not even queried), rate-limited
  * (MIN_INTERVAL - a cooldown that also caps a more frequent job cron) and
- * serialized (flock). State lives in data/cronjob-pseudo-events.json.
+ * serialized (flock). State lives in data/cronjob/pseudo-events.json.
  */
 final class PseudoEventService {
 
     /** Minimum seconds between two detection runs (idempotency guard / rate limit). */
     public const MIN_INTERVAL = 300;
 
-    private const STATE_FILE = 'cronjob-pseudo-events.json';
-    private const LOCK_FILE  = 'cronjob-pseudo-events.lock';
-    private const LAST_FILE  = 'cronjob-pseudo-events-last';
+    private const STATE_FILE = 'pseudo-events.json';
+    private const LOCK_FILE  = 'pseudo-events.lock';
+    private const LAST_FILE  = 'pseudo-events-last';
 
     /**
      * The registered detectors (the single place to add a new one). The
@@ -284,9 +281,6 @@ final class PseudoEventService {
      */
     public static function saveState(array $state): void {
         $file = self::statePath();
-        if (!is_dir(dirname($file))) {
-            @mkdir(dirname($file), 0777, true);
-        }
         $json = json_encode($state, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($json === false) {
             return;
@@ -300,14 +294,14 @@ final class PseudoEventService {
     }
 
     private static function statePath(): string {
-        return Webtrees::DATA_DIR . self::STATE_FILE;
+        return DataFiles::path(self::STATE_FILE);
     }
 
     private static function lockPath(): string {
-        return Webtrees::DATA_DIR . self::LOCK_FILE;
+        return DataFiles::path(self::LOCK_FILE);
     }
 
     private static function lastPath(): string {
-        return Webtrees::DATA_DIR . self::LAST_FILE;
+        return DataFiles::path(self::LAST_FILE);
     }
 }

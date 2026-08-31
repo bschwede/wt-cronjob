@@ -362,10 +362,12 @@ final class CronjobUtils {
         $root = realpath(rtrim(str_replace('\\', '/', Webtrees::ROOT_DIR), '/'));
         $php  = str_replace('\\', '/', WatchService::phpBinary());
         $tick = 'modules_v4/cronjob/cli/tick.php';
-        $log  = $root . '/data/cronjob-tick.log';
+        $log  = $root . '/data/cronjob/tick.log';
 
         return [
-            'cron_line'   => '* * * * * cd ' . $root . ' && ' . $php . ' ' . $tick . ' cron:tick >> ' . $log . ' 2>&1',
+            // mkdir -p: the redirect target must exist even when the first
+            // cron run happens before the first page load.
+            'cron_line'   => '* * * * * cd ' . $root . ' && mkdir -p data/cronjob && ' . $php . ' ' . $tick . ' cron:tick >> ' . $log . ' 2>&1',
             'service_unit' => implode("\n", [
                 '[Unit]',
                 'Description=webtrees cronjob module tick (runs due maintenance jobs)',
