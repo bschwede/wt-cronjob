@@ -16,6 +16,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var bool $cron_lib
  * @var string $cron_now
  * @var array<string, string> $install
+ * @var array{configured: string, manual_valid: bool, binary: string, source: string} $php
  * @var array{enabled: bool, running: bool, last_tick: int} $watch
  * @var string $event_token
  * @var array<string, string> $offered
@@ -319,6 +320,41 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 </fieldset>
             </div>
         </div>
+
+        <fieldset class="border rounded p-3 mt-4 mb-2">
+            <legend><?= I18N::translate('PHP CLI binary') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('The CLI interpreter the module uses for its PHP scripts (watch daemon spawn and the trigger install commands above). Leave the field empty for automatic detection.') ?>
+            </p>
+            <p class="mb-2">
+                <?= I18N::translate('Currently used:') ?>
+                <code><?= e($php['binary'] !== '' ? $php['binary'] : I18N::translate('(none found)')) ?></code>
+                <span class="badge bg-<?= $php['source'] === 'manual' ? 'primary' : 'secondary' ?>">
+                    <?= $php['source'] === 'manual' ? I18N::translate('manual path') : I18N::translate('auto-detected') ?>
+                </span>
+            </p>
+            <?php if ($php['configured'] !== '' && !$php['manual_valid']): ?>
+                <div class="alert alert-warning py-2">
+                    <?= I18N::translate('The manual path %s is not a usable PHP CLI binary (missing, not executable or an fpm build) - automatic detection is used instead.', $php['configured']) ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($php['binary'] === ''): ?>
+                <div class="alert alert-warning py-2">
+                    <?= I18N::translate('No PHP CLI binary could be determined - the watch daemon cannot start and the install commands above are incomplete. Set a manual path below.') ?>
+                </div>
+            <?php endif; ?>
+            <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminPhpBinary'])) ?>">
+                <?= csrf_field() ?>
+                <div class="input-group">
+                    <input type="text" name="php_binary" class="form-control font-monospace" value="<?= e($php['configured']) ?>"
+                           placeholder="<?= e(I18N::translate('e.g. /usr/bin/php8.3 - empty = automatic detection')) ?>">
+                    <button type="submit" class="btn btn-primary"><?= I18N::translate('Save') ?></button>
+                </div>
+                <div class="form-text">
+                    <?= I18N::translate('A watch daemon that is already running keeps using its current binary until it is restarted.') ?>
+                </div>
+            </form>
+        </fieldset>
       </div>
     </div>
   </div>

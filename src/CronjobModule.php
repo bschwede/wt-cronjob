@@ -71,6 +71,7 @@ use function is_array;
 use function is_readable;
 use function json_decode;
 use function mb_strlen;
+use function preg_match;
 use function random_bytes;
 use function str_ends_with;
 use function strlen;
@@ -297,6 +298,7 @@ class CronjobModule extends AbstractModule
             'cron_lib'    => ScheduleService::hasCronLibrary(),
             'cron_now'    => ScheduleService::now(),
             'install'     => CronjobUtils::triggerInstallBlocks(),
+            'php'           => WatchService::phpBinaryInfo(),
             'watch'         => WatchService::status(),
             'event_token'   => $this->getPreference(self::PREF_EVENT_TOKEN),
             'offered'       => $offered,
@@ -803,6 +805,35 @@ class CronjobModule extends AbstractModule
     public function postAdminWatchStopAction(ServerRequestInterface $request): ResponseInterface {
         WatchService::disable();
         FlashMessages::addMessage(I18N::translate('Watch daemon stopped - it exits within about a minute and will not restart.'), 'success');
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Set - or clear with an empty field - the manual PHP CLI binary path.
+     * It is used for the watch daemon spawn and the generated OS trigger
+     * commands; empty means automatic detection.
+     */
+    public function postAdminPhpBinaryAction(ServerRequestInterface $request): ResponseInterface {
+        $path = trim(Validator::parsedBody($request)->string('php_binary', ''));
+
+        // The value is interpolated into shell/systemd/cmd commands wrapped in
+        // double quotes: allow plain path characters (spaces included) but no
+        // quote, shell metacharacter or '%' (which would also break the
+        // sprintf-based flash messages).
+        if ($path !== '' && preg_match('#^[A-Za-z0-9_./:\\\\ -]+$#', $path) !== 1) {
+            FlashMessages::addMessage(I18N::translate('The path may only contain letters, digits and the characters _ . / \\ : - and spaces.'), 'danger');
+
+            return redirect($this->getConfigLink());
+        }
+
+        WatchService::setManualPhp($path);
+        FlashMessages::addMessage(
+            $path === ''
+                ? I18N::translate('PHP binary: automatic detection enabled.')
+                : I18N::translate('PHP binary set to %s.', $path),
+            'success'
+        );
 
         return redirect($this->getConfigLink());
     }

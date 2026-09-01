@@ -39,6 +39,7 @@ use function dirname;
 use function explode;
 use function fclose;
 use function filesize;
+use function file_get_contents;
 use function filemtime;
 use function file_put_contents;
 use function fopen;
@@ -67,6 +68,7 @@ use function str_contains;
 use function str_starts_with;
 use function time;
 use function touch;
+use function trim;
 use function unlink;
 
 /**
@@ -83,18 +85,20 @@ use function unlink;
  *   watch.heartbeat  mtime = last loop iteration
  *   watch-spawn      mtime = last spawn attempt (respawn cooldown)
  *   watch.log        one supervisor line per tick (never job output)
+ *   php-binary       optional manual PHP CLI path (admin-set; absent = auto-detect)
  */
 final class WatchService {
 
     public const SPAWN_COOLDOWN = 300; // seconds between respawn attempts
     public const TICK_TIMEOUT   = 300; // seconds a single tick may take
 
-    private const FEATURE_FILE   = 'watch.enabled';
-    private const LOCK_FILE      = 'watch.lock';
-    private const HEARTBEAT_FILE = 'watch.heartbeat';
-    private const SPAWN_FILE     = 'watch-spawn';
-    private const LOG_FILE       = 'watch.log';
-    private const LOG_MAX_BYTES  = 1048576;
+    private const FEATURE_FILE    = 'watch.enabled';
+    private const LOCK_FILE       = 'watch.lock';
+    private const HEARTBEAT_FILE  = 'watch.heartbeat';
+    private const SPAWN_FILE      = 'watch-spawn';
+    private const LOG_FILE        = 'watch.log';
+    private const LOG_MAX_BYTES   = 1048576;
+    private const PHP_BINARY_FILE = 'php-binary';
 
     /**
      * Absolute path of a state file in the module's data/cronjob/ directory.
@@ -213,12 +217,48 @@ final class WatchService {
     /**
      * A usable PHP *CLI* interpreter path.
      *
-     * Under php-fpm / mod_php (i.e. from the browser "Start watch" and the
-     * page-load watchdog) PHP_BINARY is empty or the server binary, which
-     * cannot run scripts - so the CLI interpreter is resolved explicitly. In
-     * a CLI context PHP_BINARY is already correct and is used as-is.
+     * Resolution order: the optional admin-set manual path
+     * (data/cronjob/php-binary) when it is a valid CLI php, otherwise
+     * auto-detection. Under php-fpm / mod_php (i.e. from the browser
+     * "Start watch" and the page-load watchdog) PHP_BINARY is empty or the
+     * server binary, which cannot run scripts - so the CLI interpreter is
+     * resolved explicitly. In a CLI context PHP_BINARY is already correct
+     * and is used as-is.
      */
     public static function phpBinary(): string {
+        return self::phpBinaryInfo()['binary'];
+    }
+
+    /**
+     * The resolved PHP CLI binary plus its provenance, for the admin UI.
+     * An invalid manual path (missing, not executable, fpm build) falls
+     * back to auto-detection - it is reported, never a hard error.
+     *
+     * @return array{configured: string, manual_valid: bool, binary: string, source: 'manual'|'auto'}
+     */
+    public static function phpBinaryInfo(): array {
+        $manual = self::manualPhp();
+        if ($manual !== '' && self::isCliPhp($manual)) {
+            return [
+                'configured'   => $manual,
+                'manual_valid' => true,
+                'binary'       => $manual,
+                'source'       => 'manual',
+            ];
+        }
+
+        return [
+            'configured'   => $manual,
+            'manual_valid' => false,
+            'binary'       => self::autoDetect(),
+            'source'       => 'auto',
+        ];
+    }
+
+    /**
+     * The auto-detected CLI php (no manual override).
+     */
+    private static function autoDetect(): string {
         if (self::isCliPhp(PHP_BINARY)) {
             return PHP_BINARY;
         }
@@ -238,6 +278,30 @@ final class WatchService {
         }
 
         return self::findCliPhp($dirs, $names);
+    }
+
+    /**
+     * The admin-set manual PHP CLI path ('' = not set).
+     */
+    private static function manualPhp(): string {
+        $file = self::path(self::PHP_BINARY_FILE);
+        if (!is_file($file)) {
+            return '';
+        }
+
+        return trim((string) file_get_contents($file));
+    }
+
+    /**
+     * Set - or clear with '' - the admin-set manual PHP CLI path.
+     */
+    public static function setManualPhp(string $path): void {
+        $file = self::path(self::PHP_BINARY_FILE);
+        if ($path === '') {
+            @unlink($file);
+        } else {
+            @file_put_contents($file, $path);
+        }
     }
 
     /**

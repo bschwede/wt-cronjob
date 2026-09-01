@@ -47,6 +47,7 @@ use function mkdir;
  *   data/cronjob/pseudo-events.lock pseudo-event serialization
  *   data/cronjob/pseudo-events-last pseudo-event cooldown marker
  *   data/cronjob/tick.log           tick stdout (created by the cron redirect)
+ *   data/cronjob/php-binary         optional manual PHP CLI path (admin-set)
  *
  * Files created before the subdirectory existed (flat data/cronjob-*) are
  * ignored (clean break) and may be deleted.

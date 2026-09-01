@@ -357,6 +357,9 @@ final class CronjobUtils {
      * and a Windows Task Scheduler XML plus its import command (for
      * Windows hosts) - all derived from this installation (paths, PHP
      * binary). The admin view renders the pair matching PHP_OS_FAMILY.
+     * Every interpolated path is double-quoted unconditionally (paths may
+     * contain spaces, e.g. C:\Program Files\...); on Windows the cmd
+     * wrapper uses /S for deterministic quote handling.
      *
      * @return array<string, string>
      */
@@ -371,7 +374,7 @@ final class CronjobUtils {
         // data/cronjob exists (the redirect cannot create it), same log target.
         $root_ws = rtrim(str_replace('/', '\\', (string) $root), '\\');
         $php_ws  = str_replace('/', '\\', $php);
-        $cmd_ws  = '/c "cd /d ' . $root_ws . ' && if not exist data\\cronjob mkdir data\\cronjob && "' . $php_ws . '" modules_v4\\cronjob\\cli\\tick.php cron:tick >> data\\cronjob\\tick.log 2>&1"';
+        $cmd_ws  = '/S /c "cd /d "' . $root_ws . '" && if not exist data\\cronjob mkdir data\\cronjob && "' . $php_ws . '" modules_v4\\cronjob\\cli\\tick.php cron:tick >> data\\cronjob\\tick.log 2>&1"';
         // XML-escape the element text: & first, then < and >.
         $args_ws = str_replace('&', '&amp;', $cmd_ws);
         $args_ws = str_replace('<', '&lt;', $args_ws);
@@ -437,7 +440,7 @@ final class CronjobUtils {
         return [
             // mkdir -p: the redirect target must exist even when the first
             // cron run happens before the first page load.
-            'cron_line'   => '* * * * * cd ' . $root . ' && mkdir -p data/cronjob && ' . $php . ' ' . $tick . ' cron:tick >> ' . $log . ' 2>&1',
+            'cron_line'   => '* * * * * cd "' . $root . '" && mkdir -p data/cronjob && "' . $php . '" ' . $tick . ' cron:tick >> "' . $log . '" 2>&1',
             'service_unit' => implode("\n", [
                 '[Unit]',
                 'Description=webtrees cronjob module tick (runs due maintenance jobs)',
@@ -445,8 +448,8 @@ final class CronjobUtils {
                 '[Service]',
                 'Type=oneshot',
                 'User=' . get_current_user(),
-                'WorkingDirectory=' . $root,
-                'ExecStart=' . $php . ' ./' . $tick . ' cron:tick',
+                'WorkingDirectory="' . $root . '"',
+                'ExecStart="' . $php . '" ./' . $tick . ' cron:tick',
             ]),
             'timer_unit' => implode("\n", [
                 '[Unit]',

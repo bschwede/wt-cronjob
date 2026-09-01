@@ -122,7 +122,7 @@ systemd timer, a Windows Task Scheduler task, or the built-in watch daemon):
 minute):
 
 ```
-* * * * * cd /path/to/webtrees && mkdir -p data/cronjob && php modules_v4/cronjob/cli/tick.php >> /path/to/webtrees/data/cronjob/tick.log 2>&1
+* * * * * cd "/path/to/webtrees" && mkdir -p data/cronjob && "/usr/bin/php" modules_v4/cronjob/cli/tick.php cron:tick >> "/path/to/webtrees/data/cronjob/tick.log" 2>&1
 ```
 
 **Option B - systemd timer** (two unit files, also shown in the admin page):
@@ -135,8 +135,8 @@ Description=webtrees cronjob module tick (runs due maintenance jobs)
 [Service]
 Type=oneshot
 User=<webserver-user>
-WorkingDirectory=/path/to/webtrees
-ExecStart=/usr/bin/php modules_v4/cronjob/cli/tick.php cron:tick
+WorkingDirectory="/path/to/webtrees"
+ExecStart="/usr/bin/php" ./modules_v4/cronjob/cli/tick.php cron:tick
 ```
 
 ```ini
@@ -209,7 +209,7 @@ elevated prompt (or use Task Scheduler → Actions → *Import Task…*):
   <Actions Context="Author">
     <Exec>
       <Command>cmd.exe</Command>
-      <Arguments>/c "cd /d C:\webtrees &amp;&amp; if not exist data\cronjob mkdir data\cronjob &amp;&amp; "C:\php\php.exe" modules_v4\cronjob\cli\tick.php cron:tick &gt;&gt; data\cronjob\tick.log 2&gt;&amp;1"</Arguments>
+      <Arguments>/S /c "cd /d "C:\webtrees" &amp;&amp; if not exist data\cronjob mkdir data\cronjob &amp;&amp; "C:\php\php.exe" modules_v4\cronjob\cli\tick.php cron:tick &gt;&gt; data\cronjob\tick.log 2&gt;&amp;1"</Arguments>
     </Exec>
   </Actions>
 </Task>
@@ -221,7 +221,18 @@ without a logged-in session, set the task to *run whether the user is logged on
 or not* (task properties → General, requires the password). `IgnoreNew` plus
 the module's own `data/cronjob/tick.lock` keep runs from overlapping;
 `StartWhenAvailable` fires one tick after a sleep/off gap (the tick is
-idempotent, so that is safe). Output goes to `data\cronjob\tick.log`.
+idempotent, so that is safe). Output goes to `data\cronjob\tick.log`. All
+interpolated paths are double-quoted, so paths containing spaces work.
+
+**PHP CLI binary:** the admin page's *Installation* accordion shows which
+PHP CLI interpreter is currently resolved (badge: *auto-detected* /
+*manual path*) and lets you pin a manual path (empty = automatic detection).
+The chosen binary is used for the watch daemon spawn **and** in all generated
+trigger commands. Auto-detection tries `PHP_BINARY` (in a CLI context) and
+then `PHP_BINDIR` + `PATH` for `php` / version-specific names (e.g.
+`php8.3`), skipping fpm builds. A manual path that is not a usable CLI php
+(missing, not executable, fpm build) is flagged in the admin page and
+auto-detection is used instead.
 
 <details>
 <summary>How the watch daemon works</summary>
@@ -244,6 +255,8 @@ idempotent, so that is safe). Output goes to `data\cronjob\tick.log`.
 - **Works under php-fpm / mod_php:** the daemon is spawned with a resolved PHP
   *CLI* interpreter (under the web SAPI `PHP_BINARY` is empty or the server
   binary, which cannot run scripts), so *Start watch* from the browser works.
+  The binary can be pinned to a manual path in the admin page (see *PHP CLI
+  binary* above); the choice is stored in `data/cronjob/php-binary`.
 - **Detached:** the daemon is spawned with `setsid` into its own session, so it
   survives an FPM **worker** recycle and even an FPM **master** restart; only
   stopping the whole web service / container, or *Stop watch*, ends it (the

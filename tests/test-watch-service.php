@@ -147,6 +147,39 @@ namespace {
     check('win xml: start boundary is ISO', (bool) preg_match('/<StartBoundary>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}<\/StartBoundary>/', $xml));
     check('win import: schtasks /Create /F /XML', str_contains($blocks['windows_import'], 'schtasks /Create /F /XML wt-cronjob-tick.xml'));
 
+    // 9b. Install blocks quote the interpolated paths (spaces-safe).
+    check('install blocks: cron line quotes the php binary', str_contains($blocks['cron_line'], '"' . $binary . '"'));
+    check('install blocks: cron line quotes the root', str_contains($blocks['cron_line'], 'cd "'));
+    check('install blocks: cron line quotes the log target', str_contains($blocks['cron_line'], '>> "' ));
+    check('install blocks: systemd ExecStart quotes the php binary', str_contains($blocks['service_unit'], 'ExecStart="' . $binary . '"'));
+    check('install blocks: systemd WorkingDirectory quoted', str_contains($blocks['service_unit'], 'WorkingDirectory="' ));
+    check('win xml: cmd /S with quoted root', str_contains($xml, '/S /c "cd /d "'));
+
+    // 10. Manual PHP binary override (data/cronjob/php-binary).
+    $info = WatchService::phpBinaryInfo();
+    check('php info: auto by default', $info['source'] === 'auto' && $info['configured'] === '' && $info['binary'] === $binary);
+
+    WatchService::setManualPhp($fakes . '/php');
+    check('manual php: phpBinary() honors the manual path', WatchService::phpBinary() === $fakes . '/php');
+    $info = WatchService::phpBinaryInfo();
+    check('manual php: info reports the manual source', $info['source'] === 'manual' && $info['manual_valid'] === true && $info['configured'] === $fakes . '/php' && $info['binary'] === $fakes . '/php');
+
+    WatchService::setManualPhp($fakes . '/php-fpm8.3');
+    $info = WatchService::phpBinaryInfo();
+    check('manual php: fpm-named path falls back to auto', $info['manual_valid'] === false && $info['source'] === 'auto' && $info['binary'] === $binary && $info['configured'] === $fakes . '/php-fpm8.3');
+
+    WatchService::setManualPhp('/no/such/php');
+    $info = WatchService::phpBinaryInfo();
+    check('manual php: nonexistent path falls back to auto', $info['manual_valid'] === false && $info['source'] === 'auto' && $info['binary'] === $binary);
+
+    WatchService::setManualPhp($fakes . '/noexec/php');
+    $info = WatchService::phpBinaryInfo();
+    check('manual php: non-executable path falls back to auto', $info['manual_valid'] === false && $info['source'] === 'auto');
+
+    WatchService::setManualPhp('');
+    $info = WatchService::phpBinaryInfo();
+    check('manual php: cleared again', $info['source'] === 'auto' && $info['configured'] === '' && WatchService::phpBinary() === $binary);
+
     // Cleanup
     foreach (glob($data . 'cronjob/*') ?: [] as $file) {
         @unlink($file);
