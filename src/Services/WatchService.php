@@ -44,6 +44,8 @@ use function filemtime;
 use function file_put_contents;
 use function fopen;
 use function flock;
+use function fseek;
+use function ftruncate;
 use function function_exists;
 use function getenv;
 use function getmypid;
@@ -57,9 +59,11 @@ use function is_resource;
 use function max;
 use function microtime;
 use function min;
+use function posix_kill;
 use function preg_match;
 use function proc_close;
 use function proc_open;
+use function register_shutdown_function;
 use function rename;
 use function rtrim;
 use function sleep;
@@ -81,7 +85,7 @@ use function unlink;
  *
  * State (all in data/cronjob/, see DataFiles):
  *   watch.enabled    opt-in marker (Start creates it, Stop removes it)
- *   watch.lock       liveness - the daemon holds it for its lifetime
+ *   watch.lock       liveness (flock) + informational daemon PID
  *   watch.heartbeat  mtime = last loop iteration
  *   watch-spawn      mtime = last spawn attempt (respawn cooldown)
  *   watch.log        one supervisor line per tick (never job output)
@@ -149,6 +153,45 @@ final class WatchService {
         fclose($lock);
 
         return !$acquired;
+    }
+
+    /**
+     * The PID of the running watch daemon, or null when none runs (flock
+     * free) or the stored PID is stale/unreadable. The flock is the
+     * authoritative liveness signal - this is informational (admin UI).
+     */
+    public static function daemonPid(): ?int {
+        if (!self::daemonAlive()) {
+            return null;
+        }
+        $file = self::path(self::LOCK_FILE);
+        if (!is_file($file)) {
+            return null;
+        }
+        $pid = (int) trim((string) file_get_contents($file));
+        if ($pid <= 0 || !self::pidAlive($pid)) {
+            return null;
+        }
+
+        return $pid;
+    }
+
+    /**
+     * Best-effort liveness check without sending a signal: posix_kill(0)
+     * when available, /proc on Linux, otherwise optimistically true. On
+     * Windows both are absent - harmless there, because daemonAlive()'s
+     * flock is released by the OS on every process death (incl.
+     * taskkill /F) and the lock holder writes its PID clean on acquisition.
+     */
+    private static function pidAlive(int $pid): bool {
+        if (function_exists('posix_kill')) {
+            return @posix_kill($pid, 0);
+        }
+        if (is_dir('/proc')) {
+            return is_dir('/proc/' . $pid);
+        }
+
+        return true;
     }
 
     /**
@@ -367,7 +410,7 @@ final class WatchService {
     /**
      * Status for the admin UI.
      *
-     * @return array{enabled: bool, running: bool, last_tick: int}
+     * @return array{enabled: bool, running: bool, last_tick: int, pid: int|null}
      */
     public static function status(): array {
         $heartbeat = self::path(self::HEARTBEAT_FILE);
@@ -376,6 +419,7 @@ final class WatchService {
             'enabled'   => self::featureEnabled(),
             'running'   => self::daemonAlive(),
             'last_tick' => is_file($heartbeat) ? (int) filemtime($heartbeat) : 0,
+            'pid'       => self::daemonPid(),
         ];
     }
 
@@ -390,7 +434,20 @@ final class WatchService {
 
             return;
         }
+        // The lock holder owns the informational PID in the file: write it
+        // clean (truncate first - a shorter PID must not leave digits of a
+        // previous one) and clear it on exit.
+        @fseek($lock, 0);
+        @ftruncate($lock, 0);
         @fwrite($lock, (string) getmypid());
+        register_shutdown_function(static function () use ($lock) {
+            // Safety net for fatal errors (not reached on SIGKILL - the OS
+            // releases the flock then anyway, so daemonAlive() stays right).
+            if (is_resource($lock)) {
+                @fseek($lock, 0);
+                @ftruncate($lock, 0);
+            }
+        });
 
         $fingerprint = self::installFingerprint();
         while (self::featureEnabled() && self::installFingerprint() === $fingerprint) {
@@ -402,6 +459,8 @@ final class WatchService {
         }
 
         fwrite(STDOUT, 'watch daemon exiting' . PHP_EOL);
+        @fseek($lock, 0);
+        @ftruncate($lock, 0);
         fclose($lock);
     }
 

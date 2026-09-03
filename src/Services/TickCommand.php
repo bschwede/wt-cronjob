@@ -135,6 +135,18 @@ final class TickCommand extends Command {
                 } catch (Throwable $exception) {
                     $output->writeln('<error>command catalog sync failed: ' . $exception->getMessage() . '</error>');
                 }
+
+                // Self-heal: re-schedule enabled time jobs whose next_run_at
+                // is NULL (e.g. after a restore with the cron library
+                // missing) - see ScheduleService::repairStrandedSchedules().
+                try {
+                    $repaired = ScheduleService::repairStrandedSchedules($now);
+                    if ($repaired > 0) {
+                        $output->writeln('repaired next_run_at for ' . $repaired . ' stranded job(s)');
+                    }
+                } catch (Throwable $exception) {
+                    $output->writeln('<error>schedule self-heal failed: ' . $exception->getMessage() . '</error>');
+                }
             }
 
             $failures = 0;

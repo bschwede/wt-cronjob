@@ -252,6 +252,14 @@ auto-detection is used instead.
   then has to be confirmed once).
 - **Self-update:** if the module is re-deployed the daemon detects the changed
   files and exits, so a fresh daemon picks up the new code.
+- **Self-heal:** an enabled time job whose `next_run_at` ends up `NULL`
+  (e.g. after a code/DB restore while the cron library was temporarily
+  missing) is re-scheduled at its next slot on the following tick - it can
+  never get stuck. While the cron library is missing, a run leaves
+  `next_run_at` untouched instead of zeroing it.
+- **PID:** the running daemon's PID is shown in the Watch fieldset of the
+  admin page. Liveness itself is a file lock (flock), which the OS releases
+  as soon as the daemon dies.
 - **Works under php-fpm / mod_php:** the daemon is spawned with a resolved PHP
   *CLI* interpreter (under the web SAPI `PHP_BINARY` is empty or the server
   binary, which cannot run scripts), so *Start watch* from the browser works.

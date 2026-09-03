@@ -46,6 +46,7 @@ namespace {
 
     require __DIR__ . '/../autoload.php';
 
+    use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
     use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
     $failures = 0;
@@ -179,6 +180,33 @@ namespace {
     WatchService::setManualPhp('');
     $info = WatchService::phpBinaryInfo();
     check('manual php: cleared again', $info['source'] === 'auto' && $info['configured'] === '' && WatchService::phpBinary() === $binary);
+
+    // 11. daemonPid(): the informational PID of the running daemon.
+    check('daemon pid: null when no daemon runs', WatchService::daemonPid() === null);
+
+    $lock = fopen($data . 'cronjob/watch.lock', 'c');
+    flock($lock, LOCK_EX);
+    fseek($lock, 0);
+    ftruncate($lock, 0);
+    fwrite($lock, (string) getmypid());
+    check('daemon pid: reports the lock holder pid', WatchService::daemonPid() === getmypid());
+
+    fseek($lock, 0);
+    ftruncate($lock, 0);
+    fwrite($lock, '999999999');
+    check('daemon pid: stale pid reported as null', WatchService::daemonPid() === null);
+
+    flock($lock, LOCK_UN);
+    fclose($lock);
+    check('daemon pid: null again after release', WatchService::daemonPid() === null);
+    check('status carries the pid key', array_key_exists('pid', WatchService::status()));
+
+    // 12. nextRunForRepair(): the self-heal decision (pure).
+    check('repair: event-only job stays null', ScheduleService::nextRunForRepair([['type' => 'event', 'cron' => '', 'event' => 'x']], '2026-01-01 00:00:00') === null);
+    $repair = ScheduleService::nextRunForRepair([['type' => 'time', 'cron' => '*/10 * * * *', 'event' => '']], '2026-01-01 00:00:00');
+    check('repair: time job gets a next run', is_string($repair) && $repair > '2026-01-01 00:00:00');
+    $mixed = ScheduleService::nextRunForRepair([['type' => 'event', 'cron' => '', 'event' => 'x'], ['type' => 'time', 'cron' => '@hourly', 'event' => '']], '2026-01-01 00:00:00');
+    check('repair: mixed triggers get a next run', is_string($mixed) && $mixed > '2026-01-01 00:00:00');
 
     // Cleanup
     foreach (glob($data . 'cronjob/*') ?: [] as $file) {

@@ -17,7 +17,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var string $cron_now
  * @var array<string, string> $install
  * @var array{configured: string, manual_valid: bool, binary: string, source: string} $php
- * @var array{enabled: bool, running: bool, last_tick: int} $watch
+ * @var array{enabled: bool, running: bool, last_tick: int, pid: int|null} $watch
  * @var string $event_token
  * @var array<string, string> $offered
  * @var bool $route_events
@@ -266,6 +266,9 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                         <?php endif; ?>
                         <?php if ($watch_last > 0): ?>
                             <span class="text-muted"><?= I18N::translate('Last activity (UTC): %s', date('Y-m-d H:i:s', $watch_last)) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($watch['pid'])): ?>
+                            <span class="text-muted"><?= I18N::translate('PID: %d', (int) $watch['pid']) ?></span>
                         <?php endif; ?>
                     </p>
                     <?php if ($watch_enabled): ?>

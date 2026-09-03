@@ -313,6 +313,24 @@ final class ScheduleService {
     }
 
     /**
+     * The next run the self-heal assigns to a stranded job (next_run_at =
+     * NULL) - or NULL when the job has no time trigger (pure event jobs
+     * legitimately keep next_run_at = NULL) or no cron can be scheduled.
+     * Pure - standalone-testable.
+     *
+     * @param list<array{type: string, cron: string, event: string}> $triggers
+     */
+    public static function nextRunForRepair(array $triggers, string $from): ?string {
+        foreach ($triggers as $trigger) {
+            if (($trigger['type'] ?? '') === self::TRIGGER_TIME) {
+                return self::nextRunMin($triggers, $from);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Which time triggers were due between $anchor and $now (§13): the crons
      * whose next run after $anchor is not after $now. Records
      * cj_run.trigger_detail for schedule runs. Pure and standalone-testable.
@@ -484,6 +502,39 @@ final class ScheduleService {
     }
 
     /**
+     * Self-heal for stranded schedule jobs: an enabled job with a time
+     * trigger whose next_run_at is NULL is never picked up by dueJobs()
+     * again (it filters on next_run_at IS NOT NULL). That state can arise
+     * after a code/DB restore, a manual DB edit or a crash - e.g. when a
+     * run happened while the cron library was missing. Such jobs are
+     * re-scheduled at their NEXT slot (no catch-up flood). No-op while the
+     * cron library is missing (nextRunMin() then yields NULL).
+     *
+     * @return int number of repaired jobs
+     */
+    public static function repairStrandedSchedules(string $now): int {
+        $repaired = 0;
+        $stranded = DB::table('cj_job')
+            ->where('enabled', 1)
+            ->whereNull('next_run_at')
+            ->get()
+            ->all();
+
+        foreach ($stranded as $job) {
+            $next = self::nextRunForRepair(self::jobTriggers((int) $job->id), $now);
+            if ($next !== null) {
+                DB::table('cj_job')->where('id', '=', (int) $job->id)->update([
+                    'next_run_at' => $next,
+                    'updated_at'  => $now,
+                ]);
+                $repaired++;
+            }
+        }
+
+        return $repaired;
+    }
+
+    /**
      * Enabled event-triggered jobs matching one event name (phase 2, §6.1;
      * §13: the trigger lives in cj_job_trigger, so a job with several event
      * triggers matches each of them).
@@ -538,20 +589,26 @@ final class ScheduleService {
     /**
      * After a run: update the job's last_* fields and recompute next_run_at
      * as the minimum over the job's time triggers (§13; NULL when the job
-     * has no time trigger).
+     * has no time trigger). While the cron library is missing, next_run_at
+     * is left untouched: writing NULL would silently strand the job
+     * (dueJobs() skips NULL), while the stale value keeps it running - a
+     * visible, self-healing degraded state.
      *
      * @param list<array{type: string, cron: string, event: string}> $triggers
      */
     public static function updateJobAfterRun(object $job, array $triggers, string $now, string $status, int $exit_code): void {
-        $next = self::nextRunMin($triggers, $now);
-
-        DB::table('cj_job')->where('id', '=', (int) $job->id)->update([
+        $values = [
             'last_run_at' => $now,
             'last_exit'   => $exit_code,
             'last_status' => $status,
-            'next_run_at' => $next,
             'updated_at'  => $now,
-        ]);
+        ];
+
+        if (self::hasCronLibrary()) {
+            $values['next_run_at'] = self::nextRunMin($triggers, $now);
+        }
+
+        DB::table('cj_job')->where('id', '=', (int) $job->id)->update($values);
     }
 
     /**
