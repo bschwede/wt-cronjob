@@ -33,7 +33,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 <?= view('components/breadcrumbs', [
     'links' => [
         route(ClassName::get(ClassName::CONTROL_PANEL)) => MoreI18N::xlate('Control panel'),
-        $admin_url => $module->title(),
+        $module->title(),
     ]
 ]) ?>
 
