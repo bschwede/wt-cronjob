@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
-use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
+use Schwendinger\Webtrees\Helpers\ClassName;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Helpers\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
@@ -32,7 +32,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 ?>
 <?= view('components/breadcrumbs', [
     'links' => [
-        route(ControlPanel::class) => MoreI18N::xlate('Control panel'),
+        route(ClassName::get(ClassName::CONTROL_PANEL)) => MoreI18N::xlate('Control panel'),
         $admin_url => $module->title(),
     ]
 ]) ?>

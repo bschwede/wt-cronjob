@@ -32,6 +32,7 @@ use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Tree;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Schwendinger\Webtrees\Helpers\ClassName;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Throwable;
 
@@ -547,7 +548,7 @@ final class RouteEventService {
      */
     private static function fallbackMap(): array {
         return [
-            'Fisharebest\Webtrees\Http\RequestHandlers\EditNoteAction' => [
+            ClassName::get(ClassName::EDIT_NOTE_ACTION) => [
                 'event' => self::DOMAIN . ':edit-note-object',
                 'path'  => self::TREE_PREFIX . 'edit-note-object/{xref}',
             ],

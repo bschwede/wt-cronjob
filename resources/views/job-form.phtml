@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
-use Fisharebest\Webtrees\Http\RequestHandlers\ControlPanel;
+use Schwendinger\Webtrees\Helpers\ClassName;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Helpers\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
@@ -58,7 +58,7 @@ $timeout_v = $fv['timeout'] ?? ($is_edit ? (int) $job->timeout_sec : $module::TI
 $enabled_v = $fv['enabled'] ?? ($is_edit ? ((int) $job->enabled === 1) : true);
 
 $crumbs = [
-    route(ControlPanel::class) => MoreI18N::xlate('Control panel'),
+    route(ClassName::get(ClassName::CONTROL_PANEL)) => MoreI18N::xlate('Control panel'),
     $back_url => $module->title(),
 ];
 // The breadcrumb component renders labels unescaped, and I18N::translate()
