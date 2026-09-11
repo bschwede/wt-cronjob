@@ -48,13 +48,13 @@ namespace Fisharebest\Webtrees {
 
 namespace {
 
-    require __DIR__ . '/../autoload.php';
+    require __DIR__ . '/../vendor/bschwede/wt-shared-libs/src/Helpers/MoreI18N.php';
     // Load the class directly (not via the module autoloader) so the I18N
     // stub above is what translateJobTitle() resolves against.
     require __DIR__ . '/../src/CronjobUtils.php';
 
     use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
-    use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
+    use Schwendinger\Webtrees\Helpers\MoreI18N;
 
     $failures = 0;
 

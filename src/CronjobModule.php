@@ -33,7 +33,7 @@ use Fisharebest\Webtrees\Module\AbstractModule;
 use Fisharebest\Webtrees\Module\ModuleConfigInterface;
 use Fisharebest\Webtrees\Module\ModuleConfigTrait;
 use Fisharebest\Webtrees\Module\ModuleCustomInterface;
-use Fisharebest\Webtrees\Module\ModuleCustomTrait;
+use Schwendinger\Webtrees\Traits\ModuleCustomTrait;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Session;
 use Fisharebest\Webtrees\Services\RateLimitService;
@@ -46,7 +46,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
 use Throwable;
-use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CommandCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
@@ -162,83 +162,6 @@ class CronjobModule extends AbstractModule
         }
 
         return $response;
-    }
-
-    // =========================================================================
-    // ModuleCustomInterface
-    // =========================================================================
-
-    public function customModuleAuthorName(): string {
-        return self::CUSTOM_AUTHOR;
-    }
-
-    public function customModuleVersion(): string {
-        return self::CUSTOM_VERSION;
-    }
-
-    /**
-     * A URL that will provide the latest version of this module.
-     *
-     * @return string
-     */
-    public function customModuleLatestVersionUrl(): string
-    {
-        return self::CUSTOM_LAST;
-    }
-
-    /**
-     * Where to get support for this module.  Perhaps a github repository?
-     *
-     * @return string
-     */
-    public function customModuleSupportUrl(): string
-    {
-        return self::CUSTOM_WEBSITE;
-    }    
-
-    /**
-     * Translation loader (linkenhancer pattern): loads
-     * resources/lang/<sprache>.php or .po when present. Gettext-generated
-     * files can therefore be dropped in later WITHOUT code changes.
-     */
-    public function customTranslations(string $language): array {
-        $file_base = $this->resourcesFolder() . 'lang' . DIRECTORY_SEPARATOR . $language;
-        $file      = null;
-        foreach (['.php', '.po'] as $ext) {
-            if (is_readable($file_base . $ext)) {
-                $file = $file_base . $ext;
-                break;
-            }
-        }
-
-        if ($file === null) {
-            return [];
-        }
-
-        if (class_exists('\\Fisharebest\\Webtrees\\I18N\\Translation')) {
-            if (str_ends_with($file, '.po')) {
-                $stream = fopen($file, 'rb');
-                if ($stream === false) {
-                    return [];
-                }
-                try {
-                    return \Fisharebest\Webtrees\I18N\Translation::fromPoStream($stream)->toArray();
-                } finally {
-                    fclose($stream);
-                }
-            }
-            return \Fisharebest\Webtrees\I18N\Translation::fromPhpFile($file)->toArray();
-        }
-
-        if (class_exists('\\Fisharebest\\Localization\\Translation')) {
-            return (new \Fisharebest\Localization\Translation($file))->asArray();
-        }
-
-        return [];
-    }
-
-    public function resourcesFolder(): string {
-        return dirname(__DIR__) . DIRECTORY_SEPARATOR . 'resources' . DIRECTORY_SEPARATOR;
     }
 
     // =========================================================================

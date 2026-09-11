@@ -46,7 +46,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../autoload.php';
 
-use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
 CliBootstrap::guard();

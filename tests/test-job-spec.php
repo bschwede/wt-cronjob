@@ -26,7 +26,7 @@ declare(strict_types=1);
 
 // Standalone tests for the phase-2 self-registration building blocks that are
 // free of webtrees/DB: ScheduleService::validateJobSpec(),
-// CronjobUtils::loadManifestFile() and CliBootstrap::resolvePayloadPath().
+// CronjobUtils::loadManifestFile() and CronjobCli::resolvePayloadPath().
 // The webtrees root is a temp fixture (same convention as
 // test-args-validator.php).
 //
@@ -35,7 +35,7 @@ declare(strict_types=1);
 require __DIR__ . '/../autoload.php';
 
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
-use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobCli;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CommandCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 
@@ -305,13 +305,13 @@ check('jobName: module key over 64 chars rejected', CronjobUtils::isValidJobName
 // --- resolvePayloadPath ------------------------------------------------------
 $modules = $root . '/modules_v4';
 check('payload: valid sibling resolved',
-    str_ends_with((string) CliBootstrap::resolvePayloadPath($root . '/modules_v4/fakemod/cli/real-job.php', $modules), 'real-job.logic.php'));
+    str_ends_with((string) CronjobCli::resolvePayloadPath($root . '/modules_v4/fakemod/cli/real-job.php', $modules), 'real-job.logic.php'));
 check('payload: missing sibling -> null',
-    CliBootstrap::resolvePayloadPath($root . '/modules_v4/fakemod/cli/nologic.php', $modules) === null);
+    CronjobCli::resolvePayloadPath($root . '/modules_v4/fakemod/cli/nologic.php', $modules) === null);
 check('payload: escapes modules_v4 -> null',
-    CliBootstrap::resolvePayloadPath($root . '/modules_v4/fakemod/cli/../../index.php', $modules) === null);
+    CronjobCli::resolvePayloadPath($root . '/modules_v4/fakemod/cli/../../index.php', $modules) === null);
 check('payload: not under cli/ -> null',
-    CliBootstrap::resolvePayloadPath($root . '/modules_v4/fakemod/offcli.php', $modules) === null);
+    CronjobCli::resolvePayloadPath($root . '/modules_v4/fakemod/offcli.php', $modules) === null);
 
 // --- mergeCatalog (§12 command inventory, pure) -----------------------------
 $core = [

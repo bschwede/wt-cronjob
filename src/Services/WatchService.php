@@ -26,6 +26,7 @@ declare(strict_types=1);
 namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 
 use Fisharebest\Webtrees\Webtrees;
+use Schwendinger\Webtrees\Services\CliBootstrap;
 use Throwable;
 
 use function array_map;

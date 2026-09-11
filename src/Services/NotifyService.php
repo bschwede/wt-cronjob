@@ -31,7 +31,7 @@ use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Services\MessageService;
 use Fisharebest\Webtrees\Services\UserService;
 use Fisharebest\Webtrees\SiteUser;
-use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
+use Schwendinger\Webtrees\Helpers\MoreI18N;
 use Throwable;
 
 use function array_slice;

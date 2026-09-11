@@ -44,20 +44,11 @@ declare(strict_types=1);
 
 require __DIR__ . '/../autoload.php';
 
-use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
 
 CliBootstrap::guard();
-
-// Core autoloader first - makes Webtrees::DATA_DIR available for the offline
-// check WITHOUT touching the database.
-CliBootstrap::autoload();
-
-if (CliBootstrap::siteIsOffline()) {
-    echo 'site offline (data/offline.txt) - pseudo-events skipped' . PHP_EOL;
-    exit(0);
-}
-
+CliBootstrap::exitOnsiteOffline();
 CliBootstrap::boot();
 
 $force  = in_array('--force', $argv ?? [], true);

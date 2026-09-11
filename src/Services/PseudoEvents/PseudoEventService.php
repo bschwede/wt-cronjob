@@ -26,8 +26,8 @@ declare(strict_types=1);
 namespace Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents;
 
 use Fisharebest\Webtrees\DB;
-use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
-use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Helpers\MoreI18N;
+use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\DataFiles;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;

@@ -38,7 +38,7 @@ use Fisharebest\Webtrees\Webtrees;
 use InvalidArgumentException;
 use RuntimeException;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
-use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
+use Schwendinger\Webtrees\Helpers\MoreI18N;
 use Throwable;
 
 use function array_filter;

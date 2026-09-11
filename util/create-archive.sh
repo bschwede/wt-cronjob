@@ -17,6 +17,17 @@ VER=$(grep -A1 "public const CUSTOM_VERSION" "$SRCDIR/src/CronjobModule.php" \
   exit 1;
 }
 
+# Option Y: the shared lib (bschwede/wt-shared-libs) and its composer
+# installed.php (the version-skew source) must also be present.
+[[ -d "$SRCDIR/vendor/bschwede/wt-shared-libs" ]] || {
+  echo "ERROR: vendor/bschwede/wt-shared-libs missing (Option Y - run composer install before archiving)";
+  exit 1;
+}
+[[ -f "$SRCDIR/vendor/composer/installed.php" ]] || {
+  echo "ERROR: vendor/composer/installed.php missing (Option Y version skew - run composer install)";
+  exit 1;
+}
+
 # Compile PO translations into the PHP runtime fast path and keep
 # latest-version.txt in sync with CronjobModule::CUSTOM_VERSION.
 command -v php >/dev/null 2>&1 || {
@@ -38,7 +49,6 @@ tests
 composer.json
 latest-version.txt
 vendor/autoload.php
-vendor/composer
 resources/lang/*.po*
 resources/lang/*.mo
 resources/views/*.phtml.~*

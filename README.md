@@ -554,7 +554,7 @@ copying the bootstrap:
 the stub with the extension swapped from `.php` to `.logic.php`. That payload path is
 **derived from the entry script, never taken from an argument**, so there is no
 attacker-controlled include path (the confinement is enforced in
-`CliBootstrap::resolvePayloadPath()`). The job row stays `<name>.php`, unchanged; the
+`CronjobCli::resolvePayloadPath()`). The job row stays `<name>.php`, unchanged; the
 job's working directory and arguments are unchanged too.
 
 - The wrapper is **never itself a job command** - only the stub is.

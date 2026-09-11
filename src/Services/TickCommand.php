@@ -108,7 +108,7 @@ final class TickCommand extends Command {
             return 0;
         }
 
-        $lock = CliBootstrap::acquireTickLock();
+        $lock = CronjobCli::acquireTickLock();
         if ($lock === null) {
             $output->writeln('another tick is already running - skipped');
 
@@ -184,7 +184,7 @@ final class TickCommand extends Command {
 
             return ($strict && $failures > 0) ? 1 : 0;
         } finally {
-            CliBootstrap::releaseTickLock($lock);
+            CronjobCli::releaseTickLock($lock);
         }
     }
 

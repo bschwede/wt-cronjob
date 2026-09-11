@@ -36,7 +36,7 @@ declare(strict_types=1);
 // The payload path is DERIVED from the entry script (SCRIPT_FILENAME), never
 // taken from an argument, so there is no attacker-controlled include path.
 // The confinement (realpath under modules_v4/*/cli/) is enforced in
-// CliBootstrap::resolvePayloadPath(). The payload itself carries a 1-line
+// CronjobCli::resolvePayloadPath(). The payload itself carries a 1-line
 // SAPI guard, since it is a .php file inside cli/ (URL-reachable).
 //
 // Requires the cronjob module to be installed. See README.md, "Offering jobs
@@ -44,19 +44,11 @@ declare(strict_types=1);
 
 require __DIR__ . '/../autoload.php';
 
-use Schwendinger\Webtrees\Module\Cronjob\Services\CliBootstrap;
+use Schwendinger\Webtrees\Services\CliBootstrap;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobCli;
 
 CliBootstrap::guard();
-
-// Core autoloader first - makes Webtrees::DATA_DIR available for the offline
-// check WITHOUT touching the database.
-CliBootstrap::autoload();
-
-if (CliBootstrap::siteIsOffline()) {
-    fwrite(STDOUT, 'site offline (data/offline.txt) - skipped' . PHP_EOL);
-    exit(0);
-}
-
+CliBootstrap::exitOnsiteOffline();
 CliBootstrap::boot();
 
 $modules = realpath(__DIR__ . '/../../');
@@ -66,7 +58,7 @@ if ($modules === false) {
 }
 
 $entry   = $_SERVER['SCRIPT_FILENAME'] ?? '';
-$payload = $entry === '' ? null : CliBootstrap::resolvePayloadPath($entry, $modules);
+$payload = $entry === '' ? null : CronjobCli::resolvePayloadPath($entry, $modules);
 
 if ($payload === null) {
     fwrite(STDERR, 'no confined W1 payload found for entry: ' . $entry . PHP_EOL);

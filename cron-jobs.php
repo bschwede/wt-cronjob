@@ -24,7 +24,7 @@
 
 declare(strict_types=1);
 
-use Schwendinger\Webtrees\Module\Cronjob\MoreI18N;
+use Schwendinger\Webtrees\Helpers\MoreI18N;
 /**
  * cronjob's own job manifest (self-registration, §6.3 / §12).
  *
