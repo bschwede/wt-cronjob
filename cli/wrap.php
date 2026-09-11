@@ -48,7 +48,7 @@ use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobCli;
 
 CliBootstrap::guard();
-CliBootstrap::exitOnsiteOffline();
+CliBootstrap::exitOnSiteOffline();
 CliBootstrap::boot();
 
 $modules = realpath(__DIR__ . '/../../');

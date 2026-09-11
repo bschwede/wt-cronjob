@@ -53,7 +53,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\TickCommand;
 use Symfony\Component\Console\Application;
 
 CliBootstrap::guard();
-CliBootstrap::exitOnsiteOffline();
+CliBootstrap::exitOnSiteOffline();
 CliBootstrap::boot();
 
 $application = new Application('cronjob tick', '1.0.0');

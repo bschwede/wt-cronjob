@@ -48,7 +48,7 @@ use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
 
 CliBootstrap::guard();
-CliBootstrap::exitOnsiteOffline();
+CliBootstrap::exitOnSiteOffline();
 CliBootstrap::boot();
 
 $force  = in_array('--force', $argv ?? [], true);
