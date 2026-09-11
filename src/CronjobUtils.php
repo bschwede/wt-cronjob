@@ -27,9 +27,7 @@ namespace Schwendinger\Webtrees\Module\Cronjob;
 
 use Fisharebest\Webtrees\DB;
 use Fisharebest\Webtrees\I18N;
-use Fisharebest\Webtrees\Module\AbstractModule;
 use Fisharebest\Webtrees\Webtrees;
-use PDOException;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 use Throwable;
@@ -61,44 +59,6 @@ final class CronjobUtils {
     public const SCHEMA_NAME = 'SCHEMA_VERSION';
 
     private const MODULE_SCRIPT_PATTERN = '#^modules_v4/[a-z0-9_\-]+/cli/[a-z0-9_\-]+\.php$#';
-
-    /**
-     * Apply Migration# class files (zero based) until target_version - 1.
-     *
-     * Same approach as linkenhancer's LinkEnhancerUtils::updateSchema():
-     * DDL runs outside the request transaction (MySQL implicit commits).
-     */
-    public static function updateSchema(AbstractModule $module, int $target_version): void {
-        try {
-            $current_version = (int) $module->getPreference(self::SCHEMA_NAME);
-        } catch (PDOException) {
-            // During initial installation the site tables may not be usable yet.
-            $current_version = 0;
-        }
-
-        $connection = DB::schema()->getConnection();
-
-        if ($connection->transactionLevel() > 0) {
-            $connection->commit();
-        }
-
-        try {
-            while ($current_version < $target_version) {
-                $class     = '\Schwendinger\Webtrees\Module\Cronjob\Schema\Migration' . $current_version;
-                $migration = new $class();
-                $migration->upgrade();
-                $current_version++;
-
-                // The module row may not exist yet during first installation.
-                if (DB::table('module')->where('module_name', '=', $module->name())->exists()) {
-                    $module->setPreference(self::SCHEMA_NAME, (string) $current_version);
-                }
-            }
-        } finally {
-            // Re-open a transaction for webtrees' middleware to commit.
-            $connection->beginTransaction();
-        }
-    }
 
     /**
      * All jobs plus the data of their most recent run.

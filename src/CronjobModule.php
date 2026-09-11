@@ -46,6 +46,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
 use Throwable;
+use Schwendinger\Webtrees\Helpers\Functions;
 use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CommandCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
@@ -134,7 +135,7 @@ class CronjobModule extends AbstractModule
     public function boot(): void {
         View::registerNamespace($this->name(), $this->resourcesFolder() . 'views/');
 
-        CronjobUtils::updateSchema($this, self::SCHEMA_TARGET_VERSION);
+        Functions::updateSchema($this, '\Schwendinger\Webtrees\Module\Cronjob\Schema', 'SCHEMA_VERSION', self::SCHEMA_TARGET_VERSION);
     }
 
     // =========================================================================
