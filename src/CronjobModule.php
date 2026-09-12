@@ -746,7 +746,7 @@ class CronjobModule extends AbstractModule
         // quote, shell metacharacter or '%' (which would also break the
         // sprintf-based flash messages).
         if ($path !== '' && preg_match('#^[A-Za-z0-9_./:\\\\ -]+$#', $path) !== 1) {
-            FlashMessages::addMessage(I18N::translate('The path may only contain letters, digits and the characters _ . / \\ : - and spaces.'), 'danger');
+            FlashMessages::addMessage(I18N::translate('The path may only contain letters, digits, spaces and the characters %s', '_ . / \\ : -'), 'danger');
 
             return redirect($this->getConfigLink());
         }

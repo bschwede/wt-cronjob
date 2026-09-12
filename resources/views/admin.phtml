@@ -182,7 +182,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                         <button type="submit" class="btn btn-sm <?= $notify ? 'btn-success' : 'btn-secondary' ?>"
-                                title="<?= $notify ? I18N::translate('notify on failure: on') : I18N::translate('notify on failure: off') ?>">
+                                title="<?= I18N::translate('notify on failure: %s', ($notify ? I18N::translate('on') : I18N::translate('off'))) ?>">
                             <strong><?= $notify ? "✓" : "✗" ?></strong>
                         </button>
                     </form>
@@ -211,7 +211,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                             <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                             <button type="submit" class="btn btn-sm btn-warning"
                                     title="<?= e(I18N::translate('Restore the settings currently offered by the module manifest')) ?>">
-                                <?= I18N::translate('Reset') ?>
+                                <?= MoreI18N::xlate('reset') ?>
                             </button>
                         </form>
                     <?php endif; ?>
@@ -351,7 +351,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 <div class="input-group">
                     <input type="text" name="php_binary" class="form-control font-monospace" value="<?= e($php['configured']) ?>"
                            placeholder="<?= e(I18N::translate('e.g. /usr/bin/php8.3 - empty = automatic detection')) ?>">
-                    <button type="submit" class="btn btn-primary"><?= I18N::translate('Save') ?></button>
+                    <button type="submit" class="btn btn-primary"><?= MoreI18N::xlate('save') ?></button>
                 </div>
                 <div class="form-text">
                     <?= I18N::translate('A watch daemon that is already running keeps using its current binary until it is restarted.') ?>
