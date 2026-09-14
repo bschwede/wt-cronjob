@@ -27,7 +27,9 @@ declare(strict_types=1);
 // The once-a-minute trigger of the cronjob module.
 //
 // Run (from the webtrees root, with the same PHP version as the instance):
-//   php modules_v4/cronjob/cli/tick.php [--dry-run] [--job=<name>] [--strict] [--full-output]
+//   php modules_v4/cronjob/cli/tick.php cron:tick [--dry-run] [--job=<name>] [--strict] [--full-output]
+//   (without the "cron:tick" argument the tick runs as well - it is the
+//    application's default command)
 //
 // Note: stdout carries summary lines only by default. Add --full-output for
 // debugging when you are sure the log destination is not world-readable -
@@ -41,7 +43,7 @@ declare(strict_types=1);
 //   - records every run in the cj_run table (visible in the admin UI)
 //
 // System trigger (pick one, once):
-//   cron:    * * * * * cd /path/to/webtrees && mkdir -p data/cronjob && php modules_v4/cronjob/cli/tick.php >> /path/to/webtrees/data/cronjob/tick.log 2>&1
+//   cron:    * * * * * cd /path/to/webtrees && mkdir -p data/cronjob && php modules_v4/cronjob/cli/tick.php cron:tick >> /path/to/webtrees/data/cronjob/tick.log 2>&1
 //   systemd: see the generated units in the module's admin page
 //
 // Conventions: see README.md ("CLI scripts & maintenance").
@@ -57,5 +59,12 @@ CliBootstrap::exitOnSiteOffline();
 CliBootstrap::boot();
 
 $application = new Application('cronjob tick', '1.0.0');
-$application->add(new TickCommand());
+$application->addCommand(new TickCommand());
+// Defense in depth: a bare `php tick.php` (no command name) would otherwise
+// fall through to Symfony's built-in "list" command (prints the usage, exits
+// 0, runs NO tick) - a silent no-op if any caller forgets the "cron:tick"
+// argument. Making cron:tick the default keeps every existing explicit caller
+// working. Deliberately NOT single-command mode (the ", true" form): that
+// rejects the explicit "cron:tick" that all current callers pass.
+$application->setDefaultCommand('cron:tick');
 $application->run();
