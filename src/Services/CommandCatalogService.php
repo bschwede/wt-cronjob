@@ -28,6 +28,7 @@ namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 use Fisharebest\Webtrees\DB;
 use PDOException;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Schwendinger\Webtrees\Helpers\MoreI18N;
 
 use function array_key_exists;
 use function array_values;
@@ -65,19 +66,33 @@ use const JSON_UNESCAPED_UNICODE;
 final class CommandCatalogService {
 
     /** Known parameters of the allowlisted core commands (informational). */
-    private const CORE_PARAMS = [
-        'site-setting' => [
-            ['name' => '--list', 'optional' => true, 'description' => 'Read-only: list all site settings.'],
-        ],
-    ];
+    private static ?array $CORE_PARAMS = null;
 
     /** Short descriptions for the allowlisted core commands. */
-    private const CORE_DESCRIPTIONS = [
-        'tree-export'  => 'Export a whole tree as a GEDCOM file into data/ (full personal data).',
-        'tree-list'    => 'List all trees.',
-        'user-list'    => 'List all users (includes e-mail addresses).',
-        'site-setting' => 'Read or write site settings (a job may only use the read-only --list argument).',
-    ];
+    private static ?array $CORE_DESCRIPTIONS = null;
+
+    private static function initCoreSettings() {
+        if (!self::$CORE_PARAMS) {
+            self::$CORE_PARAMS = [
+                'site-setting' => [
+                    [
+                        'name' => '--list', 
+                        'optional' => true,
+                        'description' => MoreI18N::translate('Read-only: list all site settings.')
+                    ],
+                ],
+            ];
+        }
+
+        if (!self::$CORE_DESCRIPTIONS) {
+            self::$CORE_DESCRIPTIONS = [
+                'tree-export' => MoreI18N::translate('Export a whole tree as a GEDCOM file into data directory (full personal data).'),
+                'tree-list' => MoreI18N::translate('List all trees.'),
+                'user-list' => MoreI18N::translate('List all users (includes e-mail addresses).'),
+                'site-setting' => MoreI18N::translate('Read or write site settings (a job may only use the read-only --list argument).'),
+            ];            
+        }
+    }
 
     /**
      * Collect all known commands (live, no DB sync).
@@ -86,14 +101,15 @@ final class CommandCatalogService {
      *         keyed by command value
      */
     public static function collect(): array {
+        self::initCoreSettings();
         $core = [];
         foreach (JobRunner::ALLOWED_CORE_COMMANDS as $command) {
             $core[] = [
                 'command'      => $command,
                 'command_type' => 'core',
                 'source'       => 'core',
-                'description'  => self::CORE_DESCRIPTIONS[$command] ?? '',
-                'params'       => self::CORE_PARAMS[$command] ?? [],
+                'description'  => self::$CORE_DESCRIPTIONS[$command] ?? '',
+                'params'       => self::$CORE_PARAMS[$command] ?? [],
             ];
         }
 
