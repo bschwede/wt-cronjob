@@ -472,7 +472,7 @@ final class WatchService {
      */
     private static function runTick(): void {
         $started = microtime(true);
-        $result  = JobRunner::run([PHP_BINARY, self::cliScript('tick.php')], self::TICK_TIMEOUT, Webtrees::ROOT_DIR);
+        $result  = JobRunner::run([PHP_BINARY, self::cliScript('tick.php'), 'cron:tick'], self::TICK_TIMEOUT, Webtrees::ROOT_DIR);
         $ms      = (int) round((microtime(true) - $started) * 1000);
 
         self::appendLog(sprintf('%s tick exit=%d ms=%d', date('c'), $result['exit'], $ms));
