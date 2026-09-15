@@ -64,6 +64,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 <?php if ($jobs === []): ?>
     <p><?= I18N::translate('No jobs yet. Create the first one (e.g. the linkenhancer link-index update).') ?></p>
 <?php else: ?>
+    <div id="table-wrapper" style="overflow:scroll;">
     <table id="wt-cronjob-jobs"
            class="table table-sm table-striped datatables d-none"
            <?= view('lists/datatables-attributes') ?>
@@ -194,13 +195,13 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobRunNow'])) ?>" class="d-inline">
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
-                        <button type="submit" class="btn btn-sm btn-info"
+                        <button type="submit" class="btn btn-sm btn-info m-1"
                                 title="<?= e($enabled ? I18N::translate('Run at the next tick (within 60 seconds)') : I18N::translate('The job is disabled - the queued run happens at the next tick after it is (re-)enabled')) ?>">
                             <?= I18N::translate('Run now') ?>
                         </button>
                     </form>
                     <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'duplicate' => (int) $job->id])) ?>"
-                       class="btn btn-sm btn-secondary"
+                       class="btn btn-sm btn-secondary m-1"
                        title="<?= e(I18N::translate('Open the form prefilled with a copy of this job (new -copy slug, starts disabled)')) ?>">
                         <?= I18N::translate('Duplicate') ?>
                     </a>
@@ -209,7 +210,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                               onsubmit='return confirm(<?= json_encode(I18N::translate('Reset this job to the module defaults? Your changes (title, schedule, command, arguments, enabled state) will be lost; the notification setting is kept.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);'>
                             <?= csrf_field() ?>
                             <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
-                            <button type="submit" class="btn btn-sm btn-warning"
+                            <button type="submit" class="btn btn-sm btn-warning m-1"
                                     title="<?= e(I18N::translate('Restore the settings currently offered by the module manifest')) ?>">
                                 <?= MoreI18N::xlate('reset') ?>
                             </button>
@@ -219,7 +220,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                           onsubmit='return confirm(<?= json_encode(I18N::translate('Delete this job and its run history?'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);'>
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
-                        <button type="submit" class="btn btn-sm btn-danger">
+                        <button type="submit" class="btn btn-sm btn-danger m-1">
                             <?= MoreI18N::xlate('Delete') ?>
                         </button>
                     </form>
@@ -232,6 +233,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 <?php endif; ?>
 
 <?php
@@ -404,7 +406,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                     <legend><?= I18N::translate('Event webhook (external trigger)') ?>
                     </legend>
                     <p class="text-muted">
-                        <?= I18N::translate('External systems can queue an event by GETting the endpoint below. Each queued event runs its matching event-triggered job(s) at the next tick. The token is required (send it in the X-Cronjob-Token header, not in the URL) and the endpoint is rate-limited.') ?>
+                        <?= I18N::translate('External systems can queue an event by GETting the endpoint below. Each queued event runs its matching event-triggered job(s) at the next tick. The token is required (send it in the X-Cronjob-Token header) and the endpoint is rate-limited.') ?>
                     </p>
 
                     <details>
@@ -417,7 +419,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                             <input type="text" class="form-control" id="cj_webhook_url" readonly
                                 value="<?= e(route('module', ['module' => $module->name(), 'action' => 'Event'])) ?>">
                             <div class="form-text">
-                                <?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header (never in the URL - it would end up in access logs).') ?>
+                                <?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header.') ?>
                             </div>
                         </div>
                         <div class="mb-2">
