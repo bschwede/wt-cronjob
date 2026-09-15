@@ -718,9 +718,11 @@ event into the same `cj_event` queue — a listening event job then reacts at th
 tick (~60 s), with no polling latency.
 
 **Which routes are mapped** — two rules, both derived from the live webtrees route
-table. Common prerequisites: path starts with `/tree/{tree}/`, HTTP **POST** only
-(the GET page routes of the same actions are not mapped), handler in webtrees'
-`RequestHandlers` namespace.
+table. Common prerequisites: path starts with `/tree/{tree}/`, the handler is in
+webtrees' request-handler namespace (`RequestHandlers` in 2.2.6, `Controllers` in
+2.3), and the request is a **POST** mutation. In 2.2.6 this is enforced at map time
+(GET page routes are not mapped); in 2.3 the route carries no HTTP method, so the
+POST check happens at fire-time and the GET form-load of the same route is ignored.
 
 1. **Record routes** (rule-based — core updates are picked up automatically): the
    path contains `{xref}` (the target record) *and* the handler class name starts

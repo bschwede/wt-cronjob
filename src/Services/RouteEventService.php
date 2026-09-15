@@ -27,12 +27,15 @@ namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 
 use Aura\Router\RouterContainer;
 use Fisharebest\Webtrees\DB;
+use Fisharebest\Webtrees\Http\Routing\RouteCollection;
 use Fisharebest\Webtrees\Http\Routes\WebRoutes;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Tree;
+use Fisharebest\Webtrees\Webtrees;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Schwendinger\Webtrees\Helpers\ClassName;
+use Schwendinger\Webtrees\Helpers\Functions;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Throwable;
 
@@ -50,6 +53,8 @@ use function str_contains;
 use function str_starts_with;
 use function strpos;
 use function substr;
+use function strtoupper;
+use function version_compare;
 
 /**
  * Route-triggered events.
@@ -64,10 +69,11 @@ use function substr;
  * two rules (a route is mapped when it matches either):
  *   - record routes (rule-based, auto-picked-up by core updates):
  *       path starts with /tree/{tree}/, contains {xref} (record specificity),
- *       POST only (the GET page routes of the same actions are not mapped),
- *       handler in the webtrees RequestHandlers namespace whose class name
- *       starts with Edit / Delete / Add / Create / Link / Paste / Reorder /
- *       Pending. The event name is the third path segment, namespaced
+ *       POST only (2.2.6; in 2.3 the route carries no method and the POST
+ *       check moves to fire-time), handler in the webtrees request-handler
+ *       namespace (RequestHandlers in 2.2.6, Controllers in 2.3) whose class
+ *       name starts with Edit / Delete / Add / Create / Link / Paste /
+ *       Reorder / Pending. The event name is the third path segment, namespaced
  *       `_route:<segment>` (the §11 naming scheme). When several mapped
  *       routes share a segment (e.g. `delete/{xref}` and
  *       `delete/{xref}/{fact_id}`), the following path parameters are
@@ -146,7 +152,9 @@ final class RouteEventService {
         'change-family-members'          => '_route:change-family-members',
     ];
 
-    private const HANDLER_NS = 'Fisharebest\Webtrees\Http\RequestHandlers\\';
+    /** Core request-handler namespaces: 2.2.6 `RequestHandlers`, 2.3 `Controllers`. */
+    private const HANDLER_NS_226 = 'Fisharebest\Webtrees\Http\RequestHandlers\\';
+    private const HANDLER_NS_23 = 'Fisharebest\Webtrees\Http\Controllers\\';
 
     /** Per-process map cache (handler class => ['event' => …, 'path' => …]). */
     private static ?array $cached_map = null;
@@ -172,13 +180,38 @@ final class RouteEventService {
 
     /**
      * The route triples from the live route table: in the web context the
-     * container's RouterContainer (the exact table the request matched);
-     * otherwise (CLI/tick, e.g. for the catalog sync) the core web route
-     * table is built directly.
+     * container's route table (2.2.6 Aura RouterContainer / 2.3 RouteCollection,
+     * the exact table the request matched); otherwise (CLI/tick, e.g. for the
+     * catalog sync) the core web route table is built directly. 2.3 routes carry
+     * no HTTP method, so `allows` is empty there (decided at fire-time).
      *
      * @return list<array{path: string, allows: list<string>, handler: string}>
      */
     private static function collectRouteTriples(): array {
+        if (version_compare(Webtrees::VERSION, '2.3', '>=')) {
+            try {
+                $collection = Registry::container()->get(RouteCollection::class);
+            } catch (Throwable) {
+                try {
+                    $collection = new RouteCollection();
+                    (new WebRoutes())->load($collection);
+                } catch (Throwable) {
+                    $collection = null;
+                }
+            }
+
+            $routes = [];
+            foreach (($collection?->all() ?? []) as $route) {
+                $routes[] = [
+                    'path'    => (string) $route->url,
+                    'allows'  => [],
+                    'handler' => (string) $route->controller,
+                ];
+            }
+
+            return $routes;
+        }
+
         $collection = null;
         try {
             /** @var RouterContainer $router */
@@ -214,16 +247,22 @@ final class RouteEventService {
      */
     public static function maybeFire(ServerRequestInterface $request, ResponseInterface $response): void {
         $route = $request->getAttribute('route');
-        if (!is_object($route) || !$route->handler) {
+        if (!is_object($route)) {
+            return;
+        }
+
+        $handler = self::routeHandler($route);
+        if ($handler === '') {
             return;
         }
 
         // Free in-memory match: the common (unmapped) request path ends here.
-        $entry = self::mapFor((string) $route->handler);
+        $entry = self::mapFor($handler);
         if ($entry === null) {
             return;
         }
-        if (!self::shouldFire($response->getStatusCode())) {
+        // A successful POST mutation (in 2.3 the route also serves the GET form-load).
+        if (!self::shouldFire($response->getStatusCode(), $request->getMethod())) {
             return;
         }
 
@@ -249,6 +288,15 @@ final class RouteEventService {
         }
 
         EventQueue::push($entry['event'], self::buildPayload($flat));
+    }
+
+    /**
+     * The route's handler FQCN: 2.2.6 Aura `handler`, 2.3 `controller`.
+     */
+    private static function routeHandler(object $route): string {
+        return version_compare(Webtrees::VERSION, '2.3', '>=')
+            ? (string) ($route->controller ?? '')
+            : (string) ($route->handler ?? '');
     }
 
     /**
@@ -349,12 +397,13 @@ final class RouteEventService {
     }
 
     /**
-     * A handler response counts as a successful mutation for 2xx/3xx (a
-     * redirect is a normal webtrees success, e.g. redirect to the edited
-     * record).
+     * A handler response counts as a successful mutation: 2xx/3xx (a redirect
+     * is a normal webtrees success, e.g. redirect to the edited record) AND a
+     * POST request (in 2.3 the same route serves GET form-load and POST submit;
+     * only the submit is a mutation).
      */
-    public static function shouldFire(int $status): bool {
-        return $status >= 200 && $status < 400;
+    public static function shouldFire(int $status, string $method = 'POST'): bool {
+        return $status >= 200 && $status < 400 && strtoupper($method) === 'POST';
     }
 
     /**
@@ -376,6 +425,22 @@ final class RouteEventService {
     }
 
     /**
+     * The bare handler class name without the core request-handler namespace
+     * (2.2.6 `RequestHandlers` / 2.3 `Controllers`), or null when the handler
+     * is not a core request handler.
+     */
+    private static function handlerClass(string $handler): ?string {
+        if (str_starts_with($handler, self::HANDLER_NS_226)) {
+            return substr($handler, strlen(self::HANDLER_NS_226));
+        }
+        if (str_starts_with($handler, self::HANDLER_NS_23)) {
+            return substr($handler, strlen(self::HANDLER_NS_23));
+        }
+
+        return null;
+    }
+
+    /**
      * Whether the given route triple is a mapped mutating route: a
      * record-specific route (see the class docblock) or a curated
      * tree-level allowlist route.
@@ -383,10 +448,13 @@ final class RouteEventService {
      * @param list<string> $allows
      */
     private static function isMappedRoute(string $path, array $allows, string $handler): bool {
-        if ($allows !== ['POST']) {
+        // POST-only (2.2.6) or method-unknown (2.3: no per-route method; the
+        // mutating POST is enforced at fire-time in shouldFire()).
+        if ($allows !== ['POST'] && $allows !== []) {
             return false;
         }
-        if (!str_starts_with($handler, self::HANDLER_NS)) {
+        $class = self::handlerClass($handler);
+        if ($class === null) {
             return false;
         }
         $tail = self::treeTail($path);
@@ -399,7 +467,6 @@ final class RouteEventService {
         if (!str_contains($tail, self::XREF)) {
             return false;
         }
-        $class = substr($handler, strlen(self::HANDLER_NS));
         foreach (self::HANDLER_PREFIXES as $prefix) {
             if (str_starts_with($class, $prefix)) {
                 return true;
@@ -511,13 +578,11 @@ final class RouteEventService {
             $flat['tree_name'] = (string) $tree->name();
         }
 
-        foreach ((array) ($route->attributes ?? []) as $key => $value) {
+        foreach (Functions::routeParams($route, $request) as $key => $value) {
             if ((string) $key === 'tree') {
                 continue; // expanded above
             }
-            if (is_string($value) || is_int($value) || is_float($value) || is_bool($value)) {
-                $flat[(string) $key] = $value;
-            }
+            $flat[(string) $key] = $value;
         }
 
         return $flat;

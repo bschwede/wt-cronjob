@@ -228,5 +228,37 @@ check('payloadKeys: no placeholders -> empty', RouteEventService::payloadKeys('/
 check('payloadKeys: tree-level import without change_pending', RouteEventService::payloadKeys('/tree/{tree}/import') === ['tree', 'tree_name']);
 check('payloadKeys: tree-level data-fix without change_pending', RouteEventService::payloadKeys('/tree/{tree}/data-fix/{data_fix}/update') === ['tree', 'tree_name', 'data_fix']);
 
+// --- 2.3: no per-route method (allows=[]), one handler serves GET + POST ---------
+// buildMap must map by path+handler (not method); the POST discriminator moves to
+// fire-time (shouldFire). Handler names differ from 2.2.6 (no Action/Page suffix).
+$ns23 = 'Fisharebest\Webtrees\Http\Controllers\\'; // 2.3 handler namespace (2.2.6: RequestHandlers)
+$r23 = [
+    ['path' => '/tree/{tree}/edit-note-object/{xref}',  'allows' => [], 'handler' => $ns23 . 'EditNote'],
+    ['path' => '/tree/{tree}/edit-record/{xref}',       'allows' => [], 'handler' => $ns23 . 'EditRecord'],
+    ['path' => '/tree/{tree}/edit-fact/{xref}/{fact_id}', 'allows' => [], 'handler' => $ns23 . 'EditFact'],
+    ['path' => '/tree/{tree}/delete/{xref}',            'allows' => [], 'handler' => $ns23 . 'DeleteRecord'],
+    ['path' => '/tree/{tree}/delete/{xref}/{fact_id}',  'allows' => [], 'handler' => $ns23 . 'DeleteFact'],
+    ['path' => '/tree/{tree}/individual/{xref}{/slug}', 'allows' => [], 'handler' => $ns23 . 'IndividualPage'], // GET page, no mutating prefix
+    ['path' => '/tree/{tree}/import',                   'allows' => [], 'handler' => $ns23 . 'ImportGedcom'],
+    ['path' => '/tree/{tree}/data-fix/{data_fix}/update', 'allows' => [], 'handler' => $ns23 . 'DataFixUpdate'],
+];
+$m23 = RouteEventService::buildMap($r23);
+check('2.3: edit-note-object mapped (Controllers ns, allows=[])', ($m23[$ns23 . 'EditNote']['event'] ?? '') === '_route:edit-note-object');
+check('2.3: edit-record mapped (renamed path vs 2.2.6 update-record)', ($m23[$ns23 . 'EditRecord']['event'] ?? '') === '_route:edit-record');
+check('2.3: edit-fact mapped (renamed path vs 2.2.6 update-fact)', ($m23[$ns23 . 'EditFact']['event'] ?? '') === '_route:edit-fact');
+check('2.3: delete collision xref', ($m23[$ns23 . 'DeleteRecord']['event'] ?? '') === '_route:delete-xref');
+check('2.3: delete collision xref+fact_id', ($m23[$ns23 . 'DeleteFact']['event'] ?? '') === '_route:delete-xref-fact_id');
+check('2.3: import allowlist mapped', ($m23[$ns23 . 'ImportGedcom']['event'] ?? '') === '_route:import');
+check('2.3: data-fix update allowlist', ($m23[$ns23 . 'DataFixUpdate']['event'] ?? '') === '_route:data-fix-update');
+check('2.3: GET page (IndividualPage, no prefix) not mapped', !isset($m23[$ns23 . 'IndividualPage']));
+check('2.3: mapped count (5 record + 2 allowlist)', count($m23) === 7);
+
+// --- shouldFire: fire-time POST discriminator ------------------------------------
+check('shouldFire: POST 302 fires', RouteEventService::shouldFire(302, 'POST') === true);
+check('shouldFire: GET 200 does not fire (2.3 form-load)', RouteEventService::shouldFire(200, 'GET') === false);
+check('shouldFire: method case-insensitive', RouteEventService::shouldFire(200, 'post') === true);
+check('shouldFire: 500 POST does not fire', RouteEventService::shouldFire(500, 'POST') === false);
+check('shouldFire: default method is POST', RouteEventService::shouldFire(200) === true);
+
 echo $failures === 0 ? "All route-events tests passed.\n" : "{$failures} route-events test(s) FAILED.\n";
 exit($failures === 0 ? 0 : 1);
