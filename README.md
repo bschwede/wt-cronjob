@@ -601,11 +601,11 @@ Queuing an event has four sources:
    `cronjob:pseudo-events` job and the module reads the new log entries at most
    every 5 minutes, queueing one event per entry. See
    "Pseudo-events (log-table polling)".
- 4. **Route events (built-in, request-triggered).** A curated set of mutating
-    editor routes under `/tree/{tree}/` (record-specific routes with `{xref}` in
-    the path, plus a small tree-level allowlist) queues its event immediately,
-    right inside the request that made the change. See
-    "Route events (request-triggered)".
+4. **Route events (built-in, request-triggered).** A curated set of mutating
+   editor routes under `/tree/{tree}/` (record-specific routes with `{xref}` in
+   the path, plus a small tree-level allowlist) queues its event immediately,
+   right inside the request that made the change. See
+   "Route events (request-triggered)".
 
 The tick matches each pending event against the enabled jobs that carry an event
 trigger for that name (a job can have several event triggers, or none at all), runs
