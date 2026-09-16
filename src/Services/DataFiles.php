@@ -43,6 +43,7 @@ use function mkdir;
  *   data/cronjob/watch-spawn        watch respawn cooldown
  *   data/cronjob/watch.log          watch supervisor log
  *   data/cronjob/tick.lock          tick single-instance lock
+ *   data/cronjob/tick.last          last tick execution (mtime, watch + OS trigger)
  *   data/cronjob/pseudo-events.json pseudo-event detector state
  *   data/cronjob/pseudo-events.lock pseudo-event serialization
  *   data/cronjob/pseudo-events-last pseudo-event cooldown marker

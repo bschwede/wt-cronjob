@@ -561,6 +561,36 @@ job's working directory and arguments are unchanged too.
 - **Requires the cronjob module to be installed.** If a script must also run as a
   standalone tool (no cronjob), keep the module's own `CliBootstrap` copy instead.
 
+## Using the cronjob service from other modules
+
+Neighboring modules query the module's state through a stable, read-only facade
+(`CronjobService`) instead of its internal services. Check availability first -
+the module may not be installed, and the class is only autoloadable when its
+`module.php` has been loaded:
+
+```php
+use Schwendinger\Webtrees\Module\Cronjob\CronjobService;
+
+if (class_exists(CronjobService::class) && CronjobService::isFunctional()) {
+    $status   = CronjobService::jobStatus('mymodule:backup'); // null = unknown job
+    $age      = CronjobService::lastTickAge();                // seconds since last tick
+    $listened = CronjobService::listenedEvents();             // event name => job names
+}
+```
+
+| Question | Method(s) |
+|---|---|
+| Is the service functional? | `isFunctional()`, `problems()` (codes: `module_disabled`, `not_migrated`, `cron_library_missing`, `tick_stale`) |
+| Which features are enabled? | `features()` (`watch`, `pseudo_events`, `route_events`), `watchStatus()` |
+| When did the last tick run? | `lastTick()` / `lastTickAge()` - both trigger types (marker file `data/cronjob/tick.last`) |
+| Is a job enabled / when did it last run? | `isJobEnabled($name)`, `jobStatus($name)`, `lastRun($name)` - job names are namespaced (`<module>:<name>`) |
+| Which events are listened for? | `listenedEvents()`, `listenersFor($event)`; catalogs: `eventCatalog()`, `pseudoEvents()`, `routeEvents()` |
+| Actions (the only two) | `runJobNow($name)` (queued at the next tick), `pushEvent($name, $payload)` (event queue) |
+
+Contract: read-only methods never throw when the schema is missing (safe defaults),
+descriptions are source strings (never pre-translated), and `lastRun()` deliberately
+excludes the job output, which may contain personal data.
+
 ## Event-driven jobs (webhooks & event queue)
 
 Besides time-based schedules, a job can be triggered by an **event**. webtrees has no

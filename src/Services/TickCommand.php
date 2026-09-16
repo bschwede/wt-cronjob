@@ -46,6 +46,7 @@ use function is_string;
 use function json_encode;
 use function microtime;
 use function sprintf;
+use function touch;
 use function trim;
 
 use const JSON_UNESCAPED_SLASHES;
@@ -180,6 +181,12 @@ final class TickCommand extends Command {
             if (!$dry_run) {
                 ScheduleService::trimHistory(ScheduleService::now());
                 EventQueue::purge(ScheduleService::now());
+
+                // Last-tick marker (mtime): a uniform signal for both trigger
+                // types (the watch daemon runs the same tick.php child). Also
+                // touched by manual --job runs - it marks "the tick machinery
+                // executed", read via CronjobService::lastTick().
+                @touch(DataFiles::path('tick.last'));
             }
 
             return ($strict && $failures > 0) ? 1 : 0;

@@ -588,7 +588,10 @@ final class RouteEventService {
         return $flat;
     }
 
-    private static function isEnabled(): bool {
+    /**
+     * Is the route-events feature enabled (module setting)?
+     */
+    public static function isEnabled(): bool {
         $value = DB::table('module_setting')
             ->where('module_name', '=', CronjobUtils::MODULE_NAME)
             ->where('setting_name', '=', self::SETTING)
