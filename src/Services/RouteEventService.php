@@ -54,7 +54,6 @@ use function str_starts_with;
 use function strpos;
 use function substr;
 use function strtoupper;
-use function version_compare;
 
 /**
  * Route-triggered events.
@@ -188,7 +187,7 @@ final class RouteEventService {
      * @return list<array{path: string, allows: list<string>, handler: string}>
      */
     private static function collectRouteTriples(): array {
-        if (version_compare(Webtrees::VERSION, '2.3', '>=')) {
+        if (Functions::wtIsAtLeast2_3()) {
             try {
                 $collection = Registry::container()->get(RouteCollection::class);
             } catch (Throwable) {
@@ -294,7 +293,7 @@ final class RouteEventService {
      * The route's handler FQCN: 2.2.6 Aura `handler`, 2.3 `controller`.
      */
     private static function routeHandler(object $route): string {
-        return version_compare(Webtrees::VERSION, '2.3', '>=')
+        return Functions::wtIsAtLeast2_3()
             ? (string) ($route->controller ?? '')
             : (string) ($route->handler ?? '');
     }
