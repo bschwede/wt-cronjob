@@ -350,6 +350,7 @@ New job scripts in other modules must follow these conventions (linkenhancer's
 - Exit code `0` on success (the tick records non-zero as `error`)
 - No interactive input; everything via CLI options
 - Template files are prefixed with `_` (excluded from job discovery)
+- **Template:** `cli/_template-maintenance.php` — copy into your module's `cli/`, rename, and adapt
 
 ## Offering jobs to cronjob (self-registration)
 
