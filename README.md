@@ -31,51 +31,6 @@ has to call one small script once per minute.
    block for your OS with the paths of *this* installation already filled in).
 4. Create your first job in the admin UI.
 
-### Bundled dependency
-
-The module bundles exactly one external library:
-[`dragonmantank/cron-expression`](https://github.com/dragonmantank/cron-expression)
-**v3.6.0** (cron parsing, zero dependencies of its own) - it ships in
-`vendor/dragonmantank/cron-expression/`, pinned by `composer.lock`. No
-fetch step is required; a target box without internet works out of the box.
-
-The runtime loader is the hand-written `modules_v4/cronjob/autoload.php`
-(a small PSR-4 mapper for the `Cron\` prefix) - no second Composer runtime is
-involved. If the vendor folder is ever missing (partial install), the admin UI
-shows a warning and the tick skips cron evaluation (everything else still works).
-
-> **Prefix note:** the loader maps the `Cron\` namespace to this module's vendor
-> folder. If webtrees (core) ever vendors the same library, the core autoloader is
-> registered first and wins silently - the APIs are identical (same library), so
-> this is harmless. The same applies to a second custom module bundling `Cron\`.
-
-To update the library later (on a machine with internet + composer):
-
-```bash
-cd modules_v4/cronjob
-composer update --no-dev
-```
-
-then re-bundle `composer.lock` plus `vendor/dragonmantank/cron-expression/`
-(`src/` plus its own `composer.json`) into the module.
-
-### Release archive
-
-`util/create-archive.sh` builds the installable zip `dist/cronjob_v<version>.zip`
-(needs `rsync` + `zip` + `php`). The version is read from
-`CronjobModule::CUSTOM_VERSION`. The script fails fast when the bundled cron
-library is missing (it is `.gitignore`'d in the module repo, so a fresh clone
-must have it restored first). Development artifacts are excluded: `util/`,
-`tests/`, `composer.json`, `vendor/composer/`, `vendor/autoload.php` (the
-bundled library `vendor/dragonmantank/` ships) and `latest-version.txt`.
-
-Before packaging, the script runs `util/compile-po.php`: it compiles any
-`resources/lang/*.po` into the `*.php` runtime fast path (the compiled files
-ship in the archive, the PO sources stay excluded) and - only when
-`CronjobModule::CUSTOM_VERSION` changed - updates `latest-version.txt` in the
-repo root, the plain-version file that webtrees' module update check fetches
-(see `CronjobModule::CUSTOM_LAST`).
-
 ## Usage
 
 ### Creating a job
