@@ -29,7 +29,8 @@
     "config": {
         "platform": {
             "php": "8.3.0"
-        }
+        },
+        "prepend-autoloader": false
     },
     "conflict": {
         "fisharebest/webtrees": ">2.2"
