@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-16 09:25+0200\n"
+"POT-Creation-Date: 2026-09-19 11:04+0200\n"
 "PO-Revision-Date: 2026-09-12 20:44+0200\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -88,7 +88,7 @@ msgstr "Cronjob: Der Job „%1$s“ ist fehlgeschlagen (%2$s)"
 msgid "A scheduled cronjob job failed. Details:"
 msgstr "Ein geplanter Cronjob ist fehlgeschlagen. Details:"
 
-#: src/Services/NotifyService.php:101 resources/views/admin.phtml:76
+#: src/Services/NotifyService.php:101 resources/views/admin.phtml:90
 msgid "Job"
 msgstr "Aufgabe"
 
@@ -355,7 +355,7 @@ msgstr ""
 msgid "keeps the process alive for N seconds (timeout testing)"
 msgstr "hält den Prozess N Sekunden lang am Laufen (Timeout-Test)"
 
-#: resources/views/admin.phtml:44
+#: resources/views/admin.phtml:47
 msgid ""
 "The site is offline (data/offline.txt) - the tick is skipped and no jobs run "
 "until it is removed again (e.g. during a webtrees update)."
@@ -364,7 +364,7 @@ msgstr ""
 "und es werden keine Jobs ausgeführt, bis er wieder entfernt wird (z. B. bei "
 "einer Webtrees-Aktualisierung)."
 
-#: resources/views/admin.phtml:50
+#: resources/views/admin.phtml:53
 msgid ""
 "Bundled cron library missing: fetch dragonmantank/cron-expression into "
 "modules_v4/cronjob/vendor/ (see the module README, section \"Bundled "
@@ -375,45 +375,63 @@ msgstr ""
 "README des Moduls, Abschnitt „Mitgelieferte Abhängigkeiten“). Bis dahin wird "
 "die Planung ausgesetzt."
 
-#: resources/views/admin.phtml:55 resources/views/job-form.phtml:159
+#: resources/views/admin.phtml:58 resources/views/job-form.phtml:159
 #, php-format
 msgid "All times are UTC (webtrees server time). Current time (UTC): %s"
 msgstr ""
 "Alle Zeiten sind in UTC angegeben (Webtrees-Serverzeit). Aktuelle Uhrzeit "
 "(UTC): %s"
 
-#: resources/views/admin.phtml:60 resources/views/job-form.phtml:76
+#: resources/views/admin.phtml:63 resources/views/admin.phtml:263
+msgid "Installation"
+msgstr "Installation"
+
+#: resources/views/admin.phtml:63
+#, php-format
+msgid ""
+"The tick does not appear to have run yet, so this module does not yet have "
+"any functionality. Please refer to the information in the “%s” section."
+msgstr ""
+"Der Tick scheint noch nicht gelaufen zu sein, so dass dieses Modul noch keine "
+"Funktion hat. Bitte die Informationen im Abschnitt „%s“ berücksichtigen."
+
+#: resources/views/admin.phtml:67
+#, php-format
+msgid "Time elapsed since the last tick execution: %s s"
+msgstr "Zeit vergangen seit der letzten Tick-Ausführung: %s s"
+
+#: resources/views/admin.phtml:74 resources/views/job-form.phtml:76
 msgid "New Job"
 msgstr "Neuer Job"
 
-#: resources/views/admin.phtml:65
+#: resources/views/admin.phtml:79
 msgid ""
 "No jobs yet. Create the first one (e.g. the linkenhancer link-index update)."
 msgstr ""
 "Es gibt noch keine Aufträge. Erstellen Sie den ersten (z. B. die "
 "Aktualisierung des Link-Index von LinkEnhancer)."
 
-#: resources/views/admin.phtml:77 resources/views/job-form.phtml:130
+#: resources/views/admin.phtml:91 resources/views/job-form.phtml:130
 msgid "Triggers"
 msgstr "Auslöser"
 
-#: resources/views/admin.phtml:78
+#: resources/views/admin.phtml:92
 msgid "Next Run (UTC)"
 msgstr "Nächster Lauf (UTC)"
 
-#: resources/views/admin.phtml:79
+#: resources/views/admin.phtml:93
 msgid "Last Run"
 msgstr "Letzter Lauf"
 
-#: resources/views/admin.phtml:81
+#: resources/views/admin.phtml:95
 msgid "Notify"
 msgstr "Benachrichtigen"
 
-#: resources/views/admin.phtml:82
+#: resources/views/admin.phtml:96
 msgid "Timeout"
 msgstr "Zeitüberschreitung"
 
-#: resources/views/admin.phtml:106
+#: resources/views/admin.phtml:120
 #, php-format
 msgid ""
 "Seeded automatically from the %s manifest (cron-jobs.php / getCronJobs()). "
@@ -423,7 +441,7 @@ msgstr ""
 "getCronJobs()). Über die Schaltfläche „Zurücksetzen“ werden die "
 "Standardeinstellungen des Moduls wiederhergestellt."
 
-#: resources/views/admin.phtml:117
+#: resources/views/admin.phtml:131
 msgid ""
 "This job has no usable trigger (pathological legacy row) - edit and save it "
 "to set one."
@@ -431,15 +449,15 @@ msgstr ""
 "Dieser Job verfügt über keinen verwendbaren Trigger (pathologische "
 "Altdatenzeile) – bearbeiten und speichern Sie ihn, um einen festzulegen."
 
-#: resources/views/admin.phtml:118
+#: resources/views/admin.phtml:132
 msgid "no trigger"
 msgstr "kein Auslöser"
 
-#: resources/views/admin.phtml:123 resources/views/job-history.phtml:48
+#: resources/views/admin.phtml:137 resources/views/job-history.phtml:48
 msgid "event"
 msgstr "Ereignis"
 
-#: resources/views/admin.phtml:127
+#: resources/views/admin.phtml:141
 msgid ""
 "This event no longer exists (core update, mapping change or removed built-in "
 "detector) - the job can never fire on it. Edit the job and pick a current "
@@ -450,43 +468,43 @@ msgstr ""
 "darauf ausgelöst werden. Bearbeiten Sie den Job und wählen Sie ein aktuelles "
 "Ereignis aus."
 
-#: resources/views/admin.phtml:128
+#: resources/views/admin.phtml:142
 msgid "unknown event"
 msgstr "unbekanntes Ereignis"
 
-#: resources/views/admin.phtml:164
+#: resources/views/admin.phtml:178
 msgid "triggered by"
 msgstr "ausgelöst durch"
 
-#: resources/views/admin.phtml:168 resources/views/job-history.phtml:30
+#: resources/views/admin.phtml:182 resources/views/job-history.phtml:30
 msgid "History"
 msgstr "Verlauf"
 
-#: resources/views/admin.phtml:176 resources/views/admin.phtml:186
-#: resources/views/admin.phtml:393
+#: resources/views/admin.phtml:190 resources/views/admin.phtml:200
+#: resources/views/admin.phtml:407
 msgid "on"
 msgstr "an"
 
-#: resources/views/admin.phtml:176 resources/views/admin.phtml:186
-#: resources/views/admin.phtml:393
+#: resources/views/admin.phtml:190 resources/views/admin.phtml:200
+#: resources/views/admin.phtml:407
 msgid "off"
 msgstr "aus"
 
-#: resources/views/admin.phtml:186
+#: resources/views/admin.phtml:200
 #, php-format
 msgid "notify on failure: %s"
 msgstr "Bei Fehler benachrichtigen: %s"
 
-#: resources/views/admin.phtml:192
+#: resources/views/admin.phtml:206
 msgid "s"
 msgstr "s"
 
-#: resources/views/admin.phtml:199
+#: resources/views/admin.phtml:213
 msgid "Run at the next tick (within 60 seconds)"
 msgstr ""
 "Bei der nächsten Tick-Aktualisierung ausführen (innerhalb von 60 Sekunden)"
 
-#: resources/views/admin.phtml:199
+#: resources/views/admin.phtml:213
 msgid ""
 "The job is disabled - the queued run happens at the next tick after it is "
 "(re-)enabled"
@@ -494,11 +512,11 @@ msgstr ""
 "Die Aufgabe ist deaktiviert – die Ausführung aus der Warteschlange erfolgt "
 "beim nächsten Tick, nachdem er (wieder) aktiviert wurde."
 
-#: resources/views/admin.phtml:200
+#: resources/views/admin.phtml:214
 msgid "Run now"
 msgstr "Jetzt ausführen"
 
-#: resources/views/admin.phtml:205
+#: resources/views/admin.phtml:219
 msgid ""
 "Open the form prefilled with a copy of this job (new -copy slug, starts "
 "disabled)"
@@ -506,11 +524,11 @@ msgstr ""
 "Öffnen Sie das Formular, das bereits mit einer Kopie dieser Aufgabe "
 "vorbelegt ist (neue Kopie, zunächst deaktiviert)"
 
-#: resources/views/admin.phtml:206
+#: resources/views/admin.phtml:220
 msgid "Duplicate"
 msgstr "Duplikat"
 
-#: resources/views/admin.phtml:210
+#: resources/views/admin.phtml:224
 msgid ""
 "Reset this job to the module defaults? Your changes (title, schedule, "
 "command, arguments, enabled state) will be lost; the notification setting is "
@@ -521,29 +539,25 @@ msgstr ""
 "Aktivierungsstatus) gehen dabei verloren; die Benachrichtigungseinstellung "
 "bleibt erhalten."
 
-#: resources/views/admin.phtml:214
+#: resources/views/admin.phtml:228
 msgid "Restore the settings currently offered by the module manifest"
 msgstr ""
 "Die derzeit im Modul-Manifest angebotenen Einstellungen wiederherstellen"
 
-#: resources/views/admin.phtml:220
+#: resources/views/admin.phtml:234
 msgid "Delete this job and its run history?"
 msgstr "Diese Aufgabe und dessen Ausführungsverlauf löschen?"
 
-#: resources/views/admin.phtml:249
-msgid "Installation"
-msgstr "Installation"
-
-#: resources/views/admin.phtml:254
+#: resources/views/admin.phtml:268
 msgid "Use one of the following install options, not both."
 msgstr ""
 "Verwenden Sie eine der folgenden Installationsoptionen, jedoch nicht beide."
 
-#: resources/views/admin.phtml:259
+#: resources/views/admin.phtml:273
 msgid "Watch daemon (no OS cron needed)"
 msgstr "Watch-Daemon (kein OS-Cron erforderlich)"
 
-#: resources/views/admin.phtml:261
+#: resources/views/admin.phtml:275
 msgid ""
 "Runs the tick from a resident process instead of an OS cron / systemd timer "
 "- for hosts without cron. A watchdog restarts it automatically if it dies."
@@ -552,37 +566,37 @@ msgstr ""
 "systemd-Timer des Betriebssystems aus – für Hosts ohne Cron. Ein Watchdog "
 "startet ihn automatisch neu, falls er abstürzt."
 
-#: resources/views/admin.phtml:265
+#: resources/views/admin.phtml:279
 msgid "running"
 msgstr "laufend"
 
-#: resources/views/admin.phtml:267
+#: resources/views/admin.phtml:281
 msgid "stopped"
 msgstr "angehalten"
 
-#: resources/views/admin.phtml:270
+#: resources/views/admin.phtml:284
 #, php-format
 msgid "Last activity (UTC): %s"
 msgstr "Letzte Aktivität (UTC): %s"
 
-#: resources/views/admin.phtml:273
+#: resources/views/admin.phtml:287
 #, php-format
 msgid "PID: %d"
 msgstr "PID: %d"
 
-#: resources/views/admin.phtml:279
+#: resources/views/admin.phtml:293
 msgid "Stop watch"
 msgstr "Watch-Daemon stoppen"
 
-#: resources/views/admin.phtml:284
+#: resources/views/admin.phtml:298
 msgid "Start watch"
 msgstr "Watch-Daemon starten"
 
-#: resources/views/admin.phtml:291
+#: resources/views/admin.phtml:305
 msgid "Trigger Installation"
 msgstr "Trigger-Installation"
 
-#: resources/views/admin.phtml:293
+#: resources/views/admin.phtml:307
 msgid ""
 "The module itself does not start. One OS trigger (a per-minute timer) or the "
 "built-in watch daemon must call the tick once per minute. Pick the option "
@@ -593,15 +607,15 @@ msgstr ""
 "Minute aufrufen. Wählen Sie unten die Option für Ihr Betriebssystem aus – "
 "die Pfade sind für diese Installation bereits voreingestellt."
 
-#: resources/views/admin.phtml:300
+#: resources/views/admin.phtml:314
 msgid "Option: Windows Task Scheduler (every minute)"
 msgstr "Option: Windows-Aufgabenplaner (jede Minute)"
 
-#: resources/views/admin.phtml:303
+#: resources/views/admin.phtml:317
 msgid "Install command"
 msgstr "Befehl zur Installation"
 
-#: resources/views/admin.phtml:306
+#: resources/views/admin.phtml:320
 msgid ""
 "Alternatively: the watch daemon (left fieldset) runs the tick with no OS "
 "trigger at all. For a server that runs without a logged-in user, set the "
@@ -614,23 +628,23 @@ msgstr ""
 "wird, ob der Benutzer angemeldet ist oder nicht“ (Aufgabeneigenschaften → "
 "Allgemein; hierfür ist ein Passwort erforderlich)."
 
-#: resources/views/admin.phtml:309
+#: resources/views/admin.phtml:323
 msgid "Option A: classic cron (every minute)"
 msgstr "Option A: klassischer Cron (jede Minute)"
 
-#: resources/views/admin.phtml:314
+#: resources/views/admin.phtml:328
 msgid "Option B: systemd timer"
 msgstr "Option B: systemd-Timer"
 
-#: resources/views/admin.phtml:320
+#: resources/views/admin.phtml:334
 msgid "Install commands"
 msgstr "Befehle zur Installation"
 
-#: resources/views/admin.phtml:330
+#: resources/views/admin.phtml:344
 msgid "PHP CLI binary"
 msgstr "PHP-CLI-Binärdatei"
 
-#: resources/views/admin.phtml:332
+#: resources/views/admin.phtml:346
 msgid ""
 "The CLI interpreter the module uses for its PHP scripts (watch daemon spawn "
 "and the trigger install commands above). Leave the field empty for automatic "
@@ -640,23 +654,23 @@ msgstr ""
 "die oben genannten Befehle „daemon spawn“ und „trigger install“). Lassen Sie "
 "das Feld leer, damit die Erkennung automatisch erfolgt."
 
-#: resources/views/admin.phtml:335
+#: resources/views/admin.phtml:349
 msgid "Currently used:"
 msgstr "Derzeit verwendet:"
 
-#: resources/views/admin.phtml:336
+#: resources/views/admin.phtml:350
 msgid "(none found)"
 msgstr "(keine gefunden)"
 
-#: resources/views/admin.phtml:338
+#: resources/views/admin.phtml:352
 msgid "manual path"
 msgstr "manueller Pfad"
 
-#: resources/views/admin.phtml:338
+#: resources/views/admin.phtml:352
 msgid "auto-detected"
 msgstr "automatisch erkannt"
 
-#: resources/views/admin.phtml:343
+#: resources/views/admin.phtml:357
 #, php-format
 msgid ""
 "The manual path %s is not a usable PHP CLI binary (missing, not executable "
@@ -666,7 +680,7 @@ msgstr ""
 "(fehlt, ist nicht ausführbar oder handelt sich um eine FPM-Version) – "
 "stattdessen wird die automatische Erkennung verwendet."
 
-#: resources/views/admin.phtml:348
+#: resources/views/admin.phtml:362
 msgid ""
 "No PHP CLI binary could be determined - the watch daemon cannot start and "
 "the install commands above are incomplete. Set a manual path below."
@@ -675,11 +689,11 @@ msgstr ""
 "nicht gestartet werden und die oben genannten Installationsbefehle sind "
 "unvollständig. Geben Sie unten einen manuellen Pfad an."
 
-#: resources/views/admin.phtml:355
+#: resources/views/admin.phtml:369
 msgid "e.g. /usr/bin/php8.3 - empty = automatic detection"
 msgstr "z. B. /usr/bin/php8.3 – leer = automatische Erkennung"
 
-#: resources/views/admin.phtml:359
+#: resources/views/admin.phtml:373
 msgid ""
 "A watch daemon that is already running keeps using its current binary until "
 "it is restarted."
@@ -687,11 +701,11 @@ msgstr ""
 "Ein bereits laufender Watch-Daemon verwendet so lange seine aktuelle "
 "Binärdatei, bis er neu gestartet wird."
 
-#: resources/views/admin.phtml:377
+#: resources/views/admin.phtml:391
 msgid "Pseudo-Events (log-table polling)"
 msgstr "Pseudo-Ereignisse (Abfrage der Protokolltabelle)"
 
-#: resources/views/admin.phtml:379
+#: resources/views/admin.phtml:393
 msgid ""
 "webtrees has no event bus, so core actions are observed by polling. The "
 "module reads new log-table entries (failed logins, logins, logouts, errors, "
@@ -708,7 +722,7 @@ msgstr ""
 "Durchlauf wird lediglich eine Baseline erfasst, es wird kein Ereignis "
 "ausgelöst."
 
-#: resources/views/admin.phtml:380
+#: resources/views/admin.phtml:394
 msgid ""
 "To activate, enable the \"cronjob:pseudo-events\" job in the table above. It "
 "runs in the tick child process - isolated from any web request and bounded "
@@ -718,11 +732,11 @@ msgstr ""
 "Tabelle aktivieren. Er wird im „tick“-Unterprozess ausgeführt – isoliert von "
 "jeglichen Webanfragen und an dessen Zeitlimit gebunden."
 
-#: resources/views/admin.phtml:387
+#: resources/views/admin.phtml:401
 msgid "Route events (request-triggered)"
 msgstr "Route-Ereignisse (anfragegesteuert)"
 
-#: resources/views/admin.phtml:389
+#: resources/views/admin.phtml:403
 msgid ""
 "Detects mutations directly from their HTTP route (e.g. a note edit) and "
 "queues a matching event immediately - in addition to the polling pseudo-"
@@ -736,19 +750,19 @@ msgstr ""
 "diese Funktion aktiviert ist UND ein passender Ereignis-Job auf Ereignisse "
 "wartet."
 
-#: resources/views/admin.phtml:398
+#: resources/views/admin.phtml:412
 msgid "Disable route events"
 msgstr "Route-Ereignisse deaktivieren"
 
-#: resources/views/admin.phtml:398
+#: resources/views/admin.phtml:412
 msgid "Enable route events"
 msgstr "Route-Ereignisse aktivieren"
 
-#: resources/views/admin.phtml:406
+#: resources/views/admin.phtml:420
 msgid "Event webhook (external trigger)"
 msgstr "Ereignis-Webhook (externer Auslöser)"
 
-#: resources/views/admin.phtml:409
+#: resources/views/admin.phtml:423
 msgid ""
 "External systems can queue an event by GETting the endpoint below. Each "
 "queued event runs its matching event-triggered job(s) at the next tick. The "
@@ -761,11 +775,11 @@ msgstr ""
 "Jobs beim nächsten Tick aus. Das Token ist erforderlich (senden Sie es im "
 "Header „X-Cronjob-Token“) und der Endpunkt unterliegt einer Ratenbegrenzung."
 
-#: resources/views/admin.phtml:417
+#: resources/views/admin.phtml:431
 msgid "Endpoint"
 msgstr "Endpunkt"
 
-#: resources/views/admin.phtml:422
+#: resources/views/admin.phtml:436
 msgid ""
 "GET with query params event=<name> and data=<json> (optional); send the "
 "token in the X-Cronjob-Token header."
@@ -773,19 +787,19 @@ msgstr ""
 "GET mit den Abfrageparametern „event=<name>“ und „data=<json>“ (optional); "
 "sende das Token im Header „X-Cronjob-Token“."
 
-#: resources/views/admin.phtml:427
+#: resources/views/admin.phtml:441
 msgid "Token"
 msgstr "Token"
 
-#: resources/views/admin.phtml:436
+#: resources/views/admin.phtml:450
 msgid "Regenerate token"
 msgstr "Token neu generieren"
 
-#: resources/views/admin.phtml:446
+#: resources/views/admin.phtml:460
 msgid "Event catalog"
 msgstr "Ereignis-Katalog"
 
-#: resources/views/admin.phtml:448
+#: resources/views/admin.phtml:462
 msgid ""
 "All known event names: announced by modules, built-in pseudo-events "
 "(cronjob:…), route events (_route:…) and names currently listened for by an "
@@ -798,20 +812,20 @@ msgstr ""
 "den Tick; verwenden Sie diese Namen im Feld „Ereignisname“ eines Ereignis-"
 "Jobs."
 
-#: resources/views/admin.phtml:460
+#: resources/views/admin.phtml:474
 msgid "Payload"
 msgstr "Nutzlast"
 
-#: resources/views/admin.phtml:481
+#: resources/views/admin.phtml:495
 #, fuzzy
 msgid "Commands"
 msgstr "Befehle"
 
-#: resources/views/admin.phtml:489
+#: resources/views/admin.phtml:503
 msgid "Command catalog"
 msgstr "Befehlskatalog"
 
-#: resources/views/admin.phtml:491
+#: resources/views/admin.phtml:505
 msgid ""
 "Every command a job may run: the allowlisted core commands, commands "
 "announced by modules (with their available parameters) and module CLI "
@@ -826,16 +840,16 @@ msgstr ""
 "tick/watch/wrap) nicht angeboten werden. Verwenden Sie diese im Feld "
 "„Befehl“ eines Jobs."
 
-#: resources/views/admin.phtml:500 resources/views/job-form.phtml:206
+#: resources/views/admin.phtml:514 resources/views/job-form.phtml:206
 #: resources/views/job-form.phtml:209
 msgid "Command"
 msgstr "Befehl"
 
-#: resources/views/admin.phtml:504
+#: resources/views/admin.phtml:518
 msgid "Parameters"
 msgstr "Parameter"
 
-#: resources/views/admin.phtml:522 resources/views/job-form.phtml:284
+#: resources/views/admin.phtml:536 resources/views/job-form.phtml:284
 msgid "required"
 msgstr "erforderlich"
 
