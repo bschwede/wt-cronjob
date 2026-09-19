@@ -37,7 +37,7 @@ declare(strict_types=1);
 
 namespace {
 
-    require __DIR__ . '/../src/CronjobService.php';
+    require __DIR__ . '/../src/Services/CronjobService.php';
 
     $failures = 0;
 
@@ -51,7 +51,7 @@ namespace {
         }
     }
 
-    $class = new ReflectionClass(Schwendinger\Webtrees\Module\Cronjob\CronjobService::class);
+    $class = new ReflectionClass(Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService::class);
     check('CronjobService is a final class', $class->isFinal());
 
     $expected = [
@@ -68,9 +68,9 @@ namespace {
             && $class->getMethod($method)->isStatic());
     }
 
-    check('TICK_STALE_SECONDS is 300', (int) Schwendinger\Webtrees\Module\Cronjob\CronjobService::TICK_STALE_SECONDS === 300);
+    check('TICK_STALE_SECONDS is 300', (int) Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService::TICK_STALE_SECONDS === 300);
 
-    $api_src = (string) file_get_contents(__DIR__ . '/../src/CronjobService.php');
+    $api_src = (string) file_get_contents(__DIR__ . '/../src/Services/CronjobService.php');
     check('API carries no translated strings (source strings only)', !str_contains($api_src, 'I18N::translate'));
     check('lastRun() does not select the output column', !str_contains($api_src, "'output'"));
 

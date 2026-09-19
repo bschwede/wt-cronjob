@@ -23,7 +23,7 @@
 
 declare(strict_types=1);
 
-namespace Schwendinger\Webtrees\Module\Cronjob;
+namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 
 use Fisharebest\Webtrees\DB;
 use PDOException;
@@ -51,7 +51,7 @@ use function time;
  * installed - its autoloader is registered by its module.php only when
  * present) and then talks to this facade instead of the internal Services:
  *
- *     use Schwendinger\Webtrees\Module\Cronjob\CronjobService;
+ *     use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService;
  *
  *     if (class_exists(CronjobService::class) && CronjobService::isFunctional()) {
  *         $status = CronjobService::jobStatus('mymodule:backup');

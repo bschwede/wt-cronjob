@@ -570,7 +570,7 @@ the module may not be installed, and the class is only autoloadable when its
 `module.php` has been loaded:
 
 ```php
-use Schwendinger\Webtrees\Module\Cronjob\CronjobService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService;
 
 if (class_exists(CronjobService::class) && CronjobService::isFunctional()) {
     $status   = CronjobService::jobStatus('mymodule:backup'); // null = unknown job
