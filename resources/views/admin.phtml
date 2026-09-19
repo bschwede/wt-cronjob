@@ -7,6 +7,7 @@ use Schwendinger\Webtrees\Helpers\ClassName;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Helpers\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService;
 
 /**
  * @var string $title
@@ -26,6 +27,8 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
  * @var array<int, list<array{type: string, cron: string, event: string}>> $triggers_by_job
  * @var array<int, list<string>> $orphaned_triggers
  */
+
+$last_tick_age = CronjobService::lastTickAge();
 
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
 
@@ -54,6 +57,17 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 <p class="text-muted">
     <?= I18N::translate('All times are UTC (webtrees server time). Current time (UTC): %s', $cron_now) ?>
 </p>
+
+<?php if ($last_tick_age === null): ?>
+    <div class="alert alert-warning">
+        <?= I18N::translate('The tick does not appear to have run yet, so this module does not yet have any functionality. Please refer to the information in the “%s” section.', I18N::translate('Installation')) ?>
+    </div>
+<?php else: ?>
+    <p class="<?= $last_tick_age > 120 ? 'alert alert-warning' : 'text-muted' ?>">
+        <?= I18N::translate('Time elapsed since the last tick execution: %s s', $last_tick_age) ?>
+    </p>
+<?php endif; ?>
+
 
 <div class="mb-3">
     <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm'])) ?>" class="btn btn-primary">
@@ -245,11 +259,11 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
 <div class="accordion mt-5 mb-5" id="accordion">
   <div class="accordion-item">
     <h2 class="accordion-header" id="acc-install-head">
-      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#acc-install" aria-expanded="true" aria-controls="acc-install">
+      <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#acc-install" aria-expanded="<?= $last_tick_age === null ? 'true' : 'false'?>" aria-controls="acc-install">
         <strong><?= I18N::translate('Installation') ?></strong>
       </button>
     </h2>
-    <div id="acc-install" class="accordion-collapse collapse show" aria-labelledby="acc-install-head">
+    <div id="acc-install" class="accordion-collapse collapse<?= $last_tick_age === null ? ' show' : '' ?>" aria-labelledby="acc-install-head">
       <div class="accordion-body">
         <p class="text-muted p-2"><?= I18N::translate('Use one of the following install options, not both.') ?></p>
 
