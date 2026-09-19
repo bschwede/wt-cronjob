@@ -169,6 +169,9 @@ filled in (example with placeholder paths). Save it as `wt-cronjob-tick.xml`
 (UTF-8) and run `schtasks /Create /F /XML wt-cronjob-tick.xml` once in an
 elevated prompt (or use Task Scheduler → Actions → *Import Task…*):
 
+<details>
+<summary>Example xml config file</summary>
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -214,6 +217,8 @@ elevated prompt (or use Task Scheduler → Actions → *Import Task…*):
   </Actions>
 </Task>
 ```
+</details>
+
 
 The task then runs the tick every minute as the logged-on user
 (`InteractiveToken`, no password needed for the import); for a server running
@@ -275,7 +280,37 @@ auto-detection is used instead.
 
 </details>
 
-### CLI
+## Security
+
+- **No shell, ever.** Commands are executed via `proc_open` with an argv array.
+- **Command whitelist.** Module scripts must match `modules_v4/<module>/cli/<script>.php`,
+  exist, and resolve (realpath) inside a `modules_v4/<module>/cli/` directory.
+  Core commands are limited to the read-only/export allowlist
+  (`tree-export`, `tree-list`, `user-list`, `site-setting --list`).
+- **Argument validation.** Every argument token must be a plain option or value -
+  no shell metacharacters, no spaces inside tokens, max 10 tokens.
+- **Working directories.** Module scripts run from the webtrees root; core commands
+  run from `data/`, because the core CLI writes relative to the CWD
+  (`tree-export` produces `<tree>.ged`) - generated files must not end up in the
+  web root.
+- **No sensitive data in stdout.** The tick echoes summary lines only (see "Log
+  hygiene" above); the full output stays in the admin-only run history.
+- **UI actions** are all named `*Admin*` (admin-only, CSRF-protected like every
+  webtrees form).
+- **Kill switch:** disable the module in the module list - the tick then does nothing.
+- The tick is single-instance (flock on `data/cronjob/tick.lock`), and a job's child
+  process is hard-killed after its timeout (`SIGKILL`).
+- **Event-queue coalescing.** A flood of identical events (e.g. many rapid
+  edits on a route event) cannot amplify into one job run per queued row: the tick
+  drains at most **one event per event name** (the newest) and drops the name's
+  superseded duplicates, and the event drain stops after a 60 s wall-clock budget -
+  a saturated queue then simply continues with the next tick. This relies on the
+  job-script convention (idempotent/incremental) stated above.
+- **Webhook token header-only.** Send the token exclusively in the `X-Cronjob-Token` header.
+
+## CLI scripts & maintenance
+
+### Scripts
 
 ```bash
 php modules_v4/cronjob/cli/tick.php              # run all due jobs
@@ -305,52 +340,60 @@ php modules_v4/cronjob/cli/smoke-job.php --sleep=10 # stays alive 10 s (timeout 
 Create a job with command `modules_v4/cronjob/cli/smoke-job.php`, hit **Run now**,
 wait a minute - the history page should show a green `ok` row.
 
-## Security
+### Conventions for job scripts
 
-- **No shell, ever.** Commands are executed via `proc_open` with an argv array.
-- **Command whitelist.** Module scripts must match `modules_v4/<module>/cli/<script>.php`,
-  exist, and resolve (realpath) inside a `modules_v4/<module>/cli/` directory.
-  Core commands are limited to the read-only/export allowlist
-  (`tree-export`, `tree-list`, `user-list`, `site-setting --list`).
-- **Argument validation.** Every argument token must be a plain option or value -
-  no shell metacharacters, no spaces inside tokens, max 10 tokens.
-- **Working directories.** Module scripts run from the webtrees root; core commands
-  run from `data/`, because the core CLI writes relative to the CWD
-  (`tree-export` produces `<tree>.ged`) - generated files must not end up in the
-  web root.
-- **No sensitive data in stdout.** The tick echoes summary lines only (see "Log
-  hygiene" above); the full output stays in the admin-only run history.
-- **UI actions** are all named `*Admin*` (admin-only, CSRF-protected like every
-  webtrees form).
-- **Kill switch:** disable the module in the module list - the tick then does nothing.
-- The tick is single-instance (flock on `data/cronjob/tick.lock`), and a job's child
-  process is hard-killed after its timeout (`SIGKILL`).
-- **Event-queue coalescing.** A flood of identical events (e.g. many rapid
-  edits on a route event) cannot amplify into one job run per queued row: the tick
-  drains at most **one event per event name** (the newest) and drops the name's
-  superseded duplicates, and the event drain stops after a 60 s wall-clock budget -
-  a saturated queue then simply continues with the next tick. This relies on the
-  job-script convention (idempotent/incremental) stated above.
-- **Webhook token header-only.** Send the token exclusively in the `X-Cronjob-Token` header.
-
-## CLI scripts & maintenance (conventions for future job scripts)
-
-New job scripts in other modules must follow these conventions (linkenhancer's
-`cli/` is the reference):
+New job scripts in other modules must follow these conventions:
 
 - Location `modules_v4/<module>/cli/`, invoked as
   `php modules_v4/<module>/cli/<script>.php` (working directory = webtrees root)
 - **Start with** `require autoload.php` (the module's own) **and**
   `CliBootstrap::guard()` (or the module's own equivalent) - scripts in `modules_v4/`
   are reachable by URL and would be a data leak without the CLI guard
-  - if the module already depends on cronjob, this bootstrap can instead be
-    delegated to the shared **W1 wrapper** (see "Using the W1 wrapper" below)
 - Idempotent and incremental (`--limit`, `--since`), batched, never full re-runs
   where a delta is possible
 - Exit code `0` on success (the tick records non-zero as `error`)
 - No interactive input; everything via CLI options
 - Template files are prefixed with `_` (excluded from job discovery)
-- **Template:** `cli/_template-maintenance.php` — copy into your module's `cli/`, rename, and adapt
+- For your own cli scripts you can start with
+  - a **Template:** `cli/_template-maintenance.php` — copy into your module's `cli/`, rename, and adapt
+  - or if the module already depends on cronjob, this bootstrap can instead be
+    delegated to the shared **cli wrapper** (see "Using the cli wrapper" below)
+
+### Using the cli wrapper
+
+**cronjob's bootstrap for other modules' scripts**
+
+A job script that needs webtrees + the database must bootstrap them itself. A module
+that already depends on cronjob can delegate that to a shared wrapper instead of
+copying the bootstrap:
+
+1. **Payload** `modules_v4/<module>/cli/<name>.logic.php` - the real logic; it reads
+   `$argv` like any CLI script. It keeps a 1-line SAPI guard (it is a `.php` file
+   inside `cli/`, hence URL-reachable).
+2. **Stub** `modules_v4/<module>/cli/<name>.php` - what the job row points to:
+
+   ```php
+   <?php
+   declare(strict_types=1);
+   $wrapper = __DIR__ . '/../../cronjob/cli/wrap.php';
+   if (is_file($wrapper)) {
+       require $wrapper;
+   } else {
+       fwrite(STDERR, "cronjob module required for this job\n");
+       exit(1);
+   }
+   ```
+
+`wrap.php` bootstraps webtrees + DB and then includes the payload - the *sibling* of
+the stub with the extension swapped from `.php` to `.logic.php`. That payload path is
+**derived from the entry script, never taken from an argument**, so there is no
+attacker-controlled include path (the confinement is enforced in
+`CronjobCli::resolvePayloadPath()`). The job row stays `<name>.php`, unchanged; the
+job's working directory and arguments are unchanged too.
+
+- The wrapper is **never itself a job command** - only the stub is.
+- **Requires the cronjob module to be installed.** If a script must also run as a
+  standalone tool (no cronjob), keep the module's own `CliBootstrap` copy instead.
 
 ## Offering jobs to cronjob (self-registration)
 
@@ -528,39 +571,6 @@ manifest (title, triggers, command, args, timeout, enabled state); the slug,
 the notify setting and the run history are kept. If the module is removed or no
 longer offers the spec, the badge and the reset button disappear.
 
-## Using the W1 wrapper (cronjob's bootstrap for other modules' scripts)
-
-A job script that needs webtrees + the database must bootstrap them itself. A module
-that already depends on cronjob can delegate that to a shared wrapper instead of
-copying the bootstrap:
-
-1. **Payload** `modules_v4/<module>/cli/<name>.logic.php` - the real logic; it reads
-   `$argv` like any CLI script. It keeps a 1-line SAPI guard (it is a `.php` file
-   inside `cli/`, hence URL-reachable).
-2. **Stub** `modules_v4/<module>/cli/<name>.php` - what the job row points to:
-
-   ```php
-   <?php
-   declare(strict_types=1);
-   $wrapper = __DIR__ . '/../../cronjob/cli/wrap.php';
-   if (is_file($wrapper)) {
-       require $wrapper;
-   } else {
-       fwrite(STDERR, "cronjob module required for this job\n");
-       exit(1);
-   }
-   ```
-
-`wrap.php` bootstraps webtrees + DB and then includes the payload - the *sibling* of
-the stub with the extension swapped from `.php` to `.logic.php`. That payload path is
-**derived from the entry script, never taken from an argument**, so there is no
-attacker-controlled include path (the confinement is enforced in
-`CronjobCli::resolvePayloadPath()`). The job row stays `<name>.php`, unchanged; the
-job's working directory and arguments are unchanged too.
-
-- The wrapper is **never itself a job command** - only the stub is.
-- **Requires the cronjob module to be installed.** If a script must also run as a
-  standalone tool (no cronjob), keep the module's own `CliBootstrap` copy instead.
 
 ## Using the cronjob service from other modules
 
@@ -879,42 +889,6 @@ key, translated at render time) and the available parameters (structured: name,
 optional, default, description). In the job form, entering a command that matches an
 announced command shows its parameters as a hint under the field.
 
-## Translation (i18n)
-
-All user-facing strings are extracted with `xgettext` - no manual PO entries:
-
-- View strings use `I18N::translate()` as usual. Generic strings that are already
-  provided by webtrees **core** (e.g. `Details`, `Delete`, the day names) are wrapped
-  in `MoreI18N::xlate()` instead: functionally identical at runtime, but the
-  different call name is invisible to xgettext - so they are never extracted into
-  the module POT and their translations come from the core POT. (This replaces
-  linkenhancer's `/* I18N: webtrees.pot */` comment + shell-filter approach.)
-- **Workflow after a core update:** compare `resources/lang/messages.all.pot`
-  (the full extraction) with the current core POT; every msgid that core now covers
-  gets masked with `MoreI18N::xlate()` in the code.
-- **Manifest literals** (`cron-jobs.php` is pure data, loaded in tick/CLI context -
-  `I18N::translate()` must not run there) are wrapped in `MoreI18N::translate()`, an
-  *identity* marker whose last qualified-name component matches xgettext's
-  `--keyword=translate`. Nothing is translated at manifest load time.
-- **Pipeline:** `util/update-po-files.sh` runs xgettext over the module
-  (`util/`/`vendor/`/`tests/` excluded) into `resources/lang/messages.all.pot` and
-  copies it to `resources/lang/messages.pot` (no filter step - the core dedupe lives
-  in the code via `MoreI18N::xlate`). PO files are maintained via Weblate and land
-  in `resources/lang/<language>.po`; `util/compile-po.php` then compiles them to
-  `*.php` (same output as the core `compile-po-files` command, standalone without
-  the webtrees bootstrap - `create-archive.sh` calls it). The module's
-  `CronjobModule::customTranslations()` feeds the compiled `*.php` (preferred) or
-  `*.po` files into webtrees' `I18N::init()`, so the views' translation calls find
-  them **at render time**.
-- **Job titles** are admin-editable DB values, translated at render time through
-  `CronjobUtils::translateJobTitle()` (job table, breadcrumbs, history header): the
-  default title from a manifest appears in the UI language, renamed jobs stay as-is
-  (gettext miss). Titles containing `%` are deliberately **not** translated -
-  `I18N::translate()` applies `sprintf()` to its result, where a bare `%` would be an
-  invalid conversion specification. The job form's title **input** always shows the
-  raw stored value (otherwise the translation would be written back to the DB on save).
-- **Notifications** (tick/CLI context) are not translated.
-
 ## Failure notification
 
 A job can be marked **Notify on failure**. When such a job fails (non-zero exit or
@@ -927,93 +901,6 @@ admin user accounts, and how they are reached follows the site's messaging setti
 The notification carries the job name, status, exit code, duration and a short tail of
 the captured output. It runs in the tick (no web request), so it carries no link
 beyond the text. A notification problem never breaks the tick.
-
-## Job outlook (candidates for the first jobs)
-
-| Job | Command | Trigger |
-| :--- | :--- | :--- |
-| Linkenhancer link-index update | `modules_v4/linkenhancer/cli/build-link-index.php --limit=5000` | time `*/30 * * * *` |
-| GEDCOM backup (tree export) | `tree-export <tree_name>` — writes `data/<tree_name>.ged`, **full personal data**; plan retention/cleanup of `data/*.ged` | time `0 3 * * 0` |
-| Config backup | `site-setting --list` — output lands in the run history (admin-only); for a file backup use a small module CLI script | time `0 3 * * 0` |
-| Smoke test | `modules_v4/cronjob/cli/smoke-job.php` | time `0 4 * * *` |
-| Re-index on change (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `linkenhancer:index-dirty` (announced by the linkenhancer manifest; queued by its code or a webhook) |
-| Re-index on record edit (event, log poller) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `cronjob:log-edit-update` (~5 min latency) |
-| Re-index on any record edit (event) | `modules_v4/linkenhancer/cli/build-link-index.php` | event `_route:update-record` (route events must be enabled) |
-| Failed-login alert (event) | a small CLI script (your own) | event `cronjob:log-auth-failed` |
-| Pseudo-events poll (offered job) | `modules_v4/cronjob/cli/pseudo-events.php` | time `*/5 * * * *` (fires the `cronjob:log-*` events, see above) |
-
-## Roadmap (phase 2)
-
-Implemented so far: **job self-registration** (manifest / marker method, incl.
-**event announcements**), the **W1 wrapper**, **event-driven jobs** (webhook +
-`cj_event` queue + `EventQueue::push()`), **pseudo-events** (originally state
-pollers: `cronjob:gedcom-changed` / `cronjob:media-added` / `cronjob:user-registered`;
-replaced in 1.2.0 by **log-table pollers**: the `cronjob:log-*` events — one event
-per new log row, see "Pseudo-events (log-table polling)", driven by the offered
-`cronjob:pseudo-events` job), **forced re-sync of the module's own
-manifest job** on update, **failure notification** to the administrator accounts, a
-**human-readable schedule** shown next to each cron expression in the admin table
-(translatable via `I18N`; the exact cron string is always shown too), the
-**provenance badge + reset to module defaults** for offered jobs, **duplicate a
-job** via the create form, the **client-side DataTable** (filter/sort/paging)
-for the job table, **Notify/Timeout table columns**, editable **module-offered
-job names**, the **event naming scheme** (`<domain>:<slug>`, `_route:*` /
-`cronjob:*` / `<module>:*`), **route events** (record routes: POST + `{xref}` in
-the path + mutating handler prefix `Edit/Delete/Add/Create/Link/Paste/Reorder/
-Pending` under `/tree/{tree}/`, plus a curated tree-level allowlist for import,
-merge, renumber, search-replace, data fixes and bulk accept/reject — 38 events,
-opt-in toggle, orphaned-event warning for dead triggers), the
-**event catalog** (module announcements + built-ins + route events + listened
-names, in `cj_event_catalog`), the **`cj_event_run` cross table** with triggering
-events shown in the run history, **PRG form handling** (a failed save redirects
-to the form page with the entered values kept), the **route-event payload derived
-from the route path** in the event catalog, **DataTables** for the event and command
-catalogs in the admin page, and the **command catalog** (`cj_command_catalog`: core
-allowlist + module command announcements with structured parameters + module scripts,
-with a per-module curation rule so internal scripts are not offered, and a dynamic
-parameter hint in the job form), **multi-trigger jobs** (triggers moved to the
-`cj_job_trigger` cross table: a job can combine any number of cron schedules and
-event triggers - it fires on any of them; the job's `next_run_at` is the minimum over
-its time triggers, the run history records which cron/event fired, and "Run now" on
-a disabled job runs once at (re-)enable), the **refined route-event rules** (record
-routes now require `{xref}` in the path and use the extended mutating prefixes
-`Link/Paste/Reorder/Pending`; a curated tree-level allowlist adds import, merge,
-renumber, search-replace, data fixes and bulk accept/reject - 38 events; orphaned
-`_route:*` triggers of jobs are flagged with an "unknown route event" badge), and
-**event payload in the child process** (event runs set `CRONJOB_EVENT` and, when the
-event carried one, `CRONJOB_EVENT_PAYLOAD` (JSON) in the job script's environment),
-plus the **security hardening** (event-queue coalescing + 60 s event-drain
-budget, webhook token header-only, output escaping in the job views, safe
-`confirm()` dialogs, and the corrected smoke-test catalog entry) and the
-**log-table pseudo-events** (the built-in pollers now read the webtrees
-log table - `cronjob:log-auth-failed` / `-login` / `-logout`, `cronjob:log-error`,
-`cronjob:log-edit-update` / `-delete`, `cronjob:log-search`; one event per log row
-with the row as payload; checkpoint + 200-row backpressure cap per run; reset, not
-re-fire, on table shrink; dead triggers are flagged with the **unknown event** badge),
-**pseudo-events in the event catalog** (description + payload keys from the detector),
-the **`change_pending` flag** on record-route payloads (pending change table:
-auto-accept off vs on), and the **per-event-name consumer gate** for the pollers.
-See the sections above.
-
-Still open:
-
-- **Linkenhancer side of self-registration** — the linkenhancer manifest (L1) and
-  the W1 migration of `build-link-index.php` (L2) live in that module and are done
-  in a separate session (module boundaries).
-
-## Tests
-
-```bash
-php modules_v4/cronjob/tests/test-args-validator.php  # command whitelist + arg validation (standalone)
-php modules_v4/cronjob/tests/test-cron-wrapper.php    # cron semantics (skips cleanly without the bundled vendor)
-php modules_v4/cronjob/tests/test-cron-humanize.php   # human-readable cron descriptions (standalone)
-php modules_v4/cronjob/tests/test-watch-service.php   # watch daemon logic: opt-in marker, liveness lock, cooldown (standalone)
-php modules_v4/cronjob/tests/test-job-spec.php        # self-registration: job+event+command spec validators, manifest loading (jobs/events/commands), event naming, command-catalog merge, W1 payload confinement, multi-trigger (normalizeTriggers/triggersKey/nextRunMin/dueTriggerDetails, specDiff) (standalone)
-php modules_v4/cronjob/tests/test-pseudo-events.php   # pseudo-events: log-row detector (registry, catalog info, truncation, checkpoint/backpressure/reset, payload shape), orphan/prune helpers, specDiff, state/cooldown (standalone)
-php modules_v4/cronjob/tests/test-route-events.php   # route events: map builder (record-route rule, tree-level allowlist, filters, collision suffixes, fallback), orphaned-event detection, success gate, payload builder, payload-key derivation from path incl. change_pending (standalone)
-php modules_v4/cronjob/tests/test-event-queue.php    # event-queue coalescing: newest per event name, name cap, ordering (standalone)
-php modules_v4/cronjob/tests/test-i18n-mark.php      # i18n: MoreI18N::translate identity, manifest literals/shape unchanged, translateJobTitle % guard (standalone)
-```
 
 ## License
 
