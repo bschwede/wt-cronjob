@@ -49,7 +49,7 @@ tests
 composer.json
 latest-version.txt
 vendor/autoload.php
-resources/img/*
+resources/img
 resources/lang/*.po*
 resources/lang/*.mo
 resources/views/*.phtml.~*
