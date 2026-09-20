@@ -1,5 +1,7 @@
 # webtrees module Cronjob
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0) ![webtrees major version](https://img.shields.io/badge/webtrees-v2.2.x-green) ![Latest Release](https://img.shields.io/github/v/release/bschwede/wt-cronjob) ![Downloads](https://img.shields.io/github/downloads/bschwede/wt-cronjob/total.svg)
+
 A **cron job scheduler service** for webtrees: schedule maintenance/batch jobs with
 standard cron expressions, watch their run history in the admin UI, and trigger them
 manually. The module is the *service*; the OS (classic cron or a systemd timer) only
@@ -8,9 +10,9 @@ has to call one small script once per minute.
 - **Job registry + run history** in two own tables (`cj_job`, `cj_run`)
 - **Admin UI** (control panel): job list, create/edit form, run history, run now, enable/disable, delete
 - **Isolated execution**: every job runs as a separate child PHP process (`proc_open`, no shell), with per-job timeout and captured output
-- **Self-registration**: other modules can advertise their jobs (a `cron-jobs.php` manifest or a `getCronJobs()` method); they appear here, created disabled and ready to enable
-- **Event-driven jobs**: jobs can fire on events instead of a schedule - queued by a token-protected **webhook**, by a direct `EventQueue::push()` call from other modules, by the built-in **pseudo-event** pollers (the webtrees log table: failed logins, logins, logouts, errors, record edits, searches) or by **route events** (curated mutating editor routes)
-- **Failure notification**: per-job opt-in to alert the site's administrator accounts (internal message and/or e-mail, per each admin's own preference) when a job fails
+- [**Self-registration**](#selfreg): other modules can advertise their jobs (a `cron-jobs.php` manifest or a `getCronJobs()` method); they appear here, created disabled and ready to enable
+- [**Event-driven jobs**](#event): jobs can fire on events instead of a schedule - queued by a token-protected **webhook**, by a direct `EventQueue::push()` call from other modules, by the built-in [**pseudo-event**](#event-pseudo) pollers (the webtrees log table: failed logins, logins, logouts, errors, record edits, searches) or by [**route events**](#event-route) (curated mutating editor routes)
+- [**Failure notification**](#notification): per-job opt-in to alert the site's administrator accounts (internal message and/or e-mail, per each admin's own preference) when a job fails
 - **Offline awareness**: while `data/offline.txt` exists (e.g. during a webtrees update) the tick is skipped *before any database access* - no child process starts while migrations and code are in flux
 - **No core changes, no changes to other modules**
 
@@ -356,6 +358,7 @@ job's working directory and arguments are unchanged too.
 - **Requires the cronjob module to be installed.** If a script must also run as a
   standalone tool (no cronjob), keep the module's own `CliBootstrap` copy instead.
 
+<a name="selfreg"></a>
 ## Offering jobs to cronjob (self-registration)
 
 Other modules can *advertise* their scheduled jobs so they show up in this module's
@@ -563,6 +566,7 @@ Contract: read-only methods never throw when the schema is missing (safe default
 descriptions are source strings (never pre-translated), and `lastRun()` deliberately
 excludes the job output, which may contain personal data.
 
+<a name="event"></a>
 ## Event-driven jobs (webhooks & event queue)
 
 Besides time-based schedules, a job can be triggered by an **event**. webtrees has no
@@ -646,6 +650,7 @@ $xref    = $payload['xref'] ?? '';                        // e.g. from a _route:
 - The payload is also visible in the run history (event detail), independent of the
   child process.
 
+<a name="event-pseudo"></a>
 ## Pseudo-events (log-table polling)
 
 webtrees has no event bus, so core actions (logins, failed logins, logouts, record
@@ -711,6 +716,7 @@ tick's normal event drain. To act on one, create an event-triggered job whose
 **Event name** matches (e.g. alert on `cronjob:log-auth-failed`, re-index on
 `cronjob:log-edit-update`).
 
+<a name="event-route"></a>
 ## Route events (request-triggered)
 
 A complementary, *immediate* detection mechanism: instead of polling state on a
@@ -850,6 +856,7 @@ key, translated at render time) and the available parameters (structured: name,
 optional, default, description). In the job form, entering a command that matches an
 announced command shows its parameters as a hint under the field.
 
+<a name="notification"></a>
 ## Failure notification
 
 A job can be marked **Notify on failure**. When such a job fails (non-zero exit or
