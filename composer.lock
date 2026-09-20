@@ -8,11 +8,11 @@
     "packages": [
         {
             "name": "bschwede/wt-shared-libs",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "dist": {
                 "type": "path",
                 "url": "../wt-shared-libs",
-                "reference": "03389d2018a57ceead1fa3b58f2bfd5f941cad1b"
+                "reference": "0a6583da8d783847809835b8f4c6968dd426a162"
             },
             "require": {
                 "php": ">=8.3"
