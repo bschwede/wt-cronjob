@@ -37,6 +37,10 @@ It was originally developed as a support module for [LinkEnhancer](https://codeb
    block for your OS with the paths of *this* installation already filled in).
 4. Create your first job in the admin UI.
 
+## Translations
+
+> ✅ [Contribute on Codeberg Weblate](https://translate.codeberg.org/projects/wt-modules/cronjob/)
+
 ## Usage
 
 ### Creating a job
