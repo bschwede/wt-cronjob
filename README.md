@@ -14,6 +14,10 @@ has to call one small script once per minute.
 - **Offline awareness**: while `data/offline.txt` exists (e.g. during a webtrees update) the tick is skipped *before any database access* - no child process starts while migrations and code are in flux
 - **No core changes, no changes to other modules**
 
+![Cronjob Scheduler](resources/img/cronjob-scheduler.png)
+
+It was originally developed as a support module for [LinkEnhancer](https://codeberg.org/bschwede/linkenhancer) to keep its indexes up to date.
+
 ## Requirements
 
 - webtrees 2.2.x (PHP 8.3+)
@@ -67,6 +71,8 @@ prefix is removed, since the colon cannot be entered in the form), and **Reset**
 (only for jobs offered by a module manifest) restores the module's currently-offered
 defaults. If a save fails validation, the form is re-rendered with all entered
 values kept (plus the error messages) - nothing you typed is lost.
+
+![New Cronjob](resources/img/new-cronjob.png)
 
 ### Trigger installation (once)
 
