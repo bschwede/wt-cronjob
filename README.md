@@ -59,6 +59,8 @@ It was originally developed as a support module for [LinkEnhancer](https://codeb
 | **Timeout** | 30 - 3600 s |
 | **Notify on failure** | opt-in: alert the administrator accounts when this job fails |
 
+![New Cronjob](resources/img/new-cronjob.png)
+
 The **Run now** button queues the job for the next tick (≤ 60 s). For a **disabled**
 job the queued run happens at the first tick *after* it is (re-)enabled - the button
 tooltip and the flash message say so (there is deliberately no guard: disabling the
@@ -66,6 +68,8 @@ job right after the click reaches the same state anyway). The **History** page s
 status, exit code, duration, the **trigger that fired the run** (the due cron
 expression(s) or the event name) and the captured output (last 64 KB) of the last 25
 runs per job (plus a 30-day global retention window).
+
+![New Cronjob](resources/img/run-history.png)
 
 The job table is a **client-side DataTable** (search box, sortable columns, paging,
 state saved in the browser) - no extra setup needed. The **Enabled** and **Notify**
@@ -77,8 +81,6 @@ prefix is removed, since the colon cannot be entered in the form), and **Reset**
 (only for jobs offered by a module manifest) restores the module's currently-offered
 defaults. If a save fails validation, the form is re-rendered with all entered
 values kept (plus the error messages) - nothing you typed is lost.
-
-![New Cronjob](resources/img/new-cronjob.png)
 
 ### Trigger installation (once)
 
