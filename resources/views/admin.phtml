@@ -30,6 +30,20 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService;
 
 $last_tick_age = CronjobService::lastTickAge();
 
+// calc for progress bar
+$limitGreen = 60;
+$limitOrange = 120;
+$maxTime = 120;
+$percent = min(100, (int) round($last_tick_age / $maxTime * 100));
+if ($last_tick_age > $limitOrange) {
+    $colorClass = 'bg-danger';
+} elseif ($last_tick_age > $limitGreen) {
+    $colorClass = 'bg-warning';
+} else {
+    $colorClass = 'bg-success';
+}
+$marker60Percent = min(100, (int) round($limitGreen / $maxTime * 100));
+
 $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
 
 ?>
@@ -63,9 +77,35 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
         <?= I18N::translate('The tick does not appear to have run yet, so this module does not yet have any functionality. Please refer to the information in the “%s” section.', I18N::translate('Installation')) ?>
     </div>
 <?php else: ?>
-    <p class="<?= $last_tick_age > 120 ? 'alert alert-warning' : 'text-muted' ?>">
+    <div class="row mb-2 <?= $last_tick_age > 120 ? 'alert alert-warning' : '' ?>">
+    <p class="col-md-6 text-muted">
         <?= I18N::translate('Time elapsed since the last tick execution: %s s', $last_tick_age) ?>
     </p>
+    <div class="col-md-6 justify-content-end p-2 mb-2">
+        <div class="progress" style="height: 1.5rem; position: relative; width: 200px;">
+            <div
+            class="progress-bar <?= $colorClass ?>"
+            role="progressbar"
+            style="width: <?= $percent ?>%;"
+            aria-valuenow="<?= $percent ?>"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            ><?= $last_tick_age ?>
+            </div>
+        <div
+        style="
+          position: absolute;
+          left: <?= $marker60Percent ?>%;
+              top: 0;
+              bottom: 0;
+              width: 2px;
+              background: rgba(0,0,0,0.35);
+              z-index: 1;
+            " title="60 s"></div>
+        </div>
+    </div>
+    </div>
+
 <?php endif; ?>
 
 
