@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fisharebest\Webtrees\I18N;
 use Schwendinger\Webtrees\Helpers\ClassName;
+use Schwendinger\Webtrees\Helpers\Functions;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Helpers\MoreI18N;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
@@ -120,7 +121,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 <?php else: ?>
     <div id="table-wrapper" style="overflow:scroll;">
     <table id="wt-cronjob-jobs"
-           class="table table-sm table-striped datatables d-none"
+           class="table table-sm table-striped <?= Functions::wtIsAtLeast2_3() ? 'wt-' : '' ?>datatables d-none"
            <?= view('lists/datatables-attributes') ?>
            data-auto-width="false"
            data-sorting='[[0,"asc"]]'
@@ -502,7 +503,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 <?= I18N::translate('All known event names: announced by modules, built-in pseudo-events (cronjob:…), route events (_route:…) and names currently listened for by an enabled job. Synced by the tick; use these names in the “Event name” field of an event job.') ?>
             </p>
             <table id="wt-cronjob-events"
-                   class="table table-sm table-striped datatables d-none"
+                   class="table table-sm table-striped <?= Functions::wtIsAtLeast2_3() ? 'wt-' : '' ?>datatables d-none"
                    <?= view('lists/datatables-attributes') ?>
                    data-sorting='[[0,"asc"]]'
                    data-columns='[{},{},{},{}]'>
@@ -545,7 +546,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 <?= I18N::translate('Every command a job may run: the allowlisted core commands, commands announced by modules (with their available parameters) and module CLI scripts. A module that announces commands curates its own list, so its internal scripts (e.g. cronjob tick/watch/wrap) are not offered. Use these in the “Command” field of a job.') ?>
             </p>
             <table id="wt-cronjob-commands"
-                   class="table table-sm table-striped datatables d-none"
+                   class="table table-sm table-striped <?= Functions::wtIsAtLeast2_3() ? 'wt-' : '' ?>datatables d-none"
                    <?= view('lists/datatables-attributes') ?>
                    data-sorting='[[0,"asc"]]'
                    data-columns='[{},{},{},{},{}]'>
