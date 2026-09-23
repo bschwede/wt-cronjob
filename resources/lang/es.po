@@ -1,0 +1,856 @@
+# Spanish translations for modules_v package.
+# Copyright (C) 2026 THE modules_v'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the modules_v package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: modules_v 4\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-19 11:04+0200\n"
+"PO-Revision-Date: 2026-09-19 11:04+0200\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/Services/PseudoEvents/PseudoEventService.php:95
+msgid "Failed login attempts (log type auth, message prefix \"Login failed\")"
+msgstr ""
+
+#: src/Services/PseudoEvents/PseudoEventService.php:96
+msgid "Successful logins (log type auth, message prefix \"Login: \")"
+msgstr ""
+
+#: src/Services/PseudoEvents/PseudoEventService.php:97
+msgid "Logouts (log type auth, message prefix \"Logout: \")"
+msgstr ""
+
+#: src/Services/PseudoEvents/PseudoEventService.php:98
+msgid ""
+"Application errors (log type error - the message is the exception trace)"
+msgstr ""
+
+#: src/Services/PseudoEvents/PseudoEventService.php:99
+msgid "Record updates (log type edit, message prefix \"Update: \")"
+msgstr ""
+
+#: src/Services/PseudoEvents/PseudoEventService.php:100
+msgid "Record deletions (log type edit, message prefix \"Delete: \")"
+msgstr ""
+
+#: src/Services/PseudoEvents/PseudoEventService.php:101
+msgid "Searches (log type search - one log row per searched tree)"
+msgstr ""
+
+#: src/Services/CommandCatalogService.php:81
+msgid "Read-only: list all site settings."
+msgstr ""
+
+#: src/Services/CommandCatalogService.php:89
+msgid ""
+"Export a whole tree as a GEDCOM file into data directory (full personal "
+"data)."
+msgstr ""
+
+#: src/Services/CommandCatalogService.php:90
+msgid "List all trees."
+msgstr ""
+
+#: src/Services/CommandCatalogService.php:91
+msgid "List all users (includes e-mail addresses)."
+msgstr ""
+
+#: src/Services/CommandCatalogService.php:92
+msgid ""
+"Read or write site settings (a job may only use the read-only --list "
+"argument)."
+msgstr ""
+
+#: src/Services/NotifyService.php:81
+#, php-format
+msgid "cronjob: job \"%1$s\" failed (%2$s)"
+msgstr ""
+
+#: src/Services/NotifyService.php:99
+msgid "A scheduled cronjob job failed. Details:"
+msgstr ""
+
+#: src/Services/NotifyService.php:101 resources/views/admin.phtml:90
+msgid "Job"
+msgstr ""
+
+#: src/Services/NotifyService.php:103
+msgid "Exit code"
+msgstr ""
+
+#: src/Services/NotifyService.php:104 resources/views/job-history.phtml:70
+msgid "Duration"
+msgstr ""
+
+#: src/Services/NotifyService.php:105 resources/views/job-history.phtml:65
+msgid "Started (UTC)"
+msgstr ""
+
+#: src/Services/NotifyService.php:111
+msgid "Last output"
+msgstr ""
+
+#: src/Services/ScheduleService.php:379 src/Services/ScheduleService.php:380
+#: src/Services/ScheduleService.php:401 src/Services/ScheduleService.php:407
+#, php-format
+msgid "every minute"
+msgid_plural "every %1$d minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Services/ScheduleService.php:381 src/Services/ScheduleService.php:413
+msgid "hourly"
+msgstr ""
+
+#: src/Services/ScheduleService.php:382 src/Services/ScheduleService.php:383
+#: src/Services/ScheduleService.php:417
+#, php-format
+msgid "daily at %1$s"
+msgstr ""
+
+#: src/Services/ScheduleService.php:384
+msgid "weekly on Sunday at 00:00"
+msgstr ""
+
+#: src/Services/ScheduleService.php:385 src/Services/ScheduleService.php:425
+#, php-format
+msgid "on day %1$d of each month at %2$s"
+msgstr ""
+
+#: src/Services/ScheduleService.php:386 src/Services/ScheduleService.php:387
+msgid "yearly on January 1 at 00:00"
+msgstr ""
+
+#: src/Services/ScheduleService.php:413
+#, php-format
+msgid "every hour at minute %1$d"
+msgstr ""
+
+#: src/Services/ScheduleService.php:421
+#, php-format
+msgid "on %1$s at %2$s"
+msgstr ""
+
+#: src/Services/ScheduleService.php:476
+#, php-format
+msgid "%1$s to %2$s"
+msgstr ""
+
+#: src/Services/ScheduleService.php:483
+#, php-format
+msgid "%1$s and %2$s"
+msgstr ""
+
+#: src/CronjobModule.php:124 src/CronjobModule.php:332
+msgid "Cron Job Scheduler"
+msgstr ""
+
+#: src/CronjobModule.php:128
+msgid ""
+"Schedule and monitor maintenance jobs: cron expressions, run history and "
+"manual trigger."
+msgstr ""
+
+#: src/CronjobModule.php:400
+#, php-format
+msgid "Job name must be a slug: %1$s, max %2$s characters."
+msgstr ""
+
+#: src/CronjobModule.php:403
+msgid "Job title must not be empty."
+msgstr ""
+
+#: src/CronjobModule.php:412
+#, php-format
+msgid "Job title must be at most %d characters."
+msgstr ""
+
+#: src/CronjobModule.php:415
+#, php-format
+msgid "Arguments must be at most %d characters."
+msgstr ""
+
+#: src/CronjobModule.php:420
+#, php-format
+msgid "Command must be a %1$s path or an allowlisted core command."
+msgstr ""
+
+#: src/CronjobModule.php:428
+#, php-format
+msgid "Invalid command: %s"
+msgstr ""
+
+#: src/CronjobModule.php:443
+msgid "A job with this name already exists."
+msgstr ""
+
+#: src/CronjobModule.php:462
+msgid "Job saved."
+msgstr ""
+
+#: src/CronjobModule.php:537 resources/views/job-history.phtml:36
+msgid "Run History"
+msgstr ""
+
+#: src/CronjobModule.php:567
+msgid "Job queued - it will run at the next tick (within 60 seconds)."
+msgstr ""
+
+#: src/CronjobModule.php:571
+msgid ""
+"Job queued - it is disabled, so it will run once at the next tick after it "
+"is (re-)enabled."
+msgstr ""
+
+#: src/CronjobModule.php:574 src/CronjobModule.php:601
+#: src/CronjobModule.php:626 src/CronjobModule.php:657
+#: src/CronjobModule.php:698 resources/views/job-history.phtml:43
+msgid "Job not found."
+msgstr ""
+
+#: src/CronjobModule.php:597
+msgid "Job enabled."
+msgstr ""
+
+#: src/CronjobModule.php:597
+msgid "Job disabled."
+msgstr ""
+
+#: src/CronjobModule.php:622
+msgid "Failure notification enabled."
+msgstr ""
+
+#: src/CronjobModule.php:622
+msgid "Failure notification disabled."
+msgstr ""
+
+#: src/CronjobModule.php:639
+msgid "Route events disabled."
+msgstr ""
+
+#: src/CronjobModule.php:639
+msgid "Route events enabled."
+msgstr ""
+
+#: src/CronjobModule.php:664
+msgid ""
+"This job is not (any longer) offered by a module - reset is not possible."
+msgstr ""
+
+#: src/CronjobModule.php:682
+msgid "Job reset to the module defaults."
+msgstr ""
+
+#: src/CronjobModule.php:696
+msgid "Job deleted."
+msgstr ""
+
+#: src/CronjobModule.php:710
+msgid ""
+"The watch daemon needs proc_open(), which is disabled on this server. Use an "
+"OS cron or systemd timer instead."
+msgstr ""
+
+#: src/CronjobModule.php:717
+msgid "Watch daemon started."
+msgstr ""
+
+#: src/CronjobModule.php:719
+msgid ""
+"The watch daemon could not be started (proc_open is disabled or it is "
+"already running)."
+msgstr ""
+
+#: src/CronjobModule.php:731
+msgid ""
+"Watch daemon stopped - it exits within about a minute and will not restart."
+msgstr ""
+
+#: src/CronjobModule.php:749
+#, php-format
+msgid "The path may only contain letters, digits, spaces and the characters %s"
+msgstr ""
+
+#: src/CronjobModule.php:757
+msgid "PHP binary: automatic detection enabled."
+msgstr ""
+
+#: src/CronjobModule.php:758
+#, php-format
+msgid "PHP binary set to %s."
+msgstr ""
+
+#: src/CronjobModule.php:829
+msgid "Webhook token regenerated - update any external sender."
+msgstr ""
+
+#. I18N: default title of the pseudo-events job (job list in the cronjob admin)
+#: cron-jobs.php:54
+msgid "Cronjob: Pseudo-Events (log-table pollers)"
+msgstr ""
+
+#. I18N: command description for pseudo-events.php (command catalog in the cronjob admin)
+#: cron-jobs.php:70
+msgid ""
+"Poll the webtrees log table (failed logins, logins, logouts, errors, record "
+"edits, searches) and queue one event per new matching log entry for the tick."
+msgstr ""
+
+#. I18N: parameter description for --force (command catalog in the cronjob admin)
+#: cron-jobs.php:76
+msgid "Bypass the 5-minute cooldown (a manual run)."
+msgstr ""
+
+#. I18N: command description for smoke-job.php (command catalog in the cronjob admin)
+#: cron-jobs.php:84
+msgid "Acceptance-test job for the cronjob module. It only prints and exits 0."
+msgstr ""
+
+#. I18N: parameter description for --sleep=N (command catalog in the cronjob admin)
+#: cron-jobs.php:90
+msgid "keeps the process alive for N seconds (timeout testing)"
+msgstr ""
+
+#: resources/views/admin.phtml:47
+msgid ""
+"The site is offline (data/offline.txt) - the tick is skipped and no jobs run "
+"until it is removed again (e.g. during a webtrees update)."
+msgstr ""
+
+#: resources/views/admin.phtml:53
+msgid ""
+"Bundled cron library missing: fetch dragonmantank/cron-expression into "
+"modules_v4/cronjob/vendor/ (see the module README, section \"Bundled "
+"dependency\"). Scheduling is paused until then."
+msgstr ""
+
+#: resources/views/admin.phtml:58 resources/views/job-form.phtml:159
+#, php-format
+msgid "All times are UTC (webtrees server time). Current time (UTC): %s"
+msgstr ""
+
+#: resources/views/admin.phtml:63 resources/views/admin.phtml:263
+msgid "Installation"
+msgstr ""
+
+#: resources/views/admin.phtml:63
+#, php-format
+msgid ""
+"The tick does not appear to have run yet, so this module does not yet have "
+"any functionality. Please refer to the information in the “%s” section."
+msgstr ""
+
+#: resources/views/admin.phtml:67
+#, php-format
+msgid "Time elapsed since the last tick execution: %s s"
+msgstr ""
+
+#: resources/views/admin.phtml:74 resources/views/job-form.phtml:76
+msgid "New Job"
+msgstr ""
+
+#: resources/views/admin.phtml:79
+msgid ""
+"No jobs yet. Create the first one (e.g. the linkenhancer link-index update)."
+msgstr ""
+
+#: resources/views/admin.phtml:91 resources/views/job-form.phtml:130
+msgid "Triggers"
+msgstr ""
+
+#: resources/views/admin.phtml:92
+msgid "Next Run (UTC)"
+msgstr ""
+
+#: resources/views/admin.phtml:93
+msgid "Last Run"
+msgstr ""
+
+#: resources/views/admin.phtml:95
+msgid "Notify"
+msgstr ""
+
+#: resources/views/admin.phtml:96
+msgid "Timeout"
+msgstr ""
+
+#: resources/views/admin.phtml:120
+#, php-format
+msgid ""
+"Seeded automatically from the %s manifest (cron-jobs.php / getCronJobs()). "
+"The \"Reset\" button restores the module defaults."
+msgstr ""
+
+#: resources/views/admin.phtml:131
+msgid ""
+"This job has no usable trigger (pathological legacy row) - edit and save it "
+"to set one."
+msgstr ""
+
+#: resources/views/admin.phtml:132
+msgid "no trigger"
+msgstr ""
+
+#: resources/views/admin.phtml:137 resources/views/job-history.phtml:48
+msgid "event"
+msgstr ""
+
+#: resources/views/admin.phtml:141
+msgid ""
+"This event no longer exists (core update, mapping change or removed built-in "
+"detector) - the job can never fire on it. Edit the job and pick a current "
+"event."
+msgstr ""
+
+#: resources/views/admin.phtml:142
+msgid "unknown event"
+msgstr ""
+
+#: resources/views/admin.phtml:178
+msgid "triggered by"
+msgstr ""
+
+#: resources/views/admin.phtml:182 resources/views/job-history.phtml:30
+msgid "History"
+msgstr ""
+
+#: resources/views/admin.phtml:190 resources/views/admin.phtml:200
+#: resources/views/admin.phtml:407
+msgid "on"
+msgstr ""
+
+#: resources/views/admin.phtml:190 resources/views/admin.phtml:200
+#: resources/views/admin.phtml:407
+msgid "off"
+msgstr ""
+
+#: resources/views/admin.phtml:200
+#, php-format
+msgid "notify on failure: %s"
+msgstr ""
+
+#: resources/views/admin.phtml:206
+msgid "s"
+msgstr ""
+
+#: resources/views/admin.phtml:213
+msgid "Run at the next tick (within 60 seconds)"
+msgstr ""
+
+#: resources/views/admin.phtml:213
+msgid ""
+"The job is disabled - the queued run happens at the next tick after it is "
+"(re-)enabled"
+msgstr ""
+
+#: resources/views/admin.phtml:214
+msgid "Run now"
+msgstr ""
+
+#: resources/views/admin.phtml:219
+msgid ""
+"Open the form prefilled with a copy of this job (new -copy slug, starts "
+"disabled)"
+msgstr ""
+
+#: resources/views/admin.phtml:220
+msgid "Duplicate"
+msgstr ""
+
+#: resources/views/admin.phtml:224
+msgid ""
+"Reset this job to the module defaults? Your changes (title, schedule, "
+"command, arguments, enabled state) will be lost; the notification setting is "
+"kept."
+msgstr ""
+
+#: resources/views/admin.phtml:228
+msgid "Restore the settings currently offered by the module manifest"
+msgstr ""
+
+#: resources/views/admin.phtml:234
+msgid "Delete this job and its run history?"
+msgstr ""
+
+#: resources/views/admin.phtml:268
+msgid "Use one of the following install options, not both."
+msgstr ""
+
+#: resources/views/admin.phtml:273
+msgid "Watch daemon (no OS cron needed)"
+msgstr ""
+
+#: resources/views/admin.phtml:275
+msgid ""
+"Runs the tick from a resident process instead of an OS cron / systemd timer "
+"- for hosts without cron. A watchdog restarts it automatically if it dies."
+msgstr ""
+
+#: resources/views/admin.phtml:279
+msgid "running"
+msgstr ""
+
+#: resources/views/admin.phtml:281
+msgid "stopped"
+msgstr ""
+
+#: resources/views/admin.phtml:284
+#, php-format
+msgid "Last activity (UTC): %s"
+msgstr ""
+
+#: resources/views/admin.phtml:287
+#, php-format
+msgid "PID: %d"
+msgstr ""
+
+#: resources/views/admin.phtml:293
+msgid "Stop watch"
+msgstr ""
+
+#: resources/views/admin.phtml:298
+msgid "Start watch"
+msgstr ""
+
+#: resources/views/admin.phtml:305
+msgid "Trigger Installation"
+msgstr ""
+
+#: resources/views/admin.phtml:307
+msgid ""
+"The module itself does not start. One OS trigger (a per-minute timer) or the "
+"built-in watch daemon must call the tick once per minute. Pick the option "
+"for your OS below - the paths are already filled in for this installation."
+msgstr ""
+
+#: resources/views/admin.phtml:314
+msgid "Option: Windows Task Scheduler (every minute)"
+msgstr ""
+
+#: resources/views/admin.phtml:317
+msgid "Install command"
+msgstr ""
+
+#: resources/views/admin.phtml:320
+msgid ""
+"Alternatively: the watch daemon (left fieldset) runs the tick with no OS "
+"trigger at all. For a server that runs without a logged-in user, set the "
+"task to \"run whether the user is logged on or not\" (task properties -> "
+"General, requires a password)."
+msgstr ""
+
+#: resources/views/admin.phtml:323
+msgid "Option A: classic cron (every minute)"
+msgstr ""
+
+#: resources/views/admin.phtml:328
+msgid "Option B: systemd timer"
+msgstr ""
+
+#: resources/views/admin.phtml:334
+msgid "Install commands"
+msgstr ""
+
+#: resources/views/admin.phtml:344
+msgid "PHP CLI binary"
+msgstr ""
+
+#: resources/views/admin.phtml:346
+msgid ""
+"The CLI interpreter the module uses for its PHP scripts (watch daemon spawn "
+"and the trigger install commands above). Leave the field empty for automatic "
+"detection."
+msgstr ""
+
+#: resources/views/admin.phtml:349
+msgid "Currently used:"
+msgstr ""
+
+#: resources/views/admin.phtml:350
+msgid "(none found)"
+msgstr ""
+
+#: resources/views/admin.phtml:352
+msgid "manual path"
+msgstr ""
+
+#: resources/views/admin.phtml:352
+msgid "auto-detected"
+msgstr ""
+
+#: resources/views/admin.phtml:357
+#, php-format
+msgid ""
+"The manual path %s is not a usable PHP CLI binary (missing, not executable "
+"or an fpm build) - automatic detection is used instead."
+msgstr ""
+
+#: resources/views/admin.phtml:362
+msgid ""
+"No PHP CLI binary could be determined - the watch daemon cannot start and "
+"the install commands above are incomplete. Set a manual path below."
+msgstr ""
+
+#: resources/views/admin.phtml:369
+msgid "e.g. /usr/bin/php8.3 - empty = automatic detection"
+msgstr ""
+
+#: resources/views/admin.phtml:373
+msgid ""
+"A watch daemon that is already running keeps using its current binary until "
+"it is restarted."
+msgstr ""
+
+#: resources/views/admin.phtml:391
+msgid "Pseudo-Events (log-table polling)"
+msgstr ""
+
+#: resources/views/admin.phtml:393
+msgid ""
+"webtrees has no event bus, so core actions are observed by polling. The "
+"module reads new log-table entries (failed logins, logins, logouts, errors, "
+"record edits, searches) at most every 5 minutes and queues one event per "
+"entry; an event-triggered job then acts on it. The first run only records a "
+"baseline and does not fire."
+msgstr ""
+
+#: resources/views/admin.phtml:394
+msgid ""
+"To activate, enable the \"cronjob:pseudo-events\" job in the table above. It "
+"runs in the tick child process - isolated from any web request and bounded "
+"by its timeout."
+msgstr ""
+
+#: resources/views/admin.phtml:401
+msgid "Route events (request-triggered)"
+msgstr ""
+
+#: resources/views/admin.phtml:403
+msgid ""
+"Detects mutations directly from their HTTP route (e.g. a note edit) and "
+"queues a matching event immediately - in addition to the polling pseudo-"
+"events above. Only curated routes fire, only while this is enabled AND a "
+"matching event job is listening."
+msgstr ""
+
+#: resources/views/admin.phtml:412
+msgid "Disable route events"
+msgstr ""
+
+#: resources/views/admin.phtml:412
+msgid "Enable route events"
+msgstr ""
+
+#: resources/views/admin.phtml:420
+msgid "Event webhook (external trigger)"
+msgstr ""
+
+#: resources/views/admin.phtml:423
+msgid ""
+"External systems can queue an event by GETting the endpoint below. Each "
+"queued event runs its matching event-triggered job(s) at the next tick. The "
+"token is required (send it in the X-Cronjob-Token header) and the endpoint "
+"is rate-limited."
+msgstr ""
+
+#: resources/views/admin.phtml:431
+msgid "Endpoint"
+msgstr ""
+
+#: resources/views/admin.phtml:436
+msgid ""
+"GET with query params event=<name> and data=<json> (optional); send the "
+"token in the X-Cronjob-Token header."
+msgstr ""
+
+#: resources/views/admin.phtml:441
+msgid "Token"
+msgstr ""
+
+#: resources/views/admin.phtml:450
+msgid "Regenerate token"
+msgstr ""
+
+#: resources/views/admin.phtml:460
+msgid "Event catalog"
+msgstr ""
+
+#: resources/views/admin.phtml:462
+msgid ""
+"All known event names: announced by modules, built-in pseudo-events "
+"(cronjob:…), route events (_route:…) and names currently listened for by an "
+"enabled job. Synced by the tick; use these names in the “Event name” field "
+"of an event job."
+msgstr ""
+
+#: resources/views/admin.phtml:474
+msgid "Payload"
+msgstr ""
+
+#: resources/views/admin.phtml:495
+msgid "Commands"
+msgstr ""
+
+#: resources/views/admin.phtml:503
+msgid "Command catalog"
+msgstr ""
+
+#: resources/views/admin.phtml:505
+msgid ""
+"Every command a job may run: the allowlisted core commands, commands "
+"announced by modules (with their available parameters) and module CLI "
+"scripts. A module that announces commands curates its own list, so its "
+"internal scripts (e.g. cronjob tick/watch/wrap) are not offered. Use these "
+"in the “Command” field of a job."
+msgstr ""
+
+#: resources/views/admin.phtml:514 resources/views/job-form.phtml:206
+#: resources/views/job-form.phtml:209
+msgid "Command"
+msgstr ""
+
+#: resources/views/admin.phtml:518
+msgid "Parameters"
+msgstr ""
+
+#: resources/views/admin.phtml:536 resources/views/job-form.phtml:284
+msgid "required"
+msgstr ""
+
+#: resources/views/job-form.phtml:69
+#, php-format
+msgid "New Job (copy of %s)"
+msgstr ""
+
+#: resources/views/job-form.phtml:73
+msgid "Edit Job"
+msgstr ""
+
+#: resources/views/job-form.phtml:94
+msgid "Name (slug)"
+msgstr ""
+
+#: resources/views/job-form.phtml:101
+msgid "This job is offered by a module, so its name is fixed."
+msgstr ""
+
+#: resources/views/job-form.phtml:103
+msgid "Used as identifier, not shown to users."
+msgstr ""
+
+#: resources/views/job-form.phtml:112
+msgid "Update link index"
+msgstr ""
+
+#: resources/views/job-form.phtml:124
+msgid "Notify administrators on failure"
+msgstr ""
+
+#: resources/views/job-form.phtml:125
+msgid ""
+"On failure, message the site’s administrator accounts (e-mail and/or "
+"internal message, per each admin’s own contact preference)."
+msgstr ""
+
+#: resources/views/job-form.phtml:132
+msgid ""
+"The job runs when any of its triggers fires: on one or more cron schedules "
+"(UTC) and/or on one or more named events. At least one trigger is required."
+msgstr ""
+
+#: resources/views/job-form.phtml:136
+msgid "Time triggers (cron schedule)"
+msgstr ""
+
+#: resources/views/job-form.phtml:148
+msgid "Next runs (UTC):"
+msgstr ""
+
+#: resources/views/job-form.phtml:154
+msgid "Invalid cron expression (5 fields, UTC)."
+msgstr ""
+
+#: resources/views/job-form.phtml:160
+msgid "Add cron trigger"
+msgstr ""
+
+#: resources/views/job-form.phtml:170
+msgid "Event triggers"
+msgstr ""
+
+#: resources/views/job-form.phtml:189
+msgid ""
+"The job runs once for each queued event with one of these names (webhook, "
+"module push, built-in pseudo-event poller, or a route trigger)."
+msgstr ""
+
+#: resources/views/job-form.phtml:190
+msgid ""
+"Suggested: module-announced events, built-in pseudo-events (cronjob:…) and "
+"route events (_route:…). Plain slugs for your own events work too. The full "
+"list is in the event catalog on the admin page."
+msgstr ""
+
+#: resources/views/job-form.phtml:191
+msgid "Add event trigger"
+msgstr ""
+
+#: resources/views/job-form.phtml:218
+#, php-format
+msgid "A %1s path or an allowlisted core command (%2$s)."
+msgstr ""
+
+#: resources/views/job-form.phtml:223
+msgid "Arguments (optional)"
+msgstr ""
+
+#: resources/views/job-form.phtml:227
+#, php-format
+msgid "Plain options/values only, no shell metacharacters, max %1$s tokens."
+msgstr ""
+
+#: resources/views/job-form.phtml:231
+#, php-format
+msgid "Timeout (seconds, %1$s - %2$s)"
+msgstr ""
+
+#: resources/views/job-form.phtml:237
+#, php-format
+msgid ""
+"Note on sensitive output: %1$s writes the complete tree as %2$s into data/ "
+"(full personal data!), %3$s lists all user e-mail addresses, %4$s lists all "
+"site settings. This output is stored in the run history (admin-only)."
+msgstr ""
+
+#: resources/views/job-form.phtml:283
+msgid "Available parameters"
+msgstr ""
+
+#: resources/views/job-history.phtml:53
+msgid "or"
+msgstr ""
+
+#: resources/views/job-history.phtml:60
+msgid "No runs recorded yet."
+msgstr ""
+
+#: resources/views/job-history.phtml:66
+msgid "Trigger"
+msgstr ""
+
+#: resources/views/job-history.phtml:69
+msgid "Exit"
+msgstr ""
+
+#: resources/views/job-history.phtml:71
+msgid "Output"
+msgstr ""
