@@ -4,13 +4,14 @@
 # Automatically generated, 2026.
 #
 # Iberni2 <iberni2@noreply.codeberg.org>, 2026.
+# TheDutchJewel <thedutchjewel@noreply.codeberg.org>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-09-24 15:25+0000\n"
-"Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
+"PO-Revision-Date: 2026-09-25 17:25+0000\n"
+"Last-Translator: TheDutchJewel <thedutchjewel@noreply.codeberg.org>\n"
 "Language-Team: Catalan <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/ca/>\n"
 "Language: ca\n"
