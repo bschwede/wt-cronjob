@@ -4,13 +4,14 @@
 # Automatically generated, 2026.
 #
 # gallegonovato <gallegonovato@noreply.codeberg.org>, 2026.
+# Iberni2 <iberni2@noreply.codeberg.org>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-09-24 15:25+0000\n"
-"Last-Translator: gallegonovato <gallegonovato@noreply.codeberg.org>\n"
+"PO-Revision-Date: 2026-09-25 17:25+0000\n"
+"Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
 "Language-Team: Spanish <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/es/>\n"
 "Language: es\n"
@@ -361,7 +362,7 @@ msgstr ""
 
 #: resources/views/admin.phtml:74 resources/views/job-form.phtml:76
 msgid "New Job"
-msgstr ""
+msgstr "Nueva tarea"
 
 #: resources/views/admin.phtml:79
 msgid ""
@@ -374,7 +375,7 @@ msgstr ""
 
 #: resources/views/admin.phtml:92
 msgid "Next Run (UTC)"
-msgstr ""
+msgstr "Pròxima execució (UTC)"
 
 #: resources/views/admin.phtml:93
 msgid "Last Run"

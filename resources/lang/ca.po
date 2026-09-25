@@ -11,7 +11,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
 "PO-Revision-Date: 2026-09-25 17:25+0000\n"
-"Last-Translator: TheDutchJewel <thedutchjewel@noreply.codeberg.org>\n"
+"Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
 "Language-Team: Catalan <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/ca/>\n"
 "Language: ca\n"
@@ -230,11 +230,11 @@ msgstr ""
 
 #: src/CronjobModule.php:462
 msgid "Job saved."
-msgstr ""
+msgstr "Feina guardada."
 
 #: src/CronjobModule.php:537 resources/views/job-history.phtml:36
 msgid "Run History"
-msgstr ""
+msgstr "Historial de tasques executades"
 
 #: src/CronjobModule.php:567
 msgid "Job queued - it will run at the next tick (within 60 seconds)."
@@ -258,7 +258,7 @@ msgstr ""
 
 #: src/CronjobModule.php:597
 msgid "Job disabled."
-msgstr ""
+msgstr "Tasca desactivada."
 
 #: src/CronjobModule.php:622
 msgid "Failure notification enabled."
@@ -280,6 +280,7 @@ msgstr ""
 msgid ""
 "This job is not (any longer) offered by a module - reset is not possible."
 msgstr ""
+"Aquesta tasca ja no és oferida per cap mòdul; no és possible restablir-la."
 
 #: src/CronjobModule.php:682
 msgid "Job reset to the module defaults."
@@ -294,10 +295,13 @@ msgid ""
 "The watch daemon needs proc_open(), which is disabled on this server. Use an "
 "OS cron or systemd timer instead."
 msgstr ""
+"El procés de supervisió necessita proc_open(), que està desactivat en aquest "
+"servidor. Utilitzeu un cron del sistema operatiu o un temporitzador de "
+"systemd."
 
 #: src/CronjobModule.php:717
 msgid "Watch daemon started."
-msgstr ""
+msgstr "Va a començar el procés de vigilància"
 
 #: src/CronjobModule.php:719
 msgid ""
@@ -311,6 +315,8 @@ msgstr ""
 msgid ""
 "Watch daemon stopped - it exits within about a minute and will not restart."
 msgstr ""
+"El procés de supervisió s'ha aturat: es tanca al cap d'aproximadament un "
+"minut i no es reinicia."
 
 #: src/CronjobModule.php:749
 #, php-format
