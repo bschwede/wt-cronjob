@@ -3,171 +3,206 @@
 # This file is distributed under the same license as the modules_v package.
 # Automatically generated, 2026.
 #
+# Iberni2 <iberni2@noreply.codeberg.org>, 2026.
+# TheDutchJewel <thedutchjewel@noreply.codeberg.org>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-09-19 11:04+0200\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
+"PO-Revision-Date: 2026-09-25 17:25+0000\n"
+"Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
+"Language-Team: Catalan <https://translate.codeberg.org/projects/wt-modules/"
+"cronjob/ca/>\n"
 "Language: ca\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Generator: Weblate 2026.9.1\n"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:95
+#, fuzzy
 msgid "Failed login attempts (log type auth, message prefix \"Login failed\")"
-msgstr ""
+msgstr "Failed login attempts (log type auth, message prefix \"Login failed\")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:96
 msgid "Successful logins (log type auth, message prefix \"Login: \")"
 msgstr ""
+"Inicis de sessió reeixits (tipus de registre auth, prefix de missatge "
+"\"Login: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:97
 msgid "Logouts (log type auth, message prefix \"Logout: \")"
 msgstr ""
+"Logouts (tipus de registre auth, prefix de missatge \"Tancament de sessió: "
+"\")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:98
 msgid ""
 "Application errors (log type error - the message is the exception trace)"
 msgstr ""
+"Errors d'aplicació (error de tipus de registre - el missatge és la traça "
+"d'excepció)"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:99
 msgid "Record updates (log type edit, message prefix \"Update: \")"
 msgstr ""
+"Actualitzacions de registre (tipus de registre edita, prefix de missatge "
+"\"Actualització: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:100
 msgid "Record deletions (log type edit, message prefix \"Delete: \")"
 msgstr ""
+"Eliminacions de registres (edició del tipus de registre, prefix de missatge "
+"\"Eliminar: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:101
 msgid "Searches (log type search - one log row per searched tree)"
 msgstr ""
+"Cerques (cerca per tipus de registre - una fila de logaritme per arbre "
+"cercat)"
 
 #: src/Services/CommandCatalogService.php:81
 msgid "Read-only: list all site settings."
-msgstr ""
+msgstr "Només lectura: llista tots els ajustos del lloc."
 
 #: src/Services/CommandCatalogService.php:89
 msgid ""
 "Export a whole tree as a GEDCOM file into data directory (full personal "
 "data)."
 msgstr ""
+"Export a whole tree as a GEDCOM file into data directory (full personal data)"
+"."
 
 #: src/Services/CommandCatalogService.php:90
+#, fuzzy
 msgid "List all trees."
-msgstr ""
+msgstr "List all trees."
 
 #: src/Services/CommandCatalogService.php:91
 msgid "List all users (includes e-mail addresses)."
-msgstr ""
+msgstr "Llista tots els usuaris (inclou adreces de correu electrònic)."
 
 #: src/Services/CommandCatalogService.php:92
 msgid ""
 "Read or write site settings (a job may only use the read-only --list "
 "argument)."
 msgstr ""
+"Llegeix o escriu configuracions del lloc (una feina pot utilitzar només "
+"l'argument de només lectura --list)."
 
 #: src/Services/NotifyService.php:81
-#, php-format
+#, fuzzy, php-format
 msgid "cronjob: job \"%1$s\" failed (%2$s)"
-msgstr ""
+msgstr "cronjob: job \"%1$s\" failed (%2$s)"
 
 #: src/Services/NotifyService.php:99
+#, fuzzy
 msgid "A scheduled cronjob job failed. Details:"
-msgstr ""
+msgstr "A scheduled cronjob job failed. Details:"
 
 #: src/Services/NotifyService.php:101 resources/views/admin.phtml:90
+#, fuzzy
 msgid "Job"
-msgstr ""
+msgstr "Job"
 
 #: src/Services/NotifyService.php:103
+#, fuzzy
 msgid "Exit code"
-msgstr ""
+msgstr "Exit code"
 
 #: src/Services/NotifyService.php:104 resources/views/job-history.phtml:70
+#, fuzzy
 msgid "Duration"
-msgstr ""
+msgstr "Duration"
 
 #: src/Services/NotifyService.php:105 resources/views/job-history.phtml:65
+#, fuzzy
 msgid "Started (UTC)"
-msgstr ""
+msgstr "Started (UTC)"
 
 #: src/Services/NotifyService.php:111
+#, fuzzy
 msgid "Last output"
-msgstr ""
+msgstr "Last output"
 
 #: src/Services/ScheduleService.php:379 src/Services/ScheduleService.php:380
 #: src/Services/ScheduleService.php:401 src/Services/ScheduleService.php:407
 #, php-format
 msgid "every minute"
 msgid_plural "every %1$d minutes"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "cada %1$d Minut"
+msgstr[1] "every %1$d minutes"
 
 #: src/Services/ScheduleService.php:381 src/Services/ScheduleService.php:413
+#, fuzzy
 msgid "hourly"
-msgstr ""
+msgstr "hourly"
 
 #: src/Services/ScheduleService.php:382 src/Services/ScheduleService.php:383
 #: src/Services/ScheduleService.php:417
-#, php-format
+#, fuzzy, php-format
 msgid "daily at %1$s"
-msgstr ""
+msgstr "daily at %1$s"
 
 #: src/Services/ScheduleService.php:384
+#, fuzzy
 msgid "weekly on Sunday at 00:00"
-msgstr ""
+msgstr "weekly on Sunday at 00:00"
 
 #: src/Services/ScheduleService.php:385 src/Services/ScheduleService.php:425
-#, php-format
+#, fuzzy, php-format
 msgid "on day %1$d of each month at %2$s"
-msgstr ""
+msgstr "on day %1$d of each month at %2$s"
 
 #: src/Services/ScheduleService.php:386 src/Services/ScheduleService.php:387
+#, fuzzy
 msgid "yearly on January 1 at 00:00"
-msgstr ""
+msgstr "yearly on January 1 at 00:00"
 
 #: src/Services/ScheduleService.php:413
-#, php-format
+#, fuzzy, php-format
 msgid "every hour at minute %1$d"
-msgstr ""
+msgstr "every hour at minute %1$d"
 
 #: src/Services/ScheduleService.php:421
 #, php-format
 msgid "on %1$s at %2$s"
-msgstr ""
+msgstr "de %1$s a %2$s"
 
 #: src/Services/ScheduleService.php:476
 #, php-format
 msgid "%1$s to %2$s"
-msgstr ""
+msgstr "%1$s fins a %2$s"
 
 #: src/Services/ScheduleService.php:483
 #, php-format
 msgid "%1$s and %2$s"
-msgstr ""
+msgstr "%1$s i %2$s"
 
 #: src/CronjobModule.php:124 src/CronjobModule.php:332
 msgid "Cron Job Scheduler"
-msgstr ""
+msgstr "Programador de tasques cron"
 
 #: src/CronjobModule.php:128
+#, fuzzy
 msgid ""
 "Schedule and monitor maintenance jobs: cron expressions, run history and "
 "manual trigger."
 msgstr ""
+"Schedule and monitor maintenance jobs: cron expressions, run history and "
+"manual trigger."
 
 #: src/CronjobModule.php:400
-#, php-format
+#, fuzzy, php-format
 msgid "Job name must be a slug: %1$s, max %2$s characters."
-msgstr ""
+msgstr "Job name must be a slug: %1$s, max %2$s characters."
 
 #: src/CronjobModule.php:403
+#, fuzzy
 msgid "Job title must not be empty."
-msgstr ""
+msgstr "Job title must not be empty."
 
 #: src/CronjobModule.php:412
 #, php-format
@@ -195,11 +230,11 @@ msgstr ""
 
 #: src/CronjobModule.php:462
 msgid "Job saved."
-msgstr ""
+msgstr "Feina guardada."
 
 #: src/CronjobModule.php:537 resources/views/job-history.phtml:36
 msgid "Run History"
-msgstr ""
+msgstr "Historial de tasques executades"
 
 #: src/CronjobModule.php:567
 msgid "Job queued - it will run at the next tick (within 60 seconds)."
@@ -223,7 +258,7 @@ msgstr ""
 
 #: src/CronjobModule.php:597
 msgid "Job disabled."
-msgstr ""
+msgstr "Tasca desactivada."
 
 #: src/CronjobModule.php:622
 msgid "Failure notification enabled."
@@ -245,6 +280,7 @@ msgstr ""
 msgid ""
 "This job is not (any longer) offered by a module - reset is not possible."
 msgstr ""
+"Aquesta tasca ja no és oferida per cap mòdul; no és possible restablir-la."
 
 #: src/CronjobModule.php:682
 msgid "Job reset to the module defaults."
@@ -259,21 +295,28 @@ msgid ""
 "The watch daemon needs proc_open(), which is disabled on this server. Use an "
 "OS cron or systemd timer instead."
 msgstr ""
+"El procés de supervisió necessita proc_open(), que està desactivat en aquest "
+"servidor. Utilitzeu un cron del sistema operatiu o un temporitzador de "
+"systemd."
 
 #: src/CronjobModule.php:717
 msgid "Watch daemon started."
-msgstr ""
+msgstr "Va a començar el procés de vigilància"
 
 #: src/CronjobModule.php:719
 msgid ""
 "The watch daemon could not be started (proc_open is disabled or it is "
 "already running)."
 msgstr ""
+"The watch daemon could not be started (proc_open is disabled or it is "
+"already running)."
 
 #: src/CronjobModule.php:731
 msgid ""
 "Watch daemon stopped - it exits within about a minute and will not restart."
 msgstr ""
+"El procés de supervisió s'ha aturat: es tanca al cap d'aproximadament un "
+"minut i no es reinicia."
 
 #: src/CronjobModule.php:749
 #, php-format
