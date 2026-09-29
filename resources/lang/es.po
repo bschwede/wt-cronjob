@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-09-25 17:25+0000\n"
+"PO-Revision-Date: 2026-09-29 17:49+0000\n"
 "Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
 "Language-Team: Spanish <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/es/>\n"
@@ -34,84 +34,97 @@ msgstr "Accesos correctos (tipo de registro: auth, prefijo: \"Login: \")"
 #: src/Services/PseudoEvents/PseudoEventService.php:97
 msgid "Logouts (log type auth, message prefix \"Logout: \")"
 msgstr ""
+"Cierres de sesión (tipo de registro auth, prefijo de mensaje \"Logout: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:98
 msgid ""
 "Application errors (log type error - the message is the exception trace)"
 msgstr ""
+"Errores de la aplicación (tipo de registro error - el mensaje es la traza de "
+"la excepción)"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:99
 msgid "Record updates (log type edit, message prefix \"Update: \")"
 msgstr ""
+"Actualizaciones de registros (tipo de registro editar, prefijo de mensaje "
+"\"Actualización: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:100
 msgid "Record deletions (log type edit, message prefix \"Delete: \")"
 msgstr ""
+"Eliminaciones de registros (tipo de registro edición, prefijo de mensaje "
+"\"Eliminar: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:101
 msgid "Searches (log type search - one log row per searched tree)"
 msgstr ""
+"Búsquedas (tipo de registro búsqueda - una fila de registro por cada árbol "
+"buscado)"
 
 #: src/Services/CommandCatalogService.php:81
 msgid "Read-only: list all site settings."
-msgstr ""
+msgstr "Solo lectura: listar toda la configuración del sitio."
 
 #: src/Services/CommandCatalogService.php:89
 msgid ""
 "Export a whole tree as a GEDCOM file into data directory (full personal "
 "data)."
 msgstr ""
+"Exporta todo un árbol como un archivo GEDCOM en el directorio de datos "
+"(datos personales completos)."
 
 #: src/Services/CommandCatalogService.php:90
 msgid "List all trees."
-msgstr ""
+msgstr "Haz una lista de todos los árboles."
 
 #: src/Services/CommandCatalogService.php:91
 msgid "List all users (includes e-mail addresses)."
-msgstr ""
+msgstr "Lista todos los usuarios (incluye direcciones de correo)."
 
 #: src/Services/CommandCatalogService.php:92
 msgid ""
 "Read or write site settings (a job may only use the read-only --list "
 "argument)."
 msgstr ""
+"Leer o escribir la configuración del sitio (un trabajo solo puede usar el "
+"argumento de solo lectura --list)."
 
 #: src/Services/NotifyService.php:81
 #, php-format
 msgid "cronjob: job \"%1$s\" failed (%2$s)"
-msgstr ""
+msgstr "cronjob: el trabajo \"%1$s\" falló (%2$s)"
 
 #: src/Services/NotifyService.php:99
 msgid "A scheduled cronjob job failed. Details:"
-msgstr ""
+msgstr "Un trabajo cron programado falló. Detalles:"
 
 #: src/Services/NotifyService.php:101 resources/views/admin.phtml:90
 msgid "Job"
-msgstr ""
+msgstr "Trabajo"
 
 #: src/Services/NotifyService.php:103
 msgid "Exit code"
-msgstr ""
+msgstr "Código de salida"
 
 #: src/Services/NotifyService.php:104 resources/views/job-history.phtml:70
 msgid "Duration"
-msgstr ""
+msgstr "Duración"
 
 #: src/Services/NotifyService.php:105 resources/views/job-history.phtml:65
 msgid "Started (UTC)"
-msgstr ""
+msgstr "Iniciado (UTC)"
 
 #: src/Services/NotifyService.php:111
 msgid "Last output"
-msgstr ""
+msgstr "Última salida"
 
 #: src/Services/ScheduleService.php:379 src/Services/ScheduleService.php:380
 #: src/Services/ScheduleService.php:401 src/Services/ScheduleService.php:407
 #, php-format
 msgid "every minute"
 msgid_plural "every %1$d minutes"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "cada minuto"
+msgstr[1] "cada %1$d minutos"
 
 #: src/Services/ScheduleService.php:381 src/Services/ScheduleService.php:413
 msgid "hourly"
