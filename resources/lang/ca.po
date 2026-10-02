@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-09-29 08:27+0000\n"
+"PO-Revision-Date: 2026-10-02 03:11+0000\n"
 "Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
 "Language-Team: Catalan <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/ca/>\n"
@@ -22,21 +22,20 @@ msgstr ""
 "X-Generator: Weblate 2026.9.1\n"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:95
-#, fuzzy
 msgid "Failed login attempts (log type auth, message prefix \"Login failed\")"
-msgstr "Failed login attempts (log type auth, message prefix \"Login failed\")"
+msgstr ""
+"Intents d'inici de sessió fallits (tipus de registre auth, prefix del "
+"missatge \"Inici de sessió fallit\")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:96
 msgid "Successful logins (log type auth, message prefix \"Login: \")"
 msgstr ""
-"Inicis de sessió reeixits (tipus de registre auth, prefix de missatge "
-"\"Login: \")"
+"Inicis de sessió reeixits (tipus de registre auth, prefix del missatge "
+"\"Inici de sessió: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:97
 msgid "Logouts (log type auth, message prefix \"Logout: \")"
-msgstr ""
-"Logouts (tipus de registre auth, prefix de missatge \"Tancament de sessió: "
-"\")"
+msgstr "Desconnectar (tipus de registre auth, prefix de missatge \"Logout: \")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:98
 msgid ""
@@ -72,13 +71,12 @@ msgid ""
 "Export a whole tree as a GEDCOM file into data directory (full personal "
 "data)."
 msgstr ""
-"Export a whole tree as a GEDCOM file into data directory (full personal data)"
-"."
+"Exporta un arbre complet com a fitxer GEDCOM al directori de dades (dades "
+"personals completes)."
 
 #: src/Services/CommandCatalogService.php:90
-#, fuzzy
 msgid "List all trees."
-msgstr "List all trees."
+msgstr "Llista tots els arbres."
 
 #: src/Services/CommandCatalogService.php:91
 msgid "List all users (includes e-mail addresses)."
@@ -93,39 +91,33 @@ msgstr ""
 "l'argument de només lectura --list)."
 
 #: src/Services/NotifyService.php:81
-#, fuzzy, php-format
+#, php-format
 msgid "cronjob: job \"%1$s\" failed (%2$s)"
-msgstr "cronjob: job \"%1$s\" failed (%2$s)"
+msgstr "cronjob: feina \"%1$s\" fallada (%2$s)"
 
 #: src/Services/NotifyService.php:99
-#, fuzzy
 msgid "A scheduled cronjob job failed. Details:"
-msgstr "A scheduled cronjob job failed. Details:"
+msgstr "Una tasca cron programada ha fallat. Detalls:"
 
 #: src/Services/NotifyService.php:101 resources/views/admin.phtml:90
-#, fuzzy
 msgid "Job"
-msgstr "Job"
+msgstr "Feina"
 
 #: src/Services/NotifyService.php:103
-#, fuzzy
 msgid "Exit code"
-msgstr "Exit code"
+msgstr "Codi de sortida"
 
 #: src/Services/NotifyService.php:104 resources/views/job-history.phtml:70
-#, fuzzy
 msgid "Duration"
-msgstr "Duration"
+msgstr "Durada"
 
 #: src/Services/NotifyService.php:105 resources/views/job-history.phtml:65
-#, fuzzy
 msgid "Started (UTC)"
-msgstr "Started (UTC)"
+msgstr "Iniciat (UTC)"
 
 #: src/Services/NotifyService.php:111
-#, fuzzy
 msgid "Last output"
-msgstr "Last output"
+msgstr "Última sortida"
 
 #: src/Services/ScheduleService.php:379 src/Services/ScheduleService.php:380
 #: src/Services/ScheduleService.php:401 src/Services/ScheduleService.php:407
@@ -133,33 +125,30 @@ msgstr "Last output"
 msgid "every minute"
 msgid_plural "every %1$d minutes"
 msgstr[0] "cada %1$d Minut"
-msgstr[1] "every %1$d minutes"
+msgstr[1] "cada %1$d minuts"
 
 #: src/Services/ScheduleService.php:381 src/Services/ScheduleService.php:413
-#, fuzzy
 msgid "hourly"
-msgstr "hourly"
+msgstr "per hora"
 
 #: src/Services/ScheduleService.php:382 src/Services/ScheduleService.php:383
 #: src/Services/ScheduleService.php:417
-#, fuzzy, php-format
+#, php-format
 msgid "daily at %1$s"
-msgstr "daily at %1$s"
+msgstr "diàriament a %1$s"
 
 #: src/Services/ScheduleService.php:384
-#, fuzzy
 msgid "weekly on Sunday at 00:00"
-msgstr "weekly on Sunday at 00:00"
+msgstr "Setmanalment el diumenge a les 00:00"
 
 #: src/Services/ScheduleService.php:385 src/Services/ScheduleService.php:425
-#, fuzzy, php-format
+#, php-format
 msgid "on day %1$d of each month at %2$s"
-msgstr "on day %1$d of each month at %2$s"
+msgstr "el dia %1$d de cada mes a %2$s"
 
 #: src/Services/ScheduleService.php:386 src/Services/ScheduleService.php:387
-#, fuzzy
 msgid "yearly on January 1 at 00:00"
-msgstr "yearly on January 1 at 00:00"
+msgstr "Anualment l'1 de gener a les 00:00"
 
 #: src/Services/ScheduleService.php:413
 #, fuzzy, php-format
@@ -169,7 +158,7 @@ msgstr "every hour at minute %1$d"
 #: src/Services/ScheduleService.php:421
 #, php-format
 msgid "on %1$s at %2$s"
-msgstr "de %1$s a %2$s"
+msgstr "el %1$s a las %2$s"
 
 #: src/Services/ScheduleService.php:476
 #, php-format
@@ -186,13 +175,12 @@ msgid "Cron Job Scheduler"
 msgstr "Programador de tasques cron"
 
 #: src/CronjobModule.php:128
-#, fuzzy
 msgid ""
 "Schedule and monitor maintenance jobs: cron expressions, run history and "
 "manual trigger."
 msgstr ""
-"Schedule and monitor maintenance jobs: cron expressions, run history and "
-"manual trigger."
+"Programar y supervisar tareas de mantenimiento: expresiones cron, historial "
+"de ejecuciones y activación manual."
 
 #: src/CronjobModule.php:400
 #, fuzzy, php-format
