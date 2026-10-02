@@ -5,13 +5,14 @@
 #
 # Iberni2 <iberni2@noreply.codeberg.org>, 2026.
 # TheDutchJewel <thedutchjewel@noreply.codeberg.org>, 2026.
+# bschwede <bschwede@noreply.codeberg.org>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
 "PO-Revision-Date: 2026-10-02 18:34+0000\n"
-"Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
+"Last-Translator: bschwede <bschwede@noreply.codeberg.org>\n"
 "Language-Team: Catalan <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/ca/>\n"
 "Language: ca\n"
@@ -293,7 +294,7 @@ msgstr ""
 
 #: src/CronjobModule.php:717
 msgid "Watch daemon started."
-msgstr "Va a començar el procés de vigilància"
+msgstr "Va a començar el procés de vigilància."
 
 #: src/CronjobModule.php:719
 msgid ""
@@ -819,7 +820,7 @@ msgstr "Ordres"
 
 #: resources/views/admin.phtml:503
 msgid "Command catalog"
-msgstr "Catàleg d’ordres."
+msgstr "Catàleg d’ordres"
 
 #: resources/views/admin.phtml:505
 msgid ""
