@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-09-29 17:49+0000\n"
+"PO-Revision-Date: 2026-10-01 08:27+0000\n"
 "Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
 "Language-Team: Spanish <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/es/>\n"
@@ -128,142 +128,148 @@ msgstr[1] "cada %1$d minutos"
 
 #: src/Services/ScheduleService.php:381 src/Services/ScheduleService.php:413
 msgid "hourly"
-msgstr ""
+msgstr "por hora"
 
 #: src/Services/ScheduleService.php:382 src/Services/ScheduleService.php:383
 #: src/Services/ScheduleService.php:417
 #, php-format
 msgid "daily at %1$s"
-msgstr ""
+msgstr "cada día a %1$s"
 
 #: src/Services/ScheduleService.php:384
 msgid "weekly on Sunday at 00:00"
-msgstr ""
+msgstr "semanalmente los domingos a las 00:00"
 
 #: src/Services/ScheduleService.php:385 src/Services/ScheduleService.php:425
 #, php-format
 msgid "on day %1$d of each month at %2$s"
-msgstr ""
+msgstr "el día %1$d de cada mes a las %2$s"
 
 #: src/Services/ScheduleService.php:386 src/Services/ScheduleService.php:387
 msgid "yearly on January 1 at 00:00"
-msgstr ""
+msgstr "anualmente el 1 de enero a las 00:00"
 
 #: src/Services/ScheduleService.php:413
 #, php-format
 msgid "every hour at minute %1$d"
-msgstr ""
+msgstr "cada hora en el minuto %1$d"
 
 #: src/Services/ScheduleService.php:421
 #, php-format
 msgid "on %1$s at %2$s"
-msgstr ""
+msgstr "el %1$s a las %2$s"
 
 #: src/Services/ScheduleService.php:476
 #, php-format
 msgid "%1$s to %2$s"
-msgstr ""
+msgstr "%1$s a %2$s"
 
 #: src/Services/ScheduleService.php:483
 #, php-format
 msgid "%1$s and %2$s"
-msgstr ""
+msgstr "%1$s y %2$s"
 
 #: src/CronjobModule.php:124 src/CronjobModule.php:332
 msgid "Cron Job Scheduler"
-msgstr ""
+msgstr "Programador de tareas Cron"
 
 #: src/CronjobModule.php:128
 msgid ""
 "Schedule and monitor maintenance jobs: cron expressions, run history and "
 "manual trigger."
 msgstr ""
+"Programa y supervisa trabajos de mantenimiento: expresiones cron, historial "
+"de ejecuciones y activación manual."
 
 #: src/CronjobModule.php:400
 #, php-format
 msgid "Job name must be a slug: %1$s, max %2$s characters."
-msgstr ""
+msgstr "El nombre del trabajo debe ser un slug: %1$s, máximo %2$s caracteres."
 
 #: src/CronjobModule.php:403
 msgid "Job title must not be empty."
-msgstr ""
+msgstr "El título del trabajo no debe estar vacío."
 
 #: src/CronjobModule.php:412
 #, php-format
 msgid "Job title must be at most %d characters."
-msgstr ""
+msgstr "El título del trabajo debe tener como máximo %d caracteres."
 
 #: src/CronjobModule.php:415
 #, php-format
 msgid "Arguments must be at most %d characters."
-msgstr ""
+msgstr "Los argumentos deben tener como máximo %d caracteres."
 
 #: src/CronjobModule.php:420
 #, php-format
 msgid "Command must be a %1$s path or an allowlisted core command."
-msgstr ""
+msgstr "El comando debe ser una ruta %1$s o un comando principal permitido."
 
 #: src/CronjobModule.php:428
 #, php-format
 msgid "Invalid command: %s"
-msgstr ""
+msgstr "Comando no válido: %s"
 
 #: src/CronjobModule.php:443
 msgid "A job with this name already exists."
-msgstr ""
+msgstr "Ya existe un trabajo con este nombre."
 
 #: src/CronjobModule.php:462
 msgid "Job saved."
-msgstr ""
+msgstr "Trabajo guardado."
 
 #: src/CronjobModule.php:537 resources/views/job-history.phtml:36
 msgid "Run History"
-msgstr ""
+msgstr "Historial"
 
 #: src/CronjobModule.php:567
 msgid "Job queued - it will run at the next tick (within 60 seconds)."
 msgstr ""
+"Trabajo en cola: se ejecutará en el próximo ciclo (dentro de 60 segundos)."
 
 #: src/CronjobModule.php:571
 msgid ""
 "Job queued - it is disabled, so it will run once at the next tick after it "
 "is (re-)enabled."
 msgstr ""
+"Trabajo en cola: está deshabilitado, así que se ejecutará una vez en el "
+"siguiente ciclo después de que se (re)habilite."
 
 #: src/CronjobModule.php:574 src/CronjobModule.php:601
 #: src/CronjobModule.php:626 src/CronjobModule.php:657
 #: src/CronjobModule.php:698 resources/views/job-history.phtml:43
 msgid "Job not found."
-msgstr ""
+msgstr "Trabajo no encontrado."
 
 #: src/CronjobModule.php:597
 msgid "Job enabled."
-msgstr ""
+msgstr "Trabajo habilitado."
 
 #: src/CronjobModule.php:597
 msgid "Job disabled."
-msgstr ""
+msgstr "Trabajo deshabilitado."
 
 #: src/CronjobModule.php:622
 msgid "Failure notification enabled."
-msgstr ""
+msgstr "Notificación de fallo activada."
 
 #: src/CronjobModule.php:622
 msgid "Failure notification disabled."
-msgstr ""
+msgstr "Notificación de fallos desactivada."
 
 #: src/CronjobModule.php:639
 msgid "Route events disabled."
-msgstr ""
+msgstr "Eventos de ruta desactivados."
 
 #: src/CronjobModule.php:639
 msgid "Route events enabled."
-msgstr ""
+msgstr "Eventos de ruta habilitados."
 
 #: src/CronjobModule.php:664
 msgid ""
 "This job is not (any longer) offered by a module - reset is not possible."
 msgstr ""
+"Este trabajo ya no es ofrecido por un módulo; no es posible reiniciarlo."
 
 #: src/CronjobModule.php:682
 msgid "Job reset to the module defaults."
@@ -278,44 +284,52 @@ msgid ""
 "The watch daemon needs proc_open(), which is disabled on this server. Use an "
 "OS cron or systemd timer instead."
 msgstr ""
+"El agente daemon needs proc_open(), which is disabled on this server. Use an "
+"OS cron or systemd timer instead."
 
 #: src/CronjobModule.php:717
 msgid "Watch daemon started."
-msgstr ""
+msgstr "El agente daemon se ha iniciado"
 
 #: src/CronjobModule.php:719
 msgid ""
 "The watch daemon could not be started (proc_open is disabled or it is "
 "already running)."
 msgstr ""
+"No se pudo iniciar el daemon de vigilancia (proc_open está desactivado o ya "
+"se está ejecutando)."
 
 #: src/CronjobModule.php:731
 msgid ""
 "Watch daemon stopped - it exits within about a minute and will not restart."
 msgstr ""
+"No se pudo iniciar el agente daemon de vigilancia (proc_open está "
+"deshabilitado o ya se está ejecutando). El agente daemon se cierra en "
+"aproximadamente un minuto y no se reiniciará."
 
 #: src/CronjobModule.php:749
 #, php-format
 msgid "The path may only contain letters, digits, spaces and the characters %s"
 msgstr ""
+"La ruta solo puede contener letras, números, espacios y los caracteres %s"
 
 #: src/CronjobModule.php:757
 msgid "PHP binary: automatic detection enabled."
-msgstr ""
+msgstr "Binario de PHP: detección automática activada."
 
 #: src/CronjobModule.php:758
 #, php-format
 msgid "PHP binary set to %s."
-msgstr ""
+msgstr "Binario de PHP configurado en %s."
 
 #: src/CronjobModule.php:829
 msgid "Webhook token regenerated - update any external sender."
-msgstr ""
+msgstr "Token de webhook regenerado: actualiza cualquier remitente externo."
 
 #. I18N: default title of the pseudo-events job (job list in the cronjob admin)
 #: cron-jobs.php:54
 msgid "Cronjob: Pseudo-Events (log-table pollers)"
-msgstr ""
+msgstr "Cronjob: Pseudo-eventos (sondeadores de tabla de registro)"
 
 #. I18N: command description for pseudo-events.php (command catalog in the cronjob admin)
 #: cron-jobs.php:70
@@ -323,27 +337,36 @@ msgid ""
 "Poll the webtrees log table (failed logins, logins, logouts, errors, record "
 "edits, searches) and queue one event per new matching log entry for the tick."
 msgstr ""
+"Consulta la tabla de registros de webtrees (ingresos fallidos, ingresos, "
+"cierres de sesión, errores, ediciones de registros, búsquedas) y pon en cola "
+"un evento por cada nueva entrada de registro que coincida para el tick."
 
 #. I18N: parameter description for --force (command catalog in the cronjob admin)
 #: cron-jobs.php:76
 msgid "Bypass the 5-minute cooldown (a manual run)."
-msgstr ""
+msgstr "Saltar la espera de 5 minutos (una ejecución manual)."
 
 #. I18N: command description for smoke-job.php (command catalog in the cronjob admin)
 #: cron-jobs.php:84
 msgid "Acceptance-test job for the cronjob module. It only prints and exits 0."
 msgstr ""
+"Trabajo de prueba de aceptación para el módulo de cronjob. Solo imprime y "
+"sale con 0."
 
 #. I18N: parameter description for --sleep=N (command catalog in the cronjob admin)
 #: cron-jobs.php:90
 msgid "keeps the process alive for N seconds (timeout testing)"
 msgstr ""
+"mantiene el proceso activo durante N segundos (prueba de tiempo de espera)"
 
 #: resources/views/admin.phtml:47
 msgid ""
 "The site is offline (data/offline.txt) - the tick is skipped and no jobs run "
 "until it is removed again (e.g. during a webtrees update)."
 msgstr ""
+"El sitio está fuera de línea (data/offline.txt): se omite el tick y no se "
+"ejecutan trabajos hasta que se elimine de nuevo (por ejemplo, durante una "
+"actualización de webtrees)."
 
 #: resources/views/admin.phtml:53
 msgid ""
@@ -351,15 +374,20 @@ msgid ""
 "modules_v4/cronjob/vendor/ (see the module README, section \"Bundled "
 "dependency\"). Scheduling is paused until then."
 msgstr ""
+"Falta la biblioteca cron incluida: consigue dragonmantank/cron-expression en "
+"modules_v4/cronjob/vendor/ (mira el README del módulo, sección \"Dependencia "
+"incluida\"). La programación está pausada hasta entonces."
 
 #: resources/views/admin.phtml:58 resources/views/job-form.phtml:159
 #, php-format
 msgid "All times are UTC (webtrees server time). Current time (UTC): %s"
 msgstr ""
+"Todos los horarios son UTC (hora del servidor de webtrees). Hora actual (UTC)"
+": %s"
 
 #: resources/views/admin.phtml:63 resources/views/admin.phtml:263
 msgid "Installation"
-msgstr ""
+msgstr "Instalación"
 
 #: resources/views/admin.phtml:63
 #, php-format
@@ -367,11 +395,14 @@ msgid ""
 "The tick does not appear to have run yet, so this module does not yet have "
 "any functionality. Please refer to the information in the “%s” section."
 msgstr ""
+"Parece que el tick aún no se ha ejecutado, así que este módulo todavía no "
+"tiene ninguna funcionalidad. Por favor, consulta la información en la "
+"sección “%s”."
 
 #: resources/views/admin.phtml:67
 #, php-format
 msgid "Time elapsed since the last tick execution: %s s"
-msgstr ""
+msgstr "Tiempo transcurrido desde la última ejecución del tick: %s s"
 
 #: resources/views/admin.phtml:74 resources/views/job-form.phtml:76
 msgid "New Job"
@@ -381,10 +412,12 @@ msgstr "Nueva tarea"
 msgid ""
 "No jobs yet. Create the first one (e.g. the linkenhancer link-index update)."
 msgstr ""
+"Aún no hay trabajos. Crea el primero (por ejemplo, la actualización del "
+"índice de enlaces de linkenhancer)."
 
 #: resources/views/admin.phtml:91 resources/views/job-form.phtml:130
 msgid "Triggers"
-msgstr ""
+msgstr "Desencadenantes"
 
 #: resources/views/admin.phtml:92
 msgid "Next Run (UTC)"
