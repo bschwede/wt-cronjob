@@ -11,7 +11,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
 "PO-Revision-Date: 2026-10-01 08:27+0000\n"
-"Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
+"Last-Translator: gallegonovato <gallegonovato@noreply.codeberg.org>\n"
 "Language-Team: Spanish <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/es/>\n"
 "Language: es\n"
@@ -268,8 +268,7 @@ msgstr "Eventos de ruta habilitados."
 #: src/CronjobModule.php:664
 msgid ""
 "This job is not (any longer) offered by a module - reset is not possible."
-msgstr ""
-"Este trabajo ya no es ofrecido por un módulo; no es posible reiniciarlo."
+msgstr "El módulo ya no ofrece esta tarea; no se puede restablecer."
 
 #: src/CronjobModule.php:682
 msgid "Job reset to the module defaults."
