@@ -10,7 +10,7 @@ msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-10-02 03:11+0000\n"
+"PO-Revision-Date: 2026-10-02 18:34+0000\n"
 "Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
 "Language-Team: Spanish <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/es/>\n"
@@ -34,7 +34,7 @@ msgstr "Accesos correctos (tipo de registro: auth, prefijo: \"Login: \")"
 #: src/Services/PseudoEvents/PseudoEventService.php:97
 msgid "Logouts (log type auth, message prefix \"Logout: \")"
 msgstr ""
-"Cierres de sesión (tipo de registro auth, prefijo de mensaje \"Logout: \")"
+"Cierres de sesión (tipo de registro auth, prefijo de mensaje \"Logout:\")"
 
 #: src/Services/PseudoEvents/PseudoEventService.php:98
 msgid ""
@@ -100,7 +100,7 @@ msgstr "Un trabajo cron programado falló. Detalles:"
 
 #: src/Services/NotifyService.php:101 resources/views/admin.phtml:90
 msgid "Job"
-msgstr "Trabajo"
+msgstr "Proceso"
 
 #: src/Services/NotifyService.php:103
 msgid "Exit code"

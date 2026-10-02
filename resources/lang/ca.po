@@ -5,13 +5,14 @@
 #
 # Iberni2 <iberni2@noreply.codeberg.org>, 2026.
 # TheDutchJewel <thedutchjewel@noreply.codeberg.org>, 2026.
+# bschwede <bschwede@noreply.codeberg.org>, 2026.
 msgid ""
 msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-19 11:04+0200\n"
-"PO-Revision-Date: 2026-10-02 03:11+0000\n"
-"Last-Translator: Iberni2 <iberni2@noreply.codeberg.org>\n"
+"PO-Revision-Date: 2026-10-02 18:34+0000\n"
+"Last-Translator: bschwede <bschwede@noreply.codeberg.org>\n"
 "Language-Team: Catalan <https://translate.codeberg.org/projects/wt-modules/"
 "cronjob/ca/>\n"
 "Language: ca\n"
@@ -151,9 +152,9 @@ msgid "yearly on January 1 at 00:00"
 msgstr "Anualment l'1 de gener a les 00:00"
 
 #: src/Services/ScheduleService.php:413
-#, fuzzy, php-format
+#, php-format
 msgid "every hour at minute %1$d"
-msgstr "every hour at minute %1$d"
+msgstr "cada hora al minut %1$d"
 
 #: src/Services/ScheduleService.php:421
 #, php-format
@@ -183,38 +184,39 @@ msgstr ""
 "de ejecuciones y activación manual."
 
 #: src/CronjobModule.php:400
-#, fuzzy, php-format
+#, php-format
 msgid "Job name must be a slug: %1$s, max %2$s characters."
-msgstr "Job name must be a slug: %1$s, max %2$s characters."
+msgstr "El nom del camp ha de ser un slug: %1$s, com a màxim %2$s caràcters."
 
 #: src/CronjobModule.php:403
-#, fuzzy
 msgid "Job title must not be empty."
-msgstr "Job title must not be empty."
+msgstr "El títol del lloc de treball no pot estar buit."
 
 #: src/CronjobModule.php:412
 #, php-format
 msgid "Job title must be at most %d characters."
-msgstr ""
+msgstr "El títol del lloc de treball ha de tenir com a màxim %d caràcters."
 
 #: src/CronjobModule.php:415
 #, php-format
 msgid "Arguments must be at most %d characters."
-msgstr ""
+msgstr "Els arguments han de tenir com a màxim %d caràcters."
 
 #: src/CronjobModule.php:420
 #, php-format
 msgid "Command must be a %1$s path or an allowlisted core command."
 msgstr ""
+"El comando debe ser una ruta %1$s o un comando principal incluido en la "
+"lista de permitidos."
 
 #: src/CronjobModule.php:428
 #, php-format
 msgid "Invalid command: %s"
-msgstr ""
+msgstr "Ordre invàlida: %s"
 
 #: src/CronjobModule.php:443
 msgid "A job with this name already exists."
-msgstr ""
+msgstr "Ja existeix una feina amb aquest nom."
 
 #: src/CronjobModule.php:462
 msgid "Job saved."
@@ -227,22 +229,25 @@ msgstr "Historial de tasques executades"
 #: src/CronjobModule.php:567
 msgid "Job queued - it will run at the next tick (within 60 seconds)."
 msgstr ""
+"Tasca en cua - s'executarà en el següent tick (en un termini de 60 segons)."
 
 #: src/CronjobModule.php:571
 msgid ""
 "Job queued - it is disabled, so it will run once at the next tick after it "
 "is (re-)enabled."
 msgstr ""
+"Tasca en cua: està desactivada, així que s'executarà una vegada en el "
+"següent tick després de ser (re)activada."
 
 #: src/CronjobModule.php:574 src/CronjobModule.php:601
 #: src/CronjobModule.php:626 src/CronjobModule.php:657
 #: src/CronjobModule.php:698 resources/views/job-history.phtml:43
 msgid "Job not found."
-msgstr ""
+msgstr "No s'ha trobat cap feina."
 
 #: src/CronjobModule.php:597
 msgid "Job enabled."
-msgstr ""
+msgstr "Treball habilitat."
 
 #: src/CronjobModule.php:597
 msgid "Job disabled."
@@ -250,19 +255,19 @@ msgstr "Tasca desactivada."
 
 #: src/CronjobModule.php:622
 msgid "Failure notification enabled."
-msgstr ""
+msgstr "Notificació d'errors habilitada."
 
 #: src/CronjobModule.php:622
 msgid "Failure notification disabled."
-msgstr ""
+msgstr "Notificació d'errors desactivada."
 
 #: src/CronjobModule.php:639
 msgid "Route events disabled."
-msgstr ""
+msgstr "Els esdeveniments de ruta estan desactivats."
 
 #: src/CronjobModule.php:639
 msgid "Route events enabled."
-msgstr ""
+msgstr "Esdeveniments de ruta habilitats."
 
 #: src/CronjobModule.php:664
 msgid ""
@@ -272,11 +277,11 @@ msgstr ""
 
 #: src/CronjobModule.php:682
 msgid "Job reset to the module defaults."
-msgstr ""
+msgstr "La feina s'ha reiniciat als valors per defecte del mòdul."
 
 #: src/CronjobModule.php:696
 msgid "Job deleted."
-msgstr ""
+msgstr "Feina eliminada."
 
 #: src/CronjobModule.php:710
 msgid ""
@@ -289,15 +294,15 @@ msgstr ""
 
 #: src/CronjobModule.php:717
 msgid "Watch daemon started."
-msgstr "Va a començar el procés de vigilància"
+msgstr "Va a començar el procés de vigilància."
 
 #: src/CronjobModule.php:719
 msgid ""
 "The watch daemon could not be started (proc_open is disabled or it is "
 "already running)."
 msgstr ""
-"The watch daemon could not be started (proc_open is disabled or it is "
-"already running)."
+"L'agent de vigilància no s'ha pogut iniciar (proc_open està desactivat o ja "
+"s'està executant)."
 
 #: src/CronjobModule.php:731
 msgid ""
@@ -309,25 +314,25 @@ msgstr ""
 #: src/CronjobModule.php:749
 #, php-format
 msgid "The path may only contain letters, digits, spaces and the characters %s"
-msgstr ""
+msgstr "La ruta només pot contenir lletres, dígits, espais i els caràcters %s"
 
 #: src/CronjobModule.php:757
 msgid "PHP binary: automatic detection enabled."
-msgstr ""
+msgstr "Binaris de PHP: detecció automàtica habilitada."
 
 #: src/CronjobModule.php:758
 #, php-format
 msgid "PHP binary set to %s."
-msgstr ""
+msgstr "El binari de PHP s'ha establert a %s."
 
 #: src/CronjobModule.php:829
 msgid "Webhook token regenerated - update any external sender."
-msgstr ""
+msgstr "Token del webhook regenerat - actualitza qualsevol remitent extern."
 
 #. I18N: default title of the pseudo-events job (job list in the cronjob admin)
 #: cron-jobs.php:54
 msgid "Cronjob: Pseudo-Events (log-table pollers)"
-msgstr ""
+msgstr "Cronjob: Pseudoesdeveniments (processadors de la taula de registres)"
 
 #. I18N: command description for pseudo-events.php (command catalog in the cronjob admin)
 #: cron-jobs.php:70
@@ -335,27 +340,36 @@ msgid ""
 "Poll the webtrees log table (failed logins, logins, logouts, errors, record "
 "edits, searches) and queue one event per new matching log entry for the tick."
 msgstr ""
+"Consultar periòdicament la taula de registres de webtrees (inicis de sessió "
+"fallits, inicis de sessió, tancaments de sessió, errors, edicions de "
+"registres i cerques) i posar en cua un esdeveniment per cada nova entrada "
+"del registre que coincideixi amb els criteris en cada cicle."
 
 #. I18N: parameter description for --force (command catalog in the cronjob admin)
 #: cron-jobs.php:76
 msgid "Bypass the 5-minute cooldown (a manual run)."
-msgstr ""
+msgstr "Ometre el període d’espera de 5 minuts (execució manual)."
 
 #. I18N: command description for smoke-job.php (command catalog in the cronjob admin)
 #: cron-jobs.php:84
 msgid "Acceptance-test job for the cronjob module. It only prints and exits 0."
 msgstr ""
+"Tasca de prova d'acceptació per al mòdul cronjob. Només imprimeix i surt amb "
+"0."
 
 #. I18N: parameter description for --sleep=N (command catalog in the cronjob admin)
 #: cron-jobs.php:90
 msgid "keeps the process alive for N seconds (timeout testing)"
-msgstr ""
+msgstr "Manté el procés actiu durant N segons (prova de temps d'espera)"
 
 #: resources/views/admin.phtml:47
 msgid ""
 "The site is offline (data/offline.txt) - the tick is skipped and no jobs run "
 "until it is removed again (e.g. during a webtrees update)."
 msgstr ""
+"El lloc està fora de línia (dada/offline.txt) - la marca s'omiteix i cap "
+"tasca s'executa fins que es torni a eliminar (p. ex. durant una "
+"actualització de webtrees)."
 
 #: resources/views/admin.phtml:53
 msgid ""
@@ -363,15 +377,20 @@ msgid ""
 "modules_v4/cronjob/vendor/ (see the module README, section \"Bundled "
 "dependency\"). Scheduling is paused until then."
 msgstr ""
+"Biblioteca cron adjunta absent: copia dragonmantank/cron-expression a "
+"modules_v4/cronjob/vendor/ (vegeu el README del mòdul, secció \"Dependència "
+"adjunta\"). La programació està aturada fins aleshores."
 
 #: resources/views/admin.phtml:58 resources/views/job-form.phtml:159
 #, php-format
 msgid "All times are UTC (webtrees server time). Current time (UTC): %s"
 msgstr ""
+"Tots els horaris són UTC (hora del servidor de webtrees). Hora actual (UTC): "
+"%s"
 
 #: resources/views/admin.phtml:63 resources/views/admin.phtml:263
 msgid "Installation"
-msgstr ""
+msgstr "Instal·lació"
 
 #: resources/views/admin.phtml:63
 #, php-format
@@ -379,11 +398,13 @@ msgid ""
 "The tick does not appear to have run yet, so this module does not yet have "
 "any functionality. Please refer to the information in the “%s” section."
 msgstr ""
+"La marca de selecció encara no s'ha activat, així que aquest mòdul encara no "
+"té cap funcionalitat. Si us plau, consulteu la informació a la secció \"%s\"."
 
 #: resources/views/admin.phtml:67
 #, php-format
 msgid "Time elapsed since the last tick execution: %s s"
-msgstr ""
+msgstr "Temps transcorregut des de l'última execució de tick: %s s"
 
 #: resources/views/admin.phtml:74 resources/views/job-form.phtml:76
 msgid "New Job"
@@ -393,14 +414,16 @@ msgstr "Nova tarea"
 msgid ""
 "No jobs yet. Create the first one (e.g. the linkenhancer link-index update)."
 msgstr ""
+"Encara no hi ha cap tasca. Crea la primera (p. ex. l'actualització de "
+"l'índex de vincles de Linkenhancer)."
 
 #: resources/views/admin.phtml:91 resources/views/job-form.phtml:130
 msgid "Triggers"
-msgstr ""
+msgstr "Disparadors"
 
 #: resources/views/admin.phtml:92
 msgid "Next Run (UTC)"
-msgstr "Següent execució (UTC)"
+msgstr "Pròxima sortida (UTC)"
 
 #: resources/views/admin.phtml:93
 msgid "Last Run"
@@ -408,7 +431,7 @@ msgstr "Darrera execució"
 
 #: resources/views/admin.phtml:95
 msgid "Notify"
-msgstr ""
+msgstr "Notificar"
 
 #: resources/views/admin.phtml:96
 msgid "Timeout"
@@ -433,11 +456,11 @@ msgstr ""
 
 #: resources/views/admin.phtml:132
 msgid "no trigger"
-msgstr ""
+msgstr "cap disparador"
 
 #: resources/views/admin.phtml:137 resources/views/job-history.phtml:48
 msgid "event"
-msgstr ""
+msgstr "esdeveniment"
 
 #: resources/views/admin.phtml:141
 msgid ""
@@ -445,18 +468,21 @@ msgid ""
 "detector) - the job can never fire on it. Edit the job and pick a current "
 "event."
 msgstr ""
+"Aquest esdeveniment ja no existeix (actualització del nucli, canvi de mapeig "
+"o detector integrat eliminat) – la tasca mai no s'executa. Edita la tasca i "
+"selecciona un esdeveniment actual."
 
 #: resources/views/admin.phtml:142
 msgid "unknown event"
-msgstr ""
+msgstr "esdeveniment desconegut"
 
 #: resources/views/admin.phtml:178
 msgid "triggered by"
-msgstr ""
+msgstr "activat per"
 
 #: resources/views/admin.phtml:182 resources/views/job-history.phtml:30
 msgid "History"
-msgstr ""
+msgstr "Història"
 
 #: resources/views/admin.phtml:190 resources/views/admin.phtml:200
 #: resources/views/admin.phtml:407
@@ -471,23 +497,23 @@ msgstr "inhabilitat"
 #: resources/views/admin.phtml:200
 #, php-format
 msgid "notify on failure: %s"
-msgstr ""
+msgstr "Notificar en caso de error: %s"
 
 #: resources/views/admin.phtml:206
 msgid "s"
-msgstr ""
+msgstr "s"
 
 #: resources/views/admin.phtml:213
 msgid "Run at the next tick (within 60 seconds)"
-msgstr ""
+msgstr "Ejecutar en el siguiente tick (en un plazo de 60 segundos)"
 
 #: resources/views/admin.phtml:213
 msgid ""
 "The job is disabled - the queued run happens at the next tick after it is "
 "(re-)enabled"
 msgstr ""
-"La tasca is disabled - the queued run happens at the next tick after it is "
-"(re-)enabled"
+"El trabajo está desactivado; la ejecución en cola se lleva a cabo en el "
+"siguiente tick tras su (re)activación."
 
 #: resources/views/admin.phtml:214
 msgid "Run now"
@@ -498,12 +524,12 @@ msgid ""
 "Open the form prefilled with a copy of this job (new -copy slug, starts "
 "disabled)"
 msgstr ""
-"Abre el formulario ya rellenado con una copia de esta tarea (nueva - slug de "
-"copia, desactivada inicialmente)"
+"Obre el formulari preomplert amb una còpia d'aquesta tasca (nova – còpia de "
+"slug, habilitat per defecte)"
 
 #: resources/views/admin.phtml:220
 msgid "Duplicate"
-msgstr ""
+msgstr "Duplicat"
 
 #: resources/views/admin.phtml:224
 msgid ""
@@ -556,7 +582,7 @@ msgstr "Darrera activitat (UTC): %s"
 #: resources/views/admin.phtml:287
 #, php-format
 msgid "PID: %d"
-msgstr ""
+msgstr "PID: %d"
 
 #: resources/views/admin.phtml:293
 msgid "Stop watch"
@@ -576,14 +602,18 @@ msgid ""
 "built-in watch daemon must call the tick once per minute. Pick the option "
 "for your OS below - the paths are already filled in for this installation."
 msgstr ""
+"El mòdul en si no s'inicia. Un desencadenant del sistema operatiu (un "
+"temporitzador per minut) o l'agent de rellotge integrat ha de cridar tick "
+"una vegada al minut. Tria l'opció per al teu sistema operatiu a continuació: "
+"els camins ja estan omplerts per a aquesta instal·lació."
 
 #: resources/views/admin.phtml:314
 msgid "Option: Windows Task Scheduler (every minute)"
-msgstr ""
+msgstr "Opció: Programador de tasques de Windows (cada minut)"
 
 #: resources/views/admin.phtml:317
 msgid "Install command"
-msgstr ""
+msgstr "Instal·la el comandament"
 
 #: resources/views/admin.phtml:320
 msgid ""
@@ -600,19 +630,19 @@ msgstr ""
 
 #: resources/views/admin.phtml:323
 msgid "Option A: classic cron (every minute)"
-msgstr ""
+msgstr "Opció A: cron clàssic (cada minut)"
 
 #: resources/views/admin.phtml:328
 msgid "Option B: systemd timer"
-msgstr ""
+msgstr "Opció B: temporitzador de systemd"
 
 #: resources/views/admin.phtml:334
 msgid "Install commands"
-msgstr ""
+msgstr "Ordres d'Instal·lació"
 
 #: resources/views/admin.phtml:344
 msgid "PHP CLI binary"
-msgstr ""
+msgstr "Binaris CLI de PHP"
 
 #: resources/views/admin.phtml:346
 msgid ""
@@ -621,24 +651,24 @@ msgid ""
 "detection."
 msgstr ""
 "L'intèrpret CLI que el mòdul utilitza per als seus scripts PHP (per al "
-"procés vigila, el spawn del daemon i les comandes d'instal·lació de triggers "
+"procés vigila, el spawn del daemon i les ordres d'instal·lació de triggers "
 "anteriors). Deixa el camp buit per a la detecció automàtica."
 
 #: resources/views/admin.phtml:349
 msgid "Currently used:"
-msgstr ""
+msgstr "Actualment s'utilitza:"
 
 #: resources/views/admin.phtml:350
 msgid "(none found)"
-msgstr ""
+msgstr "(no se n'ha trobat cap)"
 
 #: resources/views/admin.phtml:352
 msgid "manual path"
-msgstr ""
+msgstr "ruta manual"
 
 #: resources/views/admin.phtml:352
 msgid "auto-detected"
-msgstr ""
+msgstr "detectat automàticament"
 
 #: resources/views/admin.phtml:357
 #, php-format
@@ -646,6 +676,8 @@ msgid ""
 "The manual path %s is not a usable PHP CLI binary (missing, not executable "
 "or an fpm build) - automatic detection is used instead."
 msgstr ""
+"La ruta manual %s no és un binari PHP CLI usable (falta, no és executable o "
+"no és una compilació FPM) - s'utilitza la detecció automàtica."
 
 #: resources/views/admin.phtml:362
 msgid ""
@@ -658,7 +690,7 @@ msgstr ""
 
 #: resources/views/admin.phtml:369
 msgid "e.g. /usr/bin/php8.3 - empty = automatic detection"
-msgstr ""
+msgstr "p. ex. /usr/bin/php8.3 - buit = detecció automàtica"
 
 #: resources/views/admin.phtml:373
 msgid ""
@@ -670,7 +702,7 @@ msgstr ""
 
 #: resources/views/admin.phtml:391
 msgid "Pseudo-Events (log-table polling)"
-msgstr ""
+msgstr "Pseudo-esdeveniments (enquesta de taula de registre)"
 
 #: resources/views/admin.phtml:393
 msgid ""
@@ -680,6 +712,13 @@ msgid ""
 "entry; an event-triggered job then acts on it. The first run only records a "
 "baseline and does not fire."
 msgstr ""
+"webtrees no disposa d'un bus d'esdeveniments, de manera que les accions "
+"principals s'observen mitjançant peticions periòdiques. El mòdul llegeix les "
+"noves entrades de la taula de registre (intents d'inici de sessió fallits, "
+"inici de sessió, tancament de sessió, errors, edicions de registres, "
+"cerques) com a màxim cada 5 minuts i posa en cua un esdeveniment per cada "
+"entrada; un treball desencadenat per esdeveniments actua a continuació. La "
+"primera execució només registra una línia de base i no s'executa."
 
 #: resources/views/admin.phtml:394
 msgid ""
@@ -687,10 +726,13 @@ msgid ""
 "runs in the tick child process - isolated from any web request and bounded "
 "by its timeout."
 msgstr ""
+"Per activar, habilita la tasca \"cronjob:pseudo-events\" a la taula "
+"superior. S'executa en el procés fill tick, aïllat de qualsevol sol·licitud "
+"web i limitat pel seu temps d'espera."
 
 #: resources/views/admin.phtml:401
 msgid "Route events (request-triggered)"
-msgstr ""
+msgstr "Esdeveniments de ruta (activats per una sol·licitud)"
 
 #: resources/views/admin.phtml:403
 msgid ""
@@ -699,18 +741,24 @@ msgid ""
 "events above. Only curated routes fire, only while this is enabled AND a "
 "matching event job is listening."
 msgstr ""
+"Detecta mutacions directament a partir de la seva ruta HTTP (per exemple, "
+"una edició de nota) i posa immediatament en cua un esdeveniment "
+"corresponent, a més dels pseudo-esdeveniments de sondeig esmentats "
+"anteriorment. Només s'executen les rutes curades, i només mentre això "
+"estigui habilitat i hi hagi un treball d'esdeveniments corresponent en "
+"escolta."
 
 #: resources/views/admin.phtml:412
 msgid "Disable route events"
-msgstr ""
+msgstr "Desactiva els esdeveniments de ruta"
 
 #: resources/views/admin.phtml:412
 msgid "Enable route events"
-msgstr ""
+msgstr "Activa els esdeveniments de ruta"
 
 #: resources/views/admin.phtml:420
 msgid "Event webhook (external trigger)"
-msgstr ""
+msgstr "Webhook d'esdeveniment (disparador extern)"
 
 #: resources/views/admin.phtml:423
 msgid ""
@@ -719,28 +767,35 @@ msgid ""
 "token is required (send it in the X-Cronjob-Token header) and the endpoint "
 "is rate-limited."
 msgstr ""
+"Els sistemes externs poden posar un esdeveniment a la cua mitjançant una "
+"petició GET a l'endpoint següent. Cada esdeveniment posat a la cua executa "
+"les tasques disparades per l'esdeveniment corresponent en el següent tick. "
+"El token és necessari (envia'l al capçal X-Cronjob-Token) i l'endpoint està "
+"sotmès a limitació de velocitat."
 
 #: resources/views/admin.phtml:431
 msgid "Endpoint"
-msgstr ""
+msgstr "Endpoint (Punt final)"
 
 #: resources/views/admin.phtml:436
 msgid ""
 "GET with query params event=<name> and data=<json> (optional); send the "
 "token in the X-Cronjob-Token header."
 msgstr ""
+"GET amb paràmetres de consulta event=<name> i data=<json> (opcional); envia "
+"el token a l'encapçalament X-Cronjob-Token."
 
 #: resources/views/admin.phtml:441
 msgid "Token"
-msgstr ""
+msgstr "Token"
 
 #: resources/views/admin.phtml:450
 msgid "Regenerate token"
-msgstr ""
+msgstr "Regenera el token"
 
 #: resources/views/admin.phtml:460
 msgid "Event catalog"
-msgstr ""
+msgstr "Cataleg d'esdeveniments"
 
 #: resources/views/admin.phtml:462
 msgid ""
@@ -749,18 +804,23 @@ msgid ""
 "enabled job. Synced by the tick; use these names in the “Event name” field "
 "of an event job."
 msgstr ""
+"Tots els noms d'esdeveniments coneguts: anunciats pels mòduls, pseudo-"
+"esdeveniments integrats (cronjob:…), esdeveniments de ruta (_route:…) i noms "
+"que actualment escolta una tasca habilitada. Sincronitzats pel tick; "
+"utilitzeu aquests noms al camp \"Nom de l'esdeveniment\" d'una tasca "
+"d'esdeveniment."
 
 #: resources/views/admin.phtml:474
 msgid "Payload"
-msgstr ""
+msgstr "Càrrega útil"
 
 #: resources/views/admin.phtml:495
 msgid "Commands"
-msgstr ""
+msgstr "Ordres"
 
 #: resources/views/admin.phtml:503
 msgid "Command catalog"
-msgstr ""
+msgstr "Catàleg d’ordres"
 
 #: resources/views/admin.phtml:505
 msgid ""
@@ -770,19 +830,25 @@ msgid ""
 "internal scripts (e.g. cronjob tick/watch/wrap) are not offered. Use these "
 "in the “Command” field of a job."
 msgstr ""
+"Totes les comandes que pot executar un treball: les comandes core permeses, "
+"les ordres anunciades pels mòduls (amb els seus paràmetres disponibles) i "
+"els scripts de la CLI dels mòduls. Un mòdul que anuncia ordres gestiona la "
+"seva pròpia llista, de manera que els seus scripts interns (p. ex. cronjob "
+"tick/watch/wrap) no s'ofereixen. Utilitzeu-les al camp \"Ordre\" d'un "
+"treball."
 
 #: resources/views/admin.phtml:514 resources/views/job-form.phtml:206
 #: resources/views/job-form.phtml:209
 msgid "Command"
-msgstr ""
+msgstr "Ordre"
 
 #: resources/views/admin.phtml:518
 msgid "Parameters"
-msgstr ""
+msgstr "Paràmetres"
 
 #: resources/views/admin.phtml:536 resources/views/job-form.phtml:284
 msgid "required"
-msgstr ""
+msgstr "obligatori"
 
 #: resources/views/job-form.phtml:69
 #, php-format
@@ -795,29 +861,32 @@ msgstr "Edita treball"
 
 #: resources/views/job-form.phtml:94
 msgid "Name (slug)"
-msgstr ""
+msgstr "Nom (slug)"
 
 #: resources/views/job-form.phtml:101
 msgid "This job is offered by a module, so its name is fixed."
-msgstr ""
+msgstr "Aquesta feina s'ofereix per mòdul, per tant el seu nom és fix."
 
 #: resources/views/job-form.phtml:103
 msgid "Used as identifier, not shown to users."
-msgstr ""
+msgstr "S'utilitza com a identificador, no es mostra als usuaris."
 
 #: resources/views/job-form.phtml:112
 msgid "Update link index"
-msgstr ""
+msgstr "Actualitza l'índex d'enllaços"
 
 #: resources/views/job-form.phtml:124
 msgid "Notify administrators on failure"
-msgstr ""
+msgstr "Notificar els administradors en cas d'error"
 
 #: resources/views/job-form.phtml:125
 msgid ""
 "On failure, message the site’s administrator accounts (e-mail and/or "
 "internal message, per each admin’s own contact preference)."
 msgstr ""
+"En cas d'error, envieu un missatge als comptes d'administrador del lloc "
+"(correu electrònic i/o missatge intern, segons la preferència de contacte de "
+"cada administrador)."
 
 #: resources/views/job-form.phtml:132
 msgid ""
@@ -875,11 +944,11 @@ msgstr "Afegir activador d'esdeveniment"
 #: resources/views/job-form.phtml:218
 #, php-format
 msgid "A %1s path or an allowlisted core command (%2$s)."
-msgstr ""
+msgstr "Un camí %1s o un comandament bàsic permès (%2$s)."
 
 #: resources/views/job-form.phtml:223
 msgid "Arguments (optional)"
-msgstr ""
+msgstr "Arguments (opcional)"
 
 #: resources/views/job-form.phtml:227
 #, php-format
@@ -907,7 +976,7 @@ msgstr ""
 
 #: resources/views/job-form.phtml:283
 msgid "Available parameters"
-msgstr ""
+msgstr "Paràmetres disponibles"
 
 #: resources/views/job-history.phtml:53
 msgid "or"
@@ -919,11 +988,11 @@ msgstr "Encara no s'han registrat inicis."
 
 #: resources/views/job-history.phtml:66
 msgid "Trigger"
-msgstr ""
+msgstr "Desencadenador"
 
 #: resources/views/job-history.phtml:69
 msgid "Exit"
-msgstr ""
+msgstr "Sortir"
 
 #: resources/views/job-history.phtml:71
 msgid "Output"
