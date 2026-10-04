@@ -35,57 +35,29 @@ It was originally developed as a support module for [LinkEnhancer](https://codeb
 3. Install the trigger (classic cron, systemd timer, or Windows Task Scheduler -
    the module's admin page (`Control panel → Cron Job Scheduler`) generates the
    block for your OS with the paths of *this* installation already filled in).
-4. Create your first job in the admin UI.
-
-## Translations
-
-> ✅ [Contribute on Codeberg Weblate](https://translate.codeberg.org/projects/wt-modules/cronjob/)
-
-## Usage
-
-### Creating a job
-
-`Control panel → Cron Job Scheduler → New Job`:
-
-| Field | Meaning |
-| :--- | :--- |
-| **Name (slug)** | technical identifier, `a-z 0-9 _ -`. **Read-only for module-offered jobs** (their `<module>:<name>` key is fixed and cannot be retargeted); editable for jobs you create yourself. |
-| **Title** | human readable name |
-| **Triggers** | one or more **time triggers** (cron schedules) and/or one or more **event triggers** (runs when a named event is queued) - the job fires when *any* of its triggers fires. At least one trigger is required. Rows can be added/removed in the form. See "Event-driven jobs". |
-| **Cron expression** | (time trigger) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). Multiple cron rows are possible (e.g. hourly *and* a daily full run). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 3 runs per expression. |
-| **Event name** | (event trigger) the event this job reacts to, e.g. `linkenhancer:index-dirty`. Multiple event rows are possible. Suggestions come from the **event catalog** (module announcements, built-in pseudo-events `cronjob:…`, route events `_route:…` and listened names); any own name (webhook / direct module push) works too. Slug or `<domain>:slug`, max 64 chars. |
-| **Command** | a `modules_v4/<module>/cli/<script>.php` path or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting`. Suggestions come from the **command catalog** (core allowlist + module announcements + module scripts). When the entered command matches an announced command, its **available parameters** are listed as a hint under the field. |
-| **Arguments** | plain options/values only (e.g. `--limit=5000`), max 10 tokens |
-| **Timeout** | 30 - 3600 s |
-| **Notify on failure** | opt-in: alert the administrator accounts when this job fails |
-
-![New Cronjob](resources/img/new-cronjob.png)
-
-The **Run now** button queues the job for the next tick (≤ 60 s). For a **disabled**
-job the queued run happens at the first tick *after* it is (re-)enabled - the button
-tooltip and the flash message say so (there is deliberately no guard: disabling the
-job right after the click reaches the same state anyway). The **History** page shows
-status, exit code, duration, the **trigger that fired the run** (the due cron
-expression(s) or the event name) and the captured output (last 64 KB) of the last 25
-runs per job (plus a 30-day global retention window).
-
-![New Cronjob](resources/img/run-history.png)
-
-The job table is a **client-side DataTable** (search box, sortable columns, paging,
-state saved in the browser) - no extra setup needed. The **Enabled** and **Notify**
-columns can be toggled in place (click the ✓/✗ button) without opening the form, and
-the **Timeout** column shows each job's per-run timeout in seconds. Per row there are additional
-actions: **Duplicate** opens the create form prefilled with a copy of the job
-(new `-copy` slug, starts disabled; for module-offered jobs the `<module>:` name
-prefix is removed, since the colon cannot be entered in the form), and **Reset**
-(only for jobs offered by a module manifest) restores the module's currently-offered
-defaults. If a save fails validation, the form is re-rendered with all entered
-values kept (plus the error messages) - nothing you typed is lost.
+4. Trigger installation (once) - see next section
+5. Create your first job in the admin UI or configure and activate registered jobs.
 
 ### Trigger installation (once)
 
+> [!IMPORTANT]
+> **PHP CLI binary:** the admin page's *Installation* accordion shows which
+> PHP CLI interpreter is currently resolved (badge: *auto-detected* /
+> *manual path*) and lets you pin a manual path (empty = automatic detection).
+> The chosen binary is used for the watch daemon spawn **and** in all generated
+> trigger commands. Auto-detection tries `PHP_BINARY` (in a CLI context) and
+> then `PHP_BINDIR` + `PATH` for `php` / version-specific names (e.g.
+> `php8.3`), skipping fpm builds. A manual path that is not a usable CLI php
+> (missing, not executable, fpm build) is flagged in the admin page and
+> auto-detection is used instead.
+
+It is important to check whether your web server provides a PHP-CLI binary (SAPI) and
+whether the module is configured correctly to use it. Otherwise, **tick** will not work
+and this module will have no effect.
+The tick is designed to run every 60 seconds. It makes an inventory of cron jobs, commands and event, triggers events and process the task queue.
+
 Pick **one** of the options shown in the module's admin page (classic cron, a
-systemd timer, a Windows Task Scheduler task, or the built-in watch daemon):
+systemd timer, a Windows Task Scheduler task, or the built-in watch daemon) as a trigger for the tick:
 
 **Option A - classic cron** (one line in the web server user's crontab, runs every
 minute):
@@ -130,13 +102,58 @@ sudo systemctl enable --now cronjob-tick.timer
 **Option C - watch daemon** (no OS timer at all): click *Start watch* on the
 admin page. A resident process then runs the tick every 60 seconds, and a
 page-load watchdog respawns it if it dies. Use it when the host has no cron and
-no systemd access — on Windows hosts this is the simplest option.
+no systemd access or just for testing purpuses — on Windows hosts this is the simplest option.
+After a restart of the server you have to activate it again manually.
+
+<details>
+<summary>How the watch daemon works</summary>
+
+- **Opt-in:** nothing runs until you click *Start watch*; *Stop watch* removes it
+  (the daemon exits within about a minute and is not respawned).
+- **Liveness:** the daemon holds `data/cronjob/watch.lock` for its whole life.
+  The watchdog (a per-request module middleware, on every page load) respawns it only
+  when that lock is free, the watch is enabled, the site is online, and at
+  least 5 minutes have passed since the last spawn attempt. With the watch
+  disabled the watchdog costs a single `file_exists()` per page load.
+- **Idle & offline:** while the site is offline it stays idle (no tick);
+  otherwise it ticks every 60 s. All state lives in `data/cronjob/`.
+- **Data files:** every file the module creates (locks, state, logs, opt-in
+  markers) lives in `data/cronjob/`. Flat `data/cronjob-*` files left over from
+  earlier development versions are ignored and may be deleted (the watch opt-in
+  then has to be confirmed once).
+- **Self-update:** if the module is re-deployed the daemon detects the changed
+  files and exits, so a fresh daemon picks up the new code.
+- **Self-heal:** an enabled time job whose `next_run_at` ends up `NULL`
+  (e.g. after a code/DB restore while the cron library was temporarily
+  missing) is re-scheduled at its next slot on the following tick - it can
+  never get stuck. While the cron library is missing, a run leaves
+  `next_run_at` untouched instead of zeroing it.
+- **PID:** the running daemon's PID is shown in the Watch fieldset of the
+  admin page. Liveness itself is a file lock (flock), which the OS releases
+  as soon as the daemon dies.
+- **Works under php-fpm / mod_php:** the daemon is spawned with a resolved PHP
+  *CLI* interpreter (under the web SAPI `PHP_BINARY` is empty or the server
+  binary, which cannot run scripts), so *Start watch* from the browser works.
+  The binary can be pinned to a manual path in the admin page (see *PHP CLI
+  binary* above); the choice is stored in `data/cronjob/php-binary`.
+- **Detached:** the daemon is spawned with `setsid` into its own session, so it
+  survives an FPM **worker** recycle and even an FPM **master** restart; only
+  stopping the whole web service / container, or *Stop watch*, ends it (the
+  watchdog otherwise self-heals on the next page load). Disabling the *module*
+  does not stop the daemon (use *Stop watch*); the ticks simply no-op.
+- It is one resident PHP process that sleeps between ticks (negligible CPU).
+  Use this **or** the OS trigger, not both.
+
+</details>
 
 **Option D - Windows Task Scheduler** (Windows hosts, no cron/systemd): the
 admin page generates the XML below with the paths of this installation already
 filled in (example with placeholder paths). Save it as `wt-cronjob-tick.xml`
 (UTF-8) and run `schtasks /Create /F /XML wt-cronjob-tick.xml` once in an
 elevated prompt (or use Task Scheduler → Actions → *Import Task…*):
+
+> [!INFO]
+> Config example was not yet tested!
 
 <details>
 <summary>Example xml config file</summary>
@@ -186,8 +203,8 @@ elevated prompt (or use Task Scheduler → Actions → *Import Task…*):
   </Actions>
 </Task>
 ```
-</details>
 
+</details>
 
 The task then runs the tick every minute as the logged-on user
 (`InteractiveToken`, no password needed for the import); for a server running
@@ -198,56 +215,52 @@ the module's own `data/cronjob/tick.lock` keep runs from overlapping;
 idempotent, so that is safe). Output goes to `data\cronjob\tick.log`. All
 interpolated paths are double-quoted, so paths containing spaces work.
 
-**PHP CLI binary:** the admin page's *Installation* accordion shows which
-PHP CLI interpreter is currently resolved (badge: *auto-detected* /
-*manual path*) and lets you pin a manual path (empty = automatic detection).
-The chosen binary is used for the watch daemon spawn **and** in all generated
-trigger commands. Auto-detection tries `PHP_BINARY` (in a CLI context) and
-then `PHP_BINDIR` + `PATH` for `php` / version-specific names (e.g.
-`php8.3`), skipping fpm builds. A manual path that is not a usable CLI php
-(missing, not executable, fpm build) is flagged in the admin page and
-auto-detection is used instead.
+## Translations
 
-<details>
-<summary>How the watch daemon works</summary>
+> ✅ [Contribute on Codeberg Weblate](https://translate.codeberg.org/projects/wt-modules/cronjob/)
 
-- **Opt-in:** nothing runs until you click *Start watch*; *Stop watch* removes it
-  (the daemon exits within about a minute and is not respawned).
-- **Liveness:** the daemon holds `data/cronjob/watch.lock` for its whole life.
-  The watchdog (a per-request module middleware, on every page load) respawns it only
-  when that lock is free, the watch is enabled, the site is online, and at
-  least 5 minutes have passed since the last spawn attempt. With the watch
-  disabled the watchdog costs a single `file_exists()` per page load.
-- **Idle & offline:** while the site is offline it stays idle (no tick);
-  otherwise it ticks every 60 s. All state lives in `data/cronjob/`.
-- **Data files:** every file the module creates (locks, state, logs, opt-in
-  markers) lives in `data/cronjob/`. Flat `data/cronjob-*` files left over from
-  earlier development versions are ignored and may be deleted (the watch opt-in
-  then has to be confirmed once).
-- **Self-update:** if the module is re-deployed the daemon detects the changed
-  files and exits, so a fresh daemon picks up the new code.
-- **Self-heal:** an enabled time job whose `next_run_at` ends up `NULL`
-  (e.g. after a code/DB restore while the cron library was temporarily
-  missing) is re-scheduled at its next slot on the following tick - it can
-  never get stuck. While the cron library is missing, a run leaves
-  `next_run_at` untouched instead of zeroing it.
-- **PID:** the running daemon's PID is shown in the Watch fieldset of the
-  admin page. Liveness itself is a file lock (flock), which the OS releases
-  as soon as the daemon dies.
-- **Works under php-fpm / mod_php:** the daemon is spawned with a resolved PHP
-  *CLI* interpreter (under the web SAPI `PHP_BINARY` is empty or the server
-  binary, which cannot run scripts), so *Start watch* from the browser works.
-  The binary can be pinned to a manual path in the admin page (see *PHP CLI
-  binary* above); the choice is stored in `data/cronjob/php-binary`.
-- **Detached:** the daemon is spawned with `setsid` into its own session, so it
-  survives an FPM **worker** recycle and even an FPM **master** restart; only
-  stopping the whole web service / container, or *Stop watch*, ends it (the
-  watchdog otherwise self-heals on the next page load). Disabling the *module*
-  does not stop the daemon (use *Stop watch*); the ticks simply no-op.
-- It is one resident PHP process that sleeps between ticks (negligible CPU).
-  Use this **or** the OS trigger, not both.
+## Usage
 
-</details>
+### Creating a job
+
+`Control panel → Cron Job Scheduler → New Job`:
+
+| Field | Meaning |
+| :--- | :--- |
+| **Name (slug)** | technical identifier, `a-z 0-9 _ -`. **Read-only for module-offered jobs** (their `<module>:<name>` key is fixed and cannot be retargeted); editable for jobs you create yourself. |
+| **Title** | human readable name |
+| **Triggers** | one or more **time triggers** (cron schedules) and/or one or more **event triggers** (runs when a named event is queued) - the job fires when *any* of its triggers fires. At least one trigger is required. Rows can be added/removed in the form. See "Event-driven jobs". |
+| **Cron expression** | (time trigger) standard 5-field cron (`*/30 * * * *`), or a macro (`@daily`, `@weekly`, ...). Multiple cron rows are possible (e.g. hourly *and* a daily full run). **Times are UTC** (the webtrees server time basis - the same basis the core uses for all timestamps). The form previews the next 3 runs per expression. |
+| **Event name** | (event trigger) the event this job reacts to, e.g. `linkenhancer:index-dirty`. Multiple event rows are possible. Suggestions come from the **event catalog** (module announcements, built-in pseudo-events `cronjob:…`, route events `_route:…` and listened names); any own name (webhook / direct module push) works too. Slug or `<domain>:slug`, max 64 chars. |
+| **Command** | a `modules_v4/<module>/cli/<script>.php` path or an allowlisted core command: `tree-export`, `tree-list`, `user-list`, `site-setting`. Suggestions come from the **command catalog** (core allowlist + module announcements + module scripts). When the entered command matches an announced command, its **available parameters** are listed as a hint under the field. |
+| **Arguments** | plain options/values only (e.g. `--limit=5000`), max 10 tokens |
+| **Timeout** | 30 - 3600 s |
+| **Notify on failure** | opt-in: alert the administrator accounts when this job fails |
+
+Available event names and commands are provided as [datalists](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/datalist) in order to make data entry easier.
+
+![New Cronjob](resources/img/new-cronjob.png)
+
+The **Run now** button queues the job for the next tick (≤ 60 s). For a **disabled**
+job the queued run happens at the first tick *after* it is (re-)enabled - the button
+tooltip and the flash message say so (there is deliberately no guard: disabling the
+job right after the click reaches the same state anyway). The **History** page shows
+status, exit code, duration, the **trigger that fired the run** (the due cron
+expression(s) or the event name) and the captured output (last 64 KB) of the last 25
+runs per job (plus a 30-day global retention window).
+
+![New Cronjob](resources/img/run-history.png)
+
+The job table is a **client-side DataTable** (search box, sortable columns, paging,
+state saved in the browser) - no extra setup needed. The **Enabled** and **Notify**
+columns can be toggled in place (click the ✓/✗ button) without opening the form, and
+the **Timeout** column shows each job's per-run timeout in seconds. Per row there are additional
+actions: **Duplicate** opens the create form prefilled with a copy of the job
+(new `-copy` slug, starts disabled; for module-offered jobs the `<module>:` name
+prefix is removed, since the colon cannot be entered in the form), and **Reset**
+(only for jobs offered by a module manifest) restores the module's currently-offered
+defaults. If a save fails validation, the form is re-rendered with all entered
+values kept (plus the error messages) - nothing you typed is lost.
 
 ## Security
 
