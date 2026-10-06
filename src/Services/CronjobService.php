@@ -35,6 +35,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventServic
 use Schwendinger\Webtrees\Module\Cronjob\Services\RouteEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Services\CliBootstrap;
 
 use function array_map;
