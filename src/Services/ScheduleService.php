@@ -29,7 +29,6 @@ use Cron\CronExpression;
 use DateTimeImmutable;
 use DateTimeZone;
 use DomainException;
-use Fisharebest\Webtrees\DB;
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Module\ModuleInterface;
 use Fisharebest\Webtrees\Registry;
@@ -49,7 +48,6 @@ use function array_merge;
 use function array_values;
 use function class_exists;
 use function count;
-use function date;
 use function explode;
 use function in_array;
 use function is_array;
@@ -63,7 +61,6 @@ use function str_contains;
 use function str_pad;
 use function strpos;
 use function strlen;
-use function strtotime;
 use function substr;
 use function trim;
 use function usort;
@@ -71,7 +68,12 @@ use function usort;
 use const STR_PAD_LEFT;
 
 /**
- * Schedule state machine for cj_job / cj_run.
+ * Cron schedule math, trigger normalization, job-spec validation and
+ * external job discovery for the cronjob module.
+ *
+ * Database access for cj_job / cj_run / cj_job_trigger lives in
+ * JobRepository - this class only computes (the discovery methods read
+ * and write jobs through the repository).
  *
  * All cron evaluation and all stored timestamps use UTC - the same basis
  * the webtrees core uses (Webtrees::bootstrap() sets the default timezone
@@ -84,16 +86,6 @@ use const STR_PAD_LEFT;
 final class ScheduleService {
 
     public const TIMEZONE = 'UTC';
-
-    public const STATUS_RUNNING = 'running';
-    public const STATUS_OK      = 'ok';
-    public const STATUS_ERROR   = 'error';
-    public const STATUS_TIMEOUT = 'timeout';
-
-    public const RUN_RETENTION_PER_JOB = 25;
-    public const RUN_RETENTION_DAYS    = 30;
-    /** A 'running' row older than this can no longer have a live process. */
-    public const STUCK_AFTER_SECONDS   = 3660;
 
     /** Trigger types for cj_job_trigger.trigger_type (§13). */
     public const TRIGGER_TIME  = 'time';
@@ -484,239 +476,6 @@ final class ScheduleService {
         }
 
         return implode(', ', $parts);
-    }
-
-    /**
-     * Jobs that are enabled and due now (next_run_at <= $now, UTC).
-     *
-     * @return list<object>
-     */
-    public static function dueJobs(string $now): array {
-        return DB::table('cj_job')
-            ->where('enabled', 1)
-            ->whereNotNull('next_run_at')
-            ->where('next_run_at', '<=', $now)
-            ->orderBy('next_run_at')
-            ->get()
-            ->all();
-    }
-
-    /**
-     * Self-heal for stranded schedule jobs: an enabled job with a time
-     * trigger whose next_run_at is NULL is never picked up by dueJobs()
-     * again (it filters on next_run_at IS NOT NULL). That state can arise
-     * after a code/DB restore, a manual DB edit or a crash - e.g. when a
-     * run happened while the cron library was missing. Such jobs are
-     * re-scheduled at their NEXT slot (no catch-up flood). No-op while the
-     * cron library is missing (nextRunMin() then yields NULL).
-     *
-     * @return int number of repaired jobs
-     */
-    public static function repairStrandedSchedules(string $now): int {
-        $repaired = 0;
-        $stranded = DB::table('cj_job')
-            ->where('enabled', 1)
-            ->whereNull('next_run_at')
-            ->get()
-            ->all();
-
-        foreach ($stranded as $job) {
-            $next = self::nextRunForRepair(self::jobTriggers((int) $job->id), $now);
-            if ($next !== null) {
-                DB::table('cj_job')->where('id', '=', (int) $job->id)->update([
-                    'next_run_at' => $next,
-                    'updated_at'  => $now,
-                ]);
-                $repaired++;
-            }
-        }
-
-        return $repaired;
-    }
-
-    /**
-     * Enabled event-triggered jobs matching one event name (phase 2, §6.1;
-     * §13: the trigger lives in cj_job_trigger, so a job with several event
-     * triggers matches each of them).
-     *
-     * @return list<object>
-     */
-    public static function eventJobs(string $event_name): array {
-        return DB::table('cj_job')
-            ->join('cj_job_trigger', 'cj_job_trigger.job_id', '=', 'cj_job.id')
-            ->where('cj_job.enabled', 1)
-            ->where('cj_job_trigger.trigger_type', '=', self::TRIGGER_EVENT)
-            ->where('cj_job_trigger.event_name', '=', $event_name)
-            ->orderBy('cj_job.id')
-            ->select('cj_job.*')
-            ->get()
-            ->all();
-    }
-
-    /**
-     * @return object|null
-     */
-    public static function findJob(string $name): ?object {
-        return DB::table('cj_job')->where('name', '=', $name)->first();
-    }
-
-    /**
-     * Insert a new 'running' run row. Returns the new run id.
-     */
-    public static function startRun(int $job_id, string $trigger, string $started_at, string $trigger_detail = ''): int {
-        return (int) DB::table('cj_run')->insertGetId([
-            'job_id'         => $job_id,
-            'trigger'        => $trigger,
-            'trigger_detail' => $trigger_detail !== '' ? $trigger_detail : null,
-            'started_at'     => $started_at,
-            'status'         => self::STATUS_RUNNING,
-        ]);
-    }
-
-    /**
-     * Close a run row after the child process finished.
-     */
-    public static function finishRun(int $run_id, string $status, int $exit_code, int $duration_ms, string $output, string $finished_at): void {
-        DB::table('cj_run')->where('id', '=', $run_id)->update([
-            'status'      => $status,
-            'exit_code'   => $exit_code,
-            'duration_ms' => $duration_ms,
-            'output'      => $output,
-            'finished_at' => $finished_at,
-        ]);
-    }
-
-    /**
-     * After a run: update the job's last_* fields and recompute next_run_at
-     * as the minimum over the job's time triggers (§13; NULL when the job
-     * has no time trigger). While the cron library is missing, next_run_at
-     * is left untouched: writing NULL would silently strand the job
-     * (dueJobs() skips NULL), while the stale value keeps it running - a
-     * visible, self-healing degraded state.
-     *
-     * @param list<array{type: string, cron: string, event: string}> $triggers
-     */
-    public static function updateJobAfterRun(object $job, array $triggers, string $now, string $status, int $exit_code): void {
-        $values = [
-            'last_run_at' => $now,
-            'last_exit'   => $exit_code,
-            'last_status' => $status,
-            'updated_at'  => $now,
-        ];
-
-        if (self::hasCronLibrary()) {
-            $values['next_run_at'] = self::nextRunMin($triggers, $now);
-        }
-
-        DB::table('cj_job')->where('id', '=', (int) $job->id)->update($values);
-    }
-
-    /**
-     * The trigger rows of one job (§13), in the canonical shape used by
-     * normalizeTriggers()/nextRunMin()/replaceJobTriggers().
-     *
-     * @return list<array{type: string, cron: string, event: string}>
-     */
-    public static function jobTriggers(int $job_id): array {
-        $triggers = [];
-        foreach (DB::table('cj_job_trigger')->where('job_id', '=', $job_id)->get() as $row) {
-            $triggers[] = [
-                'type'  => (string) $row->trigger_type,
-                'cron'  => (string) ($row->cron ?? ''),
-                'event' => (string) ($row->event_name ?? ''),
-            ];
-        }
-
-        return $triggers;
-    }
-
-    /**
-     * Replace all trigger rows of a job (§13) - delete + insert, in one go.
-     * The caller passes an already-validated, normalized trigger list.
-     *
-     * @param list<array{type: string, cron: string, event: string}> $triggers
-     */
-    public static function replaceJobTriggers(int $job_id, array $triggers): void {
-        DB::table('cj_job_trigger')->where('job_id', '=', $job_id)->delete();
-        foreach ($triggers as $trigger) {
-            DB::table('cj_job_trigger')->insert([
-                'job_id'       => $job_id,
-                'trigger_type' => (string) $trigger['type'],
-                'cron'         => $trigger['type'] === self::TRIGGER_TIME ? (string) $trigger['cron'] : null,
-                'event_name'   => $trigger['type'] === self::TRIGGER_EVENT ? (string) $trigger['event'] : null,
-            ]);
-        }
-    }
-
-    /**
-     * All trigger rows grouped by job id (§13) - one query for the admin table.
-     *
-     * @return array<int, list<array{type: string, cron: string, event: string}>>
-     */
-    public static function allJobTriggers(): array {
-        $grouped = [];
-        foreach (DB::table('cj_job_trigger')->get() as $row) {
-            $grouped[(int) $row->job_id][] = [
-                'type'  => (string) $row->trigger_type,
-                'cron'  => (string) ($row->cron ?? ''),
-                'event' => (string) ($row->event_name ?? ''),
-            ];
-        }
-
-        return $grouped;
-    }
-
-    /**
-     * Mark 'running' rows that can no longer have a live process
-     * (tick died, server restart, ...).
-     */
-    public static function markStuckRuns(string $now): void {
-        $threshold = date('Y-m-d H:i:s', strtotime($now) - self::STUCK_AFTER_SECONDS);
-
-        DB::table('cj_run')
-            ->where('status', '=', self::STATUS_RUNNING)
-            ->where('started_at', '<', $threshold)
-            ->update([
-                'status'      => self::STATUS_TIMEOUT,
-                'finished_at' => $now,
-                'exit_code'   => -9,
-            ]);
-    }
-
-    /**
-     * Keep the history small: last RUN_RETENTION_PER_JOB runs per job
-     * and nothing older than RUN_RETENTION_DAYS.
-     */
-    public static function trimHistory(string $now): void {
-        $threshold = date('Y-m-d H:i:s', strtotime($now) - self::RUN_RETENTION_DAYS * 86400);
-
-        // Older than the global retention window.
-        DB::table('cj_run')->where('started_at', '<', $threshold)->delete();
-
-        // Beyond the per-job retention count (oldest rows first).
-        $job_ids = DB::table('cj_run')->select('job_id')->groupBy('job_id')->pluck('job_id');
-        foreach ($job_ids as $job_id) {
-            $count  = (int) DB::table('cj_run')->where('job_id', '=', $job_id)->count();
-            $excess = $count - self::RUN_RETENTION_PER_JOB;
-            if ($excess <= 0) {
-                continue;
-            }
-            $ids = DB::table('cj_run')
-                ->where('job_id', '=', $job_id)
-                ->orderBy('id')
-                ->limit($excess)
-                ->pluck('id');
-            if ($ids->isNotEmpty()) {
-                DB::table('cj_run')->whereIn('id', $ids->all())->delete();
-            }
-        }
-    }
-
-    /**
-     * The current time in the storage basis (UTC).
-     */
-    public static function now(): string {
-        return (new \DateTime("now", new DateTimeZone(self::TIMEZONE)))->format('Y-m-d H:i:s');
     }
 
     // =========================================================================
@@ -1146,13 +905,13 @@ final class ScheduleService {
      */
     public static function upsertDiscoveredJob(string $module, array $spec, string $now): void {
         $key = trim($module, '_') . ':' . (string) $spec['name'];
-        if (strlen($key) === 0 || strlen($key) > 64 || self::findJob($key) !== null) {
+        if (strlen($key) === 0 || strlen($key) > 64 || JobRepository::findByName($key) !== null) {
             return;
         }
 
         $triggers = (array) ($spec['triggers'] ?? []);
 
-        $job_id = (int) DB::table('cj_job')->insertGetId([
+        $job_id = JobRepository::insertJob([
             'name'         => $key,
             'title'        => (string) $spec['title'],
             'command_type' => (string) $spec['command_type'],
@@ -1164,7 +923,7 @@ final class ScheduleService {
             'created_at'   => $now,
             'updated_at'   => $now,
         ]);
-        self::replaceJobTriggers($job_id, $triggers);
+        JobRepository::replaceJobTriggers($job_id, $triggers);
     }
 
     /**
@@ -1176,7 +935,7 @@ final class ScheduleService {
      * so a module update (manifest change) converges within one tick.
      */
     public static function syncDiscoveredJobs(): void {
-        $now = self::now();
+        $now = JobRepository::now();
         foreach (self::discoverExternalJobs() as $entry) {
             if (trim((string) $entry['module'], '_') === trim(CronjobUtils::MODULE_NAME, '_')) {
                 self::syncOwnOfferedJob($entry['spec'], $now);
@@ -1247,7 +1006,7 @@ final class ScheduleService {
             return;
         }
 
-        $job = self::findJob($key);
+        $job = JobRepository::findByName($key);
         if ($job === null) {
             self::upsertDiscoveredJob(CronjobUtils::MODULE_NAME, $spec, $now);
 
@@ -1256,7 +1015,7 @@ final class ScheduleService {
 
         $row  = [
             'title'        => (string) $job->title,
-            'triggers_key' => self::triggersKey(self::jobTriggers((int) $job->id)),
+            'triggers_key' => self::triggersKey(JobRepository::jobTriggers((int) $job->id)),
             'command_type' => (string) $job->command_type,
             'command'      => (string) $job->command,
             'args'         => (string) $job->args,
@@ -1274,10 +1033,10 @@ final class ScheduleService {
 
         // Re-place the triggers and reschedule only when the schedule itself changed.
         if (in_array('triggers_key', $diff, true)) {
-            self::replaceJobTriggers((int) $job->id, $triggers);
+            JobRepository::replaceJobTriggers((int) $job->id, $triggers);
             $values['next_run_at'] = self::nextRunMin($triggers, $now);
         }
 
-        DB::table('cj_job')->where('id', '=', (int) $job->id)->update($values);
+        JobRepository::updateJobById((int) $job->id, $values);
     }
 }

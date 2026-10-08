@@ -204,6 +204,23 @@ final class EventQueue {
     }
 
     /**
+     * The events that triggered the given runs (cj_event_run cross table;
+     * empty for time-based jobs).
+     *
+     * @param list<int> $run_ids
+     *
+     * @return list<object> rows with run_id, event_name, payload, created_at
+     */
+    public static function eventsForRuns(array $run_ids): array {
+        return DB::table('cj_event_run', 'r')
+            ->join('cj_event', 'cj_event.id', '=', 'r.event_id')
+            ->whereIn('r.run_id', $run_ids)
+            ->orderBy('cj_event.created_at')
+            ->get(['r.run_id', 'cj_event.event_name', 'cj_event.payload', 'cj_event.created_at'])
+            ->all();
+    }
+
+    /**
      * Drop handled events older than the retention window. (Pending events are
      * kept - a stopped tick must not lose queued work.)
      */

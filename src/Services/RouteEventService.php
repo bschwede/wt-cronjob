@@ -600,12 +600,7 @@ final class RouteEventService {
     }
 
     private static function hasListener(string $event): bool {
-        return DB::table('cj_job')
-            ->join('cj_job_trigger', 'cj_job_trigger.job_id', '=', 'cj_job.id')
-            ->where('cj_job.enabled', 1)
-            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
-            ->where('cj_job_trigger.event_name', '=', $event)
-            ->exists();
+        return JobRepository::hasListenerFor($event);
     }
 
     /**

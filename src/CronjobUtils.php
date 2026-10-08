@@ -25,7 +25,6 @@ declare(strict_types=1);
 
 namespace Schwendinger\Webtrees\Module\Cronjob;
 
-use Fisharebest\Webtrees\DB;
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Webtrees;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
@@ -49,8 +48,9 @@ use function strpos;
 use function substr;
 
 /**
- * Module-level helpers: schema migration, job registry access,
- * script discovery and the generated trigger-installation blocks.
+ * Module-level helpers: naming, script discovery and the generated
+ * trigger-installation blocks. (Job registry access lives in
+ * Services\JobRepository.)
  */
 final class CronjobUtils {
 
@@ -61,86 +61,6 @@ final class CronjobUtils {
     private const MODULE_SCRIPT_PATTERN = '#^modules_v4/[a-z0-9_\-]+/cli/[a-z0-9_\-]+\.php$#';
 
     /**
-     * All jobs plus the data of their most recent run.
-     *
-     * @return list<array<string, mixed>>
-     */
-    public static function listJobs(): array {
-        $jobs = DB::table('cj_job')->orderBy('name')->get()->all();
-
-        $latest = [];
-        $runs   = DB::table('cj_run')
-            ->get(['id', 'job_id', 'started_at', 'finished_at', 'status', 'exit_code', 'duration_ms', 'trigger', 'trigger_detail'])
-            ->all();
-        foreach ($runs as $run) {
-            $job_id = (int) $run->job_id;
-            if (!isset($latest[$job_id]) || strcmp((string) $run->started_at, (string) $latest[$job_id]->started_at) > 0) {
-                $latest[$job_id] = $run;
-            }
-        }
-
-        foreach ($jobs as $job) {
-            $job->last_run = $latest[(int) $job->id] ?? null;
-        }
-
-        return $jobs;
-    }
-
-    /**
-     * @return object|null
-     */
-    public static function findJob(int $id): ?object {
-        return DB::table('cj_job')->where('id', '=', $id)->first();
-    }
-
-    /**
-     * Insert or update a job row. $data keys: name, title, triggers
-     * (normalized list, see ScheduleService::normalizeTriggers()),
-     * command_type, command, args, timeout_sec, enabled, created_at.
-     *
-     * With $id > 0 the existing row is updated by id - renaming a job
-     * (changing its slug) then works instead of creating a duplicate.
-     * next_run_at is (re)computed from $now as the minimum over the time
-     * triggers (§13); the trigger rows are replaced.
-     *
-     * @param array<string, mixed> $data
-     */
-    public static function saveJob(array $data, string $now, int $id = 0): void {
-        $triggers = (array) ($data['triggers'] ?? []);
-
-        $values = [
-            'title'        => $data['title'],
-            'command_type' => $data['command_type'],
-            'command'      => $data['command'],
-            'args'         => $data['args'],
-            'enabled'      => $data['enabled'] ? 1 : 0,
-            'notify'       => (!empty($data['notify'])) ? 1 : 0,
-            'timeout_sec'  => $data['timeout_sec'],
-            'next_run_at'  => Services\ScheduleService::nextRunMin($triggers, $now),
-            'updated_at'   => $now,
-        ];
-
-        if ($id > 0) {
-            DB::table('cj_job')->where('id', '=', $id)->update($values + [
-                'name' => $data['name'],
-            ]);
-        } else {
-            $id = (int) DB::table('cj_job')->insertGetId($values + [
-                'name'       => $data['name'],
-                'created_at' => $data['created_at'] ?? $now,
-            ]);
-        }
-        Services\ScheduleService::replaceJobTriggers($id, $triggers);
-    }
-
-    /**
-     * Delete a job (run history is removed by the FK cascade).
-     */
-    public static function deleteJob(int $id): void {
-        DB::table('cj_job')->where('id', '=', $id)->delete();
-    }
-
-    /**
      * Next free slug for a duplicated job: <base>-copy, <base>-copy2, …
      * The base is truncated to 59 chars so the suffix still fits into the
      * 64-char cj_job.name column.
@@ -148,7 +68,7 @@ final class CronjobUtils {
      * @param (callable(string): bool)|null $exists returns true if $slug is taken (default: cj_job DB check)
      */
     public static function uniqueCopySlug(string $base, ?callable $exists = null): string {
-        $exists ??= static fn (string $slug): bool => DB::table('cj_job')->where('name', '=', $slug)->exists();
+        $exists ??= static fn (string $slug): bool => Services\JobRepository::nameExists($slug);
 
         $base = substr($base, 0, 59);
         $n    = 1;

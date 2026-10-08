@@ -50,6 +50,7 @@ use Schwendinger\Webtrees\Helpers\Functions;
 use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CommandCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\JobRepository;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
@@ -191,7 +192,7 @@ class CronjobModule extends AbstractModule
         }
 
         // Triggers grouped by job id (§13) - one query for the whole table.
-        $triggers_by_job = ScheduleService::allJobTriggers();
+        $triggers_by_job = JobRepository::allJobTriggers();
 
         // Event triggers assigned to a job that no longer exist (a route
         // event vanished from the live route map, a built-in pseudo-event
@@ -217,10 +218,10 @@ class CronjobModule extends AbstractModule
         return $this->viewResponse($this->name() . '::admin', [
             'title'       => $this->title(),
             'module'      => $this,
-            'jobs'        => CronjobUtils::listJobs(),
+            'jobs'        => JobRepository::listJobs(),
             'offline'     => CliBootstrap::siteIsOffline(),
             'cron_lib'    => ScheduleService::hasCronLibrary(),
-            'cron_now'    => ScheduleService::now(),
+            'cron_now'    => JobRepository::now(),
             'install'     => CronjobUtils::triggerInstallBlocks(),
             'php'           => WatchService::phpBinaryInfo(),
             'watch'         => WatchService::status(),
@@ -243,11 +244,11 @@ class CronjobModule extends AbstractModule
 
         $job_id    = Validator::queryParams($request)->integer('job', 0);
         $duplicate = Validator::queryParams($request)->integer('duplicate', 0);
-        $job       = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job       = $job_id > 0 ? JobRepository::findById($job_id) : null;
         $copy_of   = null;
 
         if ($job === null && $duplicate > 0) {
-            $source = CronjobUtils::findJob($duplicate);
+            $source = JobRepository::findById($duplicate);
             if ($source !== null) {
                 $job          = clone $source;
                 $job->id      = 0;
@@ -271,7 +272,7 @@ class CronjobModule extends AbstractModule
             $trigger_source_id = $duplicate;
         }
         if ($trigger_source_id > 0) {
-            foreach (ScheduleService::jobTriggers($trigger_source_id) as $trigger) {
+            foreach (JobRepository::jobTriggers($trigger_source_id) as $trigger) {
                 if ($trigger['type'] === ScheduleService::TRIGGER_TIME) {
                     $triggers_time[] = $trigger['cron'];
                 } else {
@@ -321,7 +322,7 @@ class CronjobModule extends AbstractModule
                     continue;
                 }
                 try {
-                    $previews[$i] = ScheduleService::upcomingRuns((string) $cron, 3, ScheduleService::now());
+                    $previews[$i] = ScheduleService::upcomingRuns((string) $cron, 3, JobRepository::now());
                 } catch (DomainException | RuntimeException) {
                     $previews[$i] = null;
                 }
@@ -339,7 +340,7 @@ class CronjobModule extends AbstractModule
             // that announces commands curates its own list, so its internal
             // scripts (tick/watch/wrap) are not offered here.
             'command_catalog' => CommandCatalogService::listCatalog(),
-            'cron_now'       => ScheduleService::now(),
+            'cron_now'       => JobRepository::now(),
             'triggers_time'  => $triggers_time,
             'triggers_event' => $triggers_event,
             'cron_previews'  => $previews,
@@ -368,7 +369,7 @@ class CronjobModule extends AbstractModule
         $job_id         = $data->integer('job_id', 0);
         $copy_of        = $data->string('copy_of', '') !== '' ? $data->string('copy_of') : null;
 
-        $existing = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $existing = $job_id > 0 ? JobRepository::findById($job_id) : null;
 
         // Submitted values, restored when the save fails (form re-render).
         $form_values = [
@@ -438,15 +439,15 @@ class CronjobModule extends AbstractModule
         }
 
         // Renaming onto another job's slug would overwrite that job.
-        $foreign = DB::table('cj_job')->where('name', '=', $name)->first();
+        $foreign = JobRepository::findByName($name);
         if ($foreign !== null && ($existing === null || (int) $foreign->id !== (int) $existing->id)) {
             FlashMessages::addMessage(I18N::translate('A job with this name already exists.'), 'danger');
 
             return $this->storeFormAndRedirect($form_values, $notify, $copy_of, (int) ($existing?->id ?? 0));
         }
 
-        $now = ScheduleService::now();
-        CronjobUtils::saveJob([
+        $now = JobRepository::now();
+        JobRepository::saveJob([
             'name'         => $name,
             'title'        => $title,
             'triggers'     => $trigger_result['triggers'],
@@ -495,7 +496,7 @@ class CronjobModule extends AbstractModule
         $this->layout = 'layouts/administration';
 
         $job_id   = Validator::queryParams($request)->integer('job', 0);
-        $job      = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job      = $job_id > 0 ? JobRepository::findById($job_id) : null;
         $page     = max(1, Validator::queryParams($request)->integer('page', 1));
         $per_page = 25;
 
@@ -503,26 +504,14 @@ class CronjobModule extends AbstractModule
         $total      = 0;
         $run_events = [];
         if ($job !== null) {
-            $total = (int) DB::table('cj_run')->where('job_id', '=', $job->id)->count();
-            $runs  = DB::table('cj_run')
-                ->where('job_id', '=', $job->id)
-                ->orderByDesc('started_at')
-                ->orderByDesc('id')
-                ->limit($per_page)
-                ->offset(($page - 1) * $per_page)
-                ->get()
-                ->all();
+            $total = JobRepository::countRuns((int) $job->id);
+            $runs  = JobRepository::pagedRuns((int) $job->id, $page, $per_page);
 
             // Events that triggered the runs of this page (cj_event_run
             // cross table; empty for time-based jobs).
             if ($runs !== []) {
                 $run_ids = array_map(static fn (object $run): int => (int) $run->id, $runs);
-                $rows    = DB::table('cj_event_run', 'r')
-                    ->join('cj_event', 'cj_event.id', '=', 'r.event_id')
-                    ->whereIn('r.run_id', $run_ids)
-                    ->orderBy('cj_event.created_at')
-                    ->get(['r.run_id', 'cj_event.event_name', 'cj_event.payload', 'cj_event.created_at'])
-                    ->all();
+                $rows    = EventQueue::eventsForRuns($run_ids);
                 foreach ($rows as $row) {
                     $run_events[(int) $row->run_id][] = [
                         'name'       => (string) $row->event_name,
@@ -540,7 +529,7 @@ class CronjobModule extends AbstractModule
             'runs'       => $runs,
             'run_events' => $run_events,
             // The job's current triggers (§13) for the header line.
-            'triggers'   => $job !== null ? ScheduleService::jobTriggers((int) $job->id) : [],
+            'triggers'   => $job !== null ? JobRepository::jobTriggers((int) $job->id) : [],
             'page'       => $page,
             'per_page'   => $per_page,
             'total'      => $total,
@@ -555,14 +544,11 @@ class CronjobModule extends AbstractModule
      */
     public function postAdminJobRunNowAction(ServerRequestInterface $request): ResponseInterface {
         $job_id = Validator::parsedBody($request)->integer('job_id', 0);
-        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job    = $job_id > 0 ? JobRepository::findById($job_id) : null;
 
         if ($job !== null) {
-            $now = ScheduleService::now();
-            DB::table('cj_job')->where('id', '=', $job_id)->update([
-                'next_run_at' => $now,
-                'updated_at'  => $now,
-            ]);
+            $now = JobRepository::now();
+            JobRepository::queueForNextTick($job_id, $now);
             if ((int) $job->enabled === 1) {
                 FlashMessages::addMessage(I18N::translate('Job queued - it will run at the next tick (within 60 seconds).'), 'success');
             } else {
@@ -582,17 +568,12 @@ class CronjobModule extends AbstractModule
      */
     public function postAdminJobToggleAction(ServerRequestInterface $request): ResponseInterface {
         $job_id = Validator::parsedBody($request)->integer('job_id', 0);
-        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job    = $job_id > 0 ? JobRepository::findById($job_id) : null;
 
         if ($job !== null) {
-            $now     = ScheduleService::now();
+            $now     = JobRepository::now();
             $enabled = (int) $job->enabled === 0 ? 1 : 0;
-            DB::table('cj_job')->where('id', '=', $job_id)->update([
-                'enabled'    => $enabled,
-                // A disabled job keeps its next_run_at; on re-enable the
-                // single catch-up run happens (no burst).
-                'updated_at' => $now,
-            ]);
+            JobRepository::setEnabled($job_id, $enabled, $now);
             FlashMessages::addMessage(
                 $enabled ? I18N::translate('Job enabled.') : I18N::translate('Job disabled.'),
                 'success'
@@ -609,15 +590,12 @@ class CronjobModule extends AbstractModule
      */
     public function postAdminJobNotifyToggleAction(ServerRequestInterface $request): ResponseInterface {
         $job_id = Validator::parsedBody($request)->integer('job_id', 0);
-        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job    = $job_id > 0 ? JobRepository::findById($job_id) : null;
 
         if ($job !== null) {
-            $now    = ScheduleService::now();
+            $now    = JobRepository::now();
             $notify = (int) $job->notify === 0 ? 1 : 0;
-            DB::table('cj_job')->where('id', '=', $job_id)->update([
-                'notify'     => $notify,
-                'updated_at' => $now,
-            ]);
+            JobRepository::setNotify($job_id, $notify, $now);
             FlashMessages::addMessage(
                 $notify ? I18N::translate('Failure notification enabled.') : I18N::translate('Failure notification disabled.'),
                 'success'
@@ -651,7 +629,7 @@ class CronjobModule extends AbstractModule
      */
     public function postAdminJobResetAction(ServerRequestInterface $request): ResponseInterface {
         $job_id = Validator::parsedBody($request)->integer('job_id', 0);
-        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job    = $job_id > 0 ? JobRepository::findById($job_id) : null;
 
         if ($job === null) {
             FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
@@ -666,7 +644,7 @@ class CronjobModule extends AbstractModule
             return redirect($this->getConfigLink());
         }
 
-        CronjobUtils::saveJob([
+        JobRepository::saveJob([
             'name'         => (string) $job->name,
             'title'        => (string) $spec['title'],
             'triggers'     => (array) ($spec['triggers'] ?? []),
@@ -677,7 +655,7 @@ class CronjobModule extends AbstractModule
             'enabled'      => (bool) $spec['enabled'],
             'notify'       => (int) $job->notify === 1,
             'created_at'   => (string) $job->created_at,
-        ], ScheduleService::now(), (int) $job->id);
+        ], JobRepository::now(), (int) $job->id);
 
         FlashMessages::addMessage(I18N::translate('Job reset to the module defaults.'), 'success');
 
@@ -689,10 +667,10 @@ class CronjobModule extends AbstractModule
      */
     public function postAdminJobDeleteAction(ServerRequestInterface $request): ResponseInterface {
         $job_id = Validator::parsedBody($request)->integer('job_id', 0);
-        $job    = $job_id > 0 ? CronjobUtils::findJob($job_id) : null;
+        $job    = $job_id > 0 ? JobRepository::findById($job_id) : null;
 
         if ($job !== null) {
-            CronjobUtils::deleteJob($job_id);
+            JobRepository::deleteJob($job_id);
             FlashMessages::addMessage(I18N::translate('Job deleted.'), 'success');
         } else {
             FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
