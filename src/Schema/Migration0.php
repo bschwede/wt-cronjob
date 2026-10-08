@@ -71,7 +71,7 @@ class Migration0 implements MigrationInterface
                 $table->unsignedInteger('timeout_sec')->default(300);
                 // Notify the site administrators when the job fails.
                 $table->boolean('notify')->default(false);
-                // Minimum over all time triggers (see ScheduleService::nextRunMin()).
+                // Minimum over all time triggers (see TriggerService::nextRunMin()).
                 $table->timestamp('next_run_at', 0)->nullable()->default(null);
                 $table->timestamp('last_run_at', 0)->nullable()->default(null);
                 $table->smallInteger('last_exit', false)->nullable()->default(null);

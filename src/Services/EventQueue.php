@@ -68,7 +68,7 @@ final class EventQueue {
      * built-in pseudo-events `cronjob:*`, module-announced `<module>:*`).
      * The domain may start with an underscore (reserved domains). The total
      * length (colon included) is capped at 64 by the callers
-     * (CronjobUtils::isValidEventName / push()).
+     * (JobNaming::isValidEventName / push()).
      */
     public const NAME_PATTERN = '/^(?:[a-z0-9_][a-z0-9_\-]*:)?[a-z0-9][a-z0-9_\-]{0,63}$/';
 
@@ -201,6 +201,23 @@ final class EventQueue {
         } catch (PDOException) {
             // (event_id, run_id) unique - already recorded.
         }
+    }
+
+    /**
+     * The events that triggered the given runs (cj_event_run cross table;
+     * empty for time-based jobs).
+     *
+     * @param list<int> $run_ids
+     *
+     * @return list<object> rows with run_id, event_name, payload, created_at
+     */
+    public static function eventsForRuns(array $run_ids): array {
+        return DB::table('cj_event_run', 'r')
+            ->join('cj_event', 'cj_event.id', '=', 'r.event_id')
+            ->whereIn('r.run_id', $run_ids)
+            ->orderBy('cj_event.created_at')
+            ->get(['r.run_id', 'cj_event.event_name', 'cj_event.payload', 'cj_event.created_at'])
+            ->all();
     }
 
     /**

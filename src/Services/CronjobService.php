@@ -33,7 +33,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\RouteEventService;
-use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CronExpressionService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Services\CliBootstrap;
@@ -108,7 +108,7 @@ final class CronjobService {
      * expression library is present (time triggers need it).
      */
     public static function isFunctional(): bool {
-        return self::isEnabled() && self::isMigrated() && ScheduleService::hasCronLibrary();
+        return self::isEnabled() && self::isMigrated() && CronExpressionService::hasCronLibrary();
     }
 
     /**
@@ -124,7 +124,7 @@ final class CronjobService {
         if (!self::isMigrated()) {
             $problems[] = 'not_migrated';
         }
-        if (!ScheduleService::hasCronLibrary()) {
+        if (!CronExpressionService::hasCronLibrary()) {
             $problems[] = 'cron_library_missing';
         }
         // tick_stale only when the tick ran before and then stopped - and the
@@ -197,10 +197,7 @@ final class CronjobService {
             return [];
         }
 
-        return array_map(
-            static fn (object $job): string => (string) $job->name,
-            DB::table('cj_job')->orderBy('name')->get()->all()
-        );
+        return JobRepository::jobNames();
     }
 
     /**
@@ -210,8 +207,9 @@ final class CronjobService {
         if (!self::isMigrated()) {
             return false;
         }
+        $job = JobRepository::findByName($name);
 
-        return (int) DB::table('cj_job')->where('name', '=', $name)->value('enabled') === 1;
+        return $job !== null && (int) $job->enabled === 1;
     }
 
     /**
@@ -226,7 +224,7 @@ final class CronjobService {
         if (!self::isMigrated()) {
             return null;
         }
-        $job = ScheduleService::findJob($name);
+        $job = JobRepository::findByName($name);
         if ($job === null) {
             return null;
         }
@@ -240,7 +238,7 @@ final class CronjobService {
             'last_exit'   => $job->last_exit !== null ? (int) $job->last_exit : null,
             'last_status' => $job->last_status !== null ? (string) $job->last_status : null,
             'next_run_at' => $job->next_run_at !== null ? (string) $job->next_run_at : null,
-            'triggers'    => ScheduleService::jobTriggers((int) $job->id),
+            'triggers'    => JobRepository::jobTriggers((int) $job->id),
         ];
     }
 
@@ -256,15 +254,11 @@ final class CronjobService {
         if (!self::isMigrated()) {
             return null;
         }
-        $job = ScheduleService::findJob($name);
+        $job = JobRepository::findByName($name);
         if ($job === null) {
             return null;
         }
-        $run = DB::table('cj_run')
-            ->where('job_id', '=', (int) $job->id)
-            ->orderByDesc('started_at')
-            ->orderByDesc('id')
-            ->first();
+        $run = JobRepository::lastRunFor((int) $job->id);
         if ($run === null) {
             return null;
         }
@@ -293,22 +287,8 @@ final class CronjobService {
         if (!self::isMigrated()) {
             return [];
         }
-        $map  = [];
-        $rows = DB::table('cj_job_trigger')
-            ->join('cj_job', 'cj_job.id', '=', 'cj_job_trigger.job_id')
-            ->where('cj_job.enabled', '=', 1)
-            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
-            ->whereNotNull('cj_job_trigger.event_name')
-            ->select('cj_job_trigger.event_name', 'cj_job.name')
-            ->get()
-            ->all();
 
-        foreach ($rows as $row) {
-            $map[(string) $row->event_name][] = (string) $row->name;
-        }
-        ksort($map);
-
-        return $map;
+        return JobRepository::listenedEvents();
     }
 
     /**
@@ -323,7 +303,7 @@ final class CronjobService {
 
         return array_map(
             static fn (object $job): string => (string) $job->name,
-            ScheduleService::eventJobs($event_name)
+            JobRepository::jobsForEvent($event_name)
         );
     }
 
@@ -382,16 +362,12 @@ final class CronjobService {
         if (!self::isMigrated()) {
             return false;
         }
-        $job = ScheduleService::findJob($name);
+        $job = JobRepository::findByName($name);
         if ($job === null) {
             return false;
         }
 
-        $now = ScheduleService::now();
-        DB::table('cj_job')->where('id', '=', (int) $job->id)->update([
-            'next_run_at' => $now,
-            'updated_at'  => $now,
-        ]);
+        JobRepository::queueForNextTick((int) $job->id, JobRepository::now());
 
         return true;
     }

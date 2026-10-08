@@ -25,12 +25,11 @@ declare(strict_types=1);
 
 namespace Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents;
 
-use Fisharebest\Webtrees\DB;
 use Schwendinger\Webtrees\Helpers\MoreI18N;
 use Schwendinger\Webtrees\Services\CliBootstrap;
 use Schwendinger\Webtrees\Module\Cronjob\Services\DataFiles;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
-use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\JobRepository;
 use Throwable;
 
 use function array_flip;
@@ -241,14 +240,7 @@ final class PseudoEventService {
      * @return list<string>
      */
     private static function activeEventNames(): array {
-        return DB::table('cj_job_trigger')
-            ->join('cj_job', 'cj_job.id', '=', 'cj_job_trigger.job_id')
-            ->where('cj_job.enabled', 1)
-            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
-            ->whereNotNull('cj_job_trigger.event_name')
-            ->distinct()
-            ->pluck('cj_job_trigger.event_name')
-            ->all();
+        return JobRepository::enabledEventNames();
     }
 
     /**

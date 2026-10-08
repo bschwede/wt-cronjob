@@ -118,7 +118,7 @@ final class CommandCatalogService {
             $globbed[] = ['command' => $path, 'module' => self::moduleOf($path)];
         }
 
-        return self::mergeCatalog($core, ScheduleService::discoverExternalCommands(), $globbed);
+        return self::mergeCatalog($core, JobDiscovery::discoverExternalCommands(), $globbed);
     }
 
     /**

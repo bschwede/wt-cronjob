@@ -46,7 +46,8 @@ namespace {
 
     require __DIR__ . '/../autoload.php';
 
-    use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+    use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerInstallService;
+    use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerService;
     use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
     $failures = 0;
@@ -135,7 +136,7 @@ namespace {
     check('findCliPhp: empty when nothing found', $rm_find->invoke(null, [$fakes . '/nope', ''], ['php']) === '');
 
     // 9. triggerInstallBlocks: the Windows Task Scheduler XML is structural.
-    $blocks = \Schwendinger\Webtrees\Module\Cronjob\CronjobUtils::triggerInstallBlocks();
+    $blocks = \Schwendinger\Webtrees\Module\Cronjob\TriggerInstallService::triggerInstallBlocks();
     check('install blocks: windows keys present', isset($blocks['windows_task_xml'], $blocks['windows_import']));
     $xml = (string) $blocks['windows_task_xml'];
     check('win xml: task root + namespace', str_contains($xml, '<Task version="1.2"') && str_contains($xml, 'schemas.microsoft.com/windows/2004/02/mit/task'));
@@ -202,10 +203,10 @@ namespace {
     check('status carries the pid key', array_key_exists('pid', WatchService::status()));
 
     // 12. nextRunForRepair(): the self-heal decision (pure).
-    check('repair: event-only job stays null', ScheduleService::nextRunForRepair([['type' => 'event', 'cron' => '', 'event' => 'x']], '2026-01-01 00:00:00') === null);
-    $repair = ScheduleService::nextRunForRepair([['type' => 'time', 'cron' => '*/10 * * * *', 'event' => '']], '2026-01-01 00:00:00');
+    check('repair: event-only job stays null', TriggerService::nextRunForRepair([['type' => 'event', 'cron' => '', 'event' => 'x']], '2026-01-01 00:00:00') === null);
+    $repair = TriggerService::nextRunForRepair([['type' => 'time', 'cron' => '*/10 * * * *', 'event' => '']], '2026-01-01 00:00:00');
     check('repair: time job gets a next run', is_string($repair) && $repair > '2026-01-01 00:00:00');
-    $mixed = ScheduleService::nextRunForRepair([['type' => 'event', 'cron' => '', 'event' => 'x'], ['type' => 'time', 'cron' => '@hourly', 'event' => '']], '2026-01-01 00:00:00');
+    $mixed = TriggerService::nextRunForRepair([['type' => 'event', 'cron' => '', 'event' => 'x'], ['type' => 'time', 'cron' => '@hourly', 'event' => '']], '2026-01-01 00:00:00');
     check('repair: mixed triggers get a next run', is_string($mixed) && $mixed > '2026-01-01 00:00:00');
 
     // Cleanup

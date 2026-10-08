@@ -103,7 +103,7 @@ final class TickCommand extends Command {
         }
 
         // The tables are created by the module's boot() on the first HTTP request.
-        if (!DB::schema()->hasTable('cj_job') || !DB::schema()->hasTable('cj_run')) {
+        if (!JobRepository::isMigrated()) {
             $output->writeln('cronjob tables missing - open webtrees once so the module can create them');
 
             return 0;
@@ -117,15 +117,15 @@ final class TickCommand extends Command {
         }
 
         try {
-            $now = ScheduleService::now();
-            ScheduleService::markStuckRuns($now);
+            $now = JobRepository::now();
+            JobRepository::markStuckRuns($now);
 
             // Sync externally-offered jobs into cj_job (insert-if-missing,
             // keyed <module>:<name>) and the event/command inventories
             // (catalogs). Skipped under --dry-run so a dry run has no side
             // effects on the registries.
             if (!$dry_run) {
-                ScheduleService::syncDiscoveredJobs();
+                JobDiscovery::syncDiscoveredJobs();
                 try {
                     EventCatalogService::syncCatalog($now);
                 } catch (Throwable $exception) {
@@ -139,9 +139,9 @@ final class TickCommand extends Command {
 
                 // Self-heal: re-schedule enabled time jobs whose next_run_at
                 // is NULL (e.g. after a restore with the cron library
-                // missing) - see ScheduleService::repairStrandedSchedules().
+                // missing) - see JobRepository::repairStrandedSchedules().
                 try {
-                    $repaired = ScheduleService::repairStrandedSchedules($now);
+                    $repaired = JobRepository::repairStrandedSchedules($now);
                     if ($repaired > 0) {
                         $output->writeln('repaired next_run_at for ' . $repaired . ' stranded job(s)');
                     }
@@ -154,7 +154,7 @@ final class TickCommand extends Command {
 
             if (is_string($job_name) && trim($job_name) !== '') {
                 // Manual single-job trigger (--job): run just that job.
-                $job = ScheduleService::findJob(trim($job_name));
+                $job = JobRepository::findByName(trim($job_name));
                 if ($job === null) {
                     $output->writeln('<error>job not found: ' . trim($job_name) . '</error>');
 
@@ -165,7 +165,7 @@ final class TickCommand extends Command {
                 $failures += $result['ok'] ? 0 : 1;
             } else {
                 // Scheduled tick: due time-based jobs, then the event queue.
-                $jobs = ScheduleService::dueJobs($now);
+                $jobs = JobRepository::dueJobs($now);
                 if ($jobs === []) {
                     $output->writeln('no time-based jobs due');
                 }
@@ -179,8 +179,8 @@ final class TickCommand extends Command {
             }
 
             if (!$dry_run) {
-                ScheduleService::trimHistory(ScheduleService::now());
-                EventQueue::purge(ScheduleService::now());
+                JobRepository::trimHistory(JobRepository::now());
+                EventQueue::purge(JobRepository::now());
 
                 // Last-tick marker (mtime): a uniform signal for both trigger
                 // types (the watch daemon runs the same tick.php child). Also
@@ -214,19 +214,19 @@ final class TickCommand extends Command {
         $dry_run     = (bool) $input->getOption('dry-run');
         $full_output = (bool) $input->getOption('full-output');
 
-        $triggers = ScheduleService::jobTriggers((int) $job->id);
+        $triggers = JobRepository::jobTriggers((int) $job->id);
 
         if ($trigger === 'schedule' && $trigger_detail === '') {
             // Which cron(s) were due since the previous run (anchor: last
             // run, or the job creation for never-run jobs)?
             $anchor = (string) ($job->last_run_at ?? $job->created_at);
-            $trigger_detail = implode(' + ', ScheduleService::dueTriggerDetails(
+            $trigger_detail = implode(' + ', TriggerService::dueTriggerDetails(
                 array_values(array_filter(
                     $triggers,
-                    static fn (array $t): bool => $t['type'] === ScheduleService::TRIGGER_TIME
+                    static fn (array $t): bool => $t['type'] === TriggerService::TRIGGER_TIME
                 )),
                 $anchor,
-                ScheduleService::now()
+                JobRepository::now()
             ));
         }
 
@@ -235,8 +235,8 @@ final class TickCommand extends Command {
             $output->writeln('  <error>invalid job definition: ' . $built['error'] . '</error>');
             // Move the schedule forward so a broken job does not re-trigger
             // every minute; a broken definition is a failure to report.
-            ScheduleService::updateJobAfterRun($job, $triggers, ScheduleService::now(), ScheduleService::STATUS_ERROR, -1);
-            NotifyService::notifyJobFailed($job, ScheduleService::STATUS_ERROR, -1, 0, '', ScheduleService::now());
+            JobRepository::updateJobAfterRun($job, $triggers, JobRepository::now(), JobRepository::STATUS_ERROR, -1);
+            NotifyService::notifyJobFailed($job, JobRepository::STATUS_ERROR, -1, 0, '', JobRepository::now());
 
             return ['run_id' => 0, 'ok' => false];
         }
@@ -262,20 +262,20 @@ final class TickCommand extends Command {
             return ['run_id' => 0, 'ok' => true];
         }
 
-        $started_at  = ScheduleService::now();
-        $run_id      = ScheduleService::startRun((int) $job->id, $trigger, $started_at, $trigger_detail);
+        $started_at  = JobRepository::now();
+        $run_id      = JobRepository::startRun((int) $job->id, $trigger, $started_at, $trigger_detail);
         $start_micro = microtime(true);
 
         $result = JobRunner::run($built['argv'], (int) $job->timeout_sec, JobRunner::cwdFor((array) $job, Webtrees::ROOT_DIR), $env);
 
         $duration_ms = (int) round((microtime(true) - $start_micro) * 1000);
         $status      = $result['timed_out']
-            ? ScheduleService::STATUS_TIMEOUT
-            : ($result['exit'] === 0 ? ScheduleService::STATUS_OK : ScheduleService::STATUS_ERROR);
+            ? JobRepository::STATUS_TIMEOUT
+            : ($result['exit'] === 0 ? JobRepository::STATUS_OK : JobRepository::STATUS_ERROR);
 
-        $done = ScheduleService::now();
-        ScheduleService::finishRun($run_id, $status, $result['exit'], $duration_ms, $result['output'], $done);
-        ScheduleService::updateJobAfterRun($job, $triggers, $done, $status, $result['exit']);
+        $done = JobRepository::now();
+        JobRepository::finishRun($run_id, $status, $result['exit'], $duration_ms, $result['output'], $done);
+        JobRepository::updateJobAfterRun($job, $triggers, $done, $status, $result['exit']);
 
         if ($full_output && $result['output'] !== '') {
             foreach (explode("\n", trim($result['output'])) as $line) {
@@ -284,7 +284,7 @@ final class TickCommand extends Command {
         }
         $output->writeln(sprintf('  %s (exit %d, %d ms)', $status, $result['exit'], $duration_ms));
 
-        if ($status !== ScheduleService::STATUS_OK) {
+        if ($status !== JobRepository::STATUS_OK) {
             NotifyService::notifyJobFailed($job, $status, $result['exit'], $duration_ms, $result['output'], $started_at);
 
             return ['run_id' => $run_id, 'ok' => false];
@@ -319,7 +319,7 @@ final class TickCommand extends Command {
 
             $name    = (string) $event->event_name;
             $payload = EventQueue::decodePayload($event);
-            $matched = ScheduleService::eventJobs($name);
+            $matched = JobRepository::jobsForEvent($name);
 
             $output->writeln('event ' . $name . ($matched === [] ? ': no matching job - discarded' : ':'));
 
