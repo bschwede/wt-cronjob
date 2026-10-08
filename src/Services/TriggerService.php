@@ -27,7 +27,6 @@ namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 
 use DomainException;
 use RuntimeException;
-use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 
 use function array_values;
 use function is_array;
