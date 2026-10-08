@@ -103,7 +103,9 @@ sudo systemctl enable --now cronjob-tick.timer
 admin page. A resident process then runs the tick every 60 seconds, and a
 page-load watchdog respawns it if it dies. Use it when the host has no cron and
 no systemd access or just for testing purpuses — on Windows hosts this is the simplest option.
-After a restart of the server you have to activate it again manually.
+After a restart of the web service the daemon is usually killed, but the
+watchdog respawns it on the next page load (details in the box below); a
+wiped `data/cronjob/` (e.g. a fresh container) needs a manual re-activation.
 
 <details>
 <summary>How the watch daemon works</summary>
@@ -137,10 +139,21 @@ After a restart of the server you have to activate it again manually.
   The binary can be pinned to a manual path in the admin page (see *PHP CLI
   binary* above); the choice is stored in `data/cronjob/php-binary`.
 - **Detached:** the daemon is spawned with `setsid` into its own session, so it
-  survives an FPM **worker** recycle and even an FPM **master** restart; only
-  stopping the whole web service / container, or *Stop watch*, ends it (the
-  watchdog otherwise self-heals on the next page load). Disabling the *module*
+  survives an FPM **worker** recycle (e.g. `pm.max_requests`) and even a
+  manually killed FPM **master**; only stopping the whole web service /
+  container, or *Stop watch*, ends it (the watchdog otherwise self-heals on
+  the next page load). Disabling the *module*
   does not stop the daemon (use *Stop watch*); the ticks simply no-op.
+- **Web server restart:** a full service restart by the process manager
+  (typical `systemctl restart`) ends the daemon, because it is a member of the
+  service's cgroup (cgroup membership is inherited at spawn and is not changed
+  by `setsid`); the same holds for a container restart. The death is clean -
+  the OS releases the lock the moment the process dies, so the status never
+  shows a stale daemon - and the opt-in marker in `data/cronjob/` is
+  untouched, so the watchdog respawns the daemon on the next page load
+  (subject to the 5-minute spawn cooldown; an idle site stays without ticks
+  until its next request). If you cannot rely on page loads (long idle
+  periods), use an OS trigger (Option A/B) instead of the daemon or ensure that your site is touched regularly (e.g. by a monitoring tool).
 - It is one resident PHP process that sleeps between ticks (negligible CPU).
   Use this **or** the OS trigger, not both.
 
