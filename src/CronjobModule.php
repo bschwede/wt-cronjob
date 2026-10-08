@@ -57,6 +57,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventServic
 use Schwendinger\Webtrees\Module\Cronjob\Services\RouteEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CronExpressionService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobDiscovery;
+use Schwendinger\Webtrees\Module\Cronjob\Services\JobFormHandler;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobNaming;
 use Schwendinger\Webtrees\Module\Cronjob\Services\SpecValidator;
 use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerInstallService;
@@ -250,64 +251,13 @@ class CronjobModule extends AbstractModule
         $job_id    = Validator::queryParams($request)->integer('job', 0);
         $duplicate = Validator::queryParams($request)->integer('duplicate', 0);
         $job       = $job_id > 0 ? JobRepository::findById($job_id) : null;
-        $copy_of   = null;
-
-        if ($job === null && $duplicate > 0) {
-            $source = JobRepository::findById($duplicate);
-            if ($source !== null) {
-                $job          = clone $source;
-                $job->id      = 0;
-                $job->enabled = 0;
-                // Module-offered jobs are keyed <module>:<name>; the colon
-                // cannot be saved via the form, so the copy's base name
-                // strips the prefix.
-                $job->name    = JobNaming::uniqueCopySlug(JobNaming::copySlugBase((string) $source->name));
-                $copy_of      = (string) $source->title;
-            }
-        }
-
-        // The job's triggers (§13), as plain lists for the form's two
-        // repeatable groups (time rows / event rows).
-        $triggers_time  = [];
-        $triggers_event = [];
-        $trigger_source_id = 0;
-        if ($job !== null) {
-            $trigger_source_id = (int) $job->id;
-        } elseif ($duplicate > 0) {
-            $trigger_source_id = $duplicate;
-        }
-        if ($trigger_source_id > 0) {
-            foreach (JobRepository::jobTriggers($trigger_source_id) as $trigger) {
-                if ($trigger['type'] === TriggerService::TRIGGER_TIME) {
-                    $triggers_time[] = $trigger['cron'];
-                } else {
-                    $triggers_event[] = $trigger['event'];
-                }
-            }
-        }
-        if ($triggers_time === []) {
-            // New job, event-only job, or a legacy row without a usable
-            // trigger: start with one empty cron row (empty rows are
-            // dropped on save).
-            $triggers_time = [''];
-        }
-
-        $notify      = $job !== null ? ((int) $job->notify === 1) : false;
-        $form_values = null;
 
         // PRG: restore the values a failed save stashed (one-shot pull).
         $stashed = Session::pull(self::SESSION_JOB_FORM);
-        if (is_array($stashed) && is_array($stashed['values'] ?? null)) {
-            $form_values    = $stashed['values'];
-            $triggers_time  = array_values(array_map('strval', (array) ($stashed['values']['triggers_time'] ?? $triggers_time)));
-            $triggers_event = array_values(array_map('strval', (array) ($stashed['values']['triggers_event'] ?? $triggers_event)));
-            $notify         = (bool) ($stashed['notify'] ?? $notify);
-            if ($copy_of === null) {
-                $copy_of = $stashed['copy_of'] ?? null;
-            }
-        }
 
-        return $this->jobFormView($job, $copy_of, $triggers_time, $triggers_event, $notify, $form_values);
+        $state = JobFormHandler::formState($job, $duplicate, $stashed);
+
+        return $this->jobFormView($state['job'], $state['copy_of'], $state['triggers_time'], $state['triggers_event'], $state['notify'], $state['form_values']);
     }
 
     /**
@@ -319,20 +269,7 @@ class CronjobModule extends AbstractModule
      * @param array<string, mixed>|null $form_values
      */
     private function jobFormView(?object $job, ?string $copy_of, array $triggers_time, array $triggers_event, bool $notify, ?array $form_values): ResponseInterface {
-        // Next-runs preview per cron row (null when the expression is invalid).
-        $previews = [];
-        if (CronExpressionService::hasCronLibrary()) {
-            foreach ($triggers_time as $i => $cron) {
-                if (trim((string) $cron) === '') {
-                    continue;
-                }
-                try {
-                    $previews[$i] = CronExpressionService::upcomingRuns((string) $cron, 3, JobRepository::now());
-                } catch (DomainException | RuntimeException) {
-                    $previews[$i] = null;
-                }
-            }
-        }
+        $previews = JobFormHandler::cronPreviews($triggers_time);
 
         return $this->viewResponse($this->name() . '::job-form', [
             'title'        => I18N::translate('Cron Job Scheduler'),
@@ -376,7 +313,6 @@ class CronjobModule extends AbstractModule
 
         $existing = $job_id > 0 ? JobRepository::findById($job_id) : null;
 
-        // Submitted values, restored when the save fails (form re-render).
         $form_values = [
             'name'           => $name,
             'title'          => $title,
@@ -388,55 +324,19 @@ class CronjobModule extends AbstractModule
             'enabled'        => $enabled,
         ];
 
-        $raw_triggers = [];
-        foreach ($triggers_time as $cron) {
-            $raw_triggers[] = ['type' => TriggerService::TRIGGER_TIME, 'cron' => $cron];
-        }
-        foreach ($triggers_event as $event) {
-            $raw_triggers[] = ['type' => TriggerService::TRIGGER_EVENT, 'event' => $event];
-        }
+        $validation = JobFormHandler::validate([
+            'name'           => $name,
+            'title'          => $title,
+            'command'        => $command,
+            'args'           => $args,
+            'timeout'        => $timeout,
+            'enabled'        => $enabled,
+            'triggers_time'  => $triggers_time,
+            'triggers_event' => $triggers_event,
+        ], $existing);
 
-        $errors = [];
-        // A module-offered job keeps its <module>:<name> key (the form renders the
-        // field read-only). The key is accepted only when it is the unchanged
-        // existing name, so a <module>: key can be preserved but not invented or
-        // retargeted (that would silently detach the job from its module).
-        $allow_key = $existing !== null && $name === (string) $existing->name;
-        if (!JobNaming::isValidJobName($name, $allow_key)) {
-            $errors[] = I18N::translate('Job name must be a slug: %1$s, max %2$s characters.', 'a-z, 0-9, "_", "-"', '64');
-        }
-        if ($title === '') {
-            $errors[] = I18N::translate('Job title must not be empty.');
-        }
-        $trigger_result = TriggerService::normalizeTriggers(['triggers' => $raw_triggers]);
-        foreach ($trigger_result['errors'] as $error) {
-            // Source strings; unknown keys are returned unchanged by I18N.
-            $errors[] = I18N::translate($error);
-        }
-        // DB column widths (Migration0): title 128, args 255.
-        if (mb_strlen($title) > 128) {
-            $errors[] = I18N::translate('Job title must be at most %d characters.', 128);
-        }
-        if (strlen($args) > 255) {
-            $errors[] = I18N::translate('Arguments must be at most %d characters.', 255);
-        }
-
-        $command_type = CronjobUtils::detectCommandType($command);
-        if ($command_type === '') {
-            $errors[] = I18N::translate('Command must be a %1$s path or an allowlisted core command.', e('modules_v4/<module>/cli/<script>.php'));
-        } else {
-            $built = JobRunner::buildArgv([
-                'command_type' => $command_type,
-                'command'      => $command,
-                'args'         => $args,
-            ], Webtrees::ROOT_DIR);
-            if ($built['error'] !== '') {
-                $errors[] = I18N::translate('Invalid command: %s', e($built['error']));
-            }
-        }
-
-        if ($errors !== []) {
-            foreach ($errors as $error) {
+        if ($validation['errors'] !== []) {
+            foreach ($validation['errors'] as $error) {
                 FlashMessages::addMessage($error, 'danger');
             }
 
@@ -455,8 +355,8 @@ class CronjobModule extends AbstractModule
         JobRepository::saveJob([
             'name'         => $name,
             'title'        => $title,
-            'triggers'     => $trigger_result['triggers'],
-            'command_type' => $command_type,
+            'triggers'     => $validation['triggers'],
+            'command_type' => $validation['command_type'],
             'command'      => $command,
             'args'         => $args,
             'timeout_sec'  => max(self::TIMEOUT_MIN, min(self::TIMEOUT_MAX, $timeout)),
