@@ -70,7 +70,7 @@ final class EventCatalogService {
         $catalog = [];
 
         // 1. Announced by modules.
-        foreach (ScheduleService::discoverExternalEvents() as $entry) {
+        foreach (JobDiscovery::discoverExternalEvents() as $entry) {
             $module = strval($entry['module']);
             $name   = $module . ':' . strval($entry['name']);
             if (strlen($name) > 64) {

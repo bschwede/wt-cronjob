@@ -28,7 +28,7 @@ declare(strict_types=1);
 // webtrees/DB: the LogRowDetector's pure compare() transition logic
 // (checkpoint, backpressure cap, reset, payload shape, truncation), the
 // detector registry / orphan / state-pruning helpers,
-// ScheduleService::specDiff() and the PseudoEventService file-based state /
+// JobDiscovery::specDiff() and the PseudoEventService file-based state /
 // cooldown handling. A minimal Webtrees constant stub stands in for the core
 // class (same convention as test-watch-service.php); state files live in a
 // temp dir the test creates and removes. The DB-dependent paths (currentState,
@@ -51,7 +51,8 @@ namespace {
 
     use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\LogRowDetector;
     use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
-    use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+    use Schwendinger\Webtrees\Module\Cronjob\Services\JobDiscovery;
+    use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerService;
 
     $failures = 0;
 
@@ -218,7 +219,7 @@ namespace {
         === ['cronjob:log-auth-failed' => 5]);
     check('pruneState: empty stays empty', PseudoEventService::pruneState([]) === []);
 
-    // --- ScheduleService::specDiff (§13: triggers_key) -----------------------
+    // --- JobDiscovery::specDiff (§13: triggers_key) -----------------------
     $spec = [
         'name'         => 'pseudo-events',
         'title'        => 'T',
@@ -233,35 +234,35 @@ namespace {
     ];
     $identical = [
         'title'        => 'T',
-        'triggers_key' => ScheduleService::triggersKey($spec['triggers']),
+        'triggers_key' => TriggerService::triggersKey($spec['triggers']),
         'command_type' => 'module',
         'command'      => 'modules_v4/cronjob/cli/pseudo-events.php',
         'args'         => '',
         'timeout_sec'  => 120,
     ];
 
-    check('specDiff: identical -> no diff', ScheduleService::specDiff($identical, $spec) === []);
+    check('specDiff: identical -> no diff', JobDiscovery::specDiff($identical, $spec) === []);
 
     $cron_changed = $identical;
-    $cron_changed['triggers_key'] = ScheduleService::triggersKey([['type' => 'time', 'cron' => '*/10 * * * *', 'event' => '']]);
-    check('specDiff: cron change -> [triggers_key]', ScheduleService::specDiff($cron_changed, $spec) === ['triggers_key']);
+    $cron_changed['triggers_key'] = TriggerService::triggersKey([['type' => 'time', 'cron' => '*/10 * * * *', 'event' => '']]);
+    check('specDiff: cron change -> [triggers_key]', JobDiscovery::specDiff($cron_changed, $spec) === ['triggers_key']);
 
     $timeout_changed = $identical;
     $timeout_changed['timeout_sec'] = 60;
-    check('specDiff: timeout change -> [timeout_sec]', ScheduleService::specDiff($timeout_changed, $spec) === ['timeout_sec']);
+    check('specDiff: timeout change -> [timeout_sec]', JobDiscovery::specDiff($timeout_changed, $spec) === ['timeout_sec']);
 
     $timeout_str = $identical;
     $timeout_str['timeout_sec'] = '120';
-    check('specDiff: timeout int vs string equal -> no diff', ScheduleService::specDiff($timeout_str, $spec) === []);
+    check('specDiff: timeout int vs string equal -> no diff', JobDiscovery::specDiff($timeout_str, $spec) === []);
 
     $multi = $identical;
     $multi['title'] = 'X';
     $multi['args']  = '--x';
-    check('specDiff: multiple changes in manifest order', ScheduleService::specDiff($multi, $spec) === ['title', 'args']);
+    check('specDiff: multiple changes in manifest order', JobDiscovery::specDiff($multi, $spec) === ['title', 'args']);
 
     $ev_spec = $spec;
     $ev_spec['triggers'] = [['type' => 'event', 'cron' => '', 'event' => 'cronjob:log-edit-update']];
-    $ev_diff = ScheduleService::specDiff($identical, $ev_spec);
+    $ev_diff = JobDiscovery::specDiff($identical, $ev_spec);
     check('specDiff: time->event job flags triggers_key only', $ev_diff === ['triggers_key']);
 
     // --- PseudoEventService file-based logic --------------------------------

@@ -68,7 +68,7 @@ final class EventQueue {
      * built-in pseudo-events `cronjob:*`, module-announced `<module>:*`).
      * The domain may start with an underscore (reserved domains). The total
      * length (colon included) is capped at 64 by the callers
-     * (CronjobUtils::isValidEventName / push()).
+     * (JobNaming::isValidEventName / push()).
      */
     public const NAME_PATTERN = '/^(?:[a-z0-9_][a-z0-9_\-]*:)?[a-z0-9][a-z0-9_\-]{0,63}$/';
 

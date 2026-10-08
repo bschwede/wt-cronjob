@@ -46,7 +46,7 @@ namespace Fisharebest\Webtrees {
 namespace {
     require __DIR__ . '/../autoload.php';
 
-    use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+    use Schwendinger\Webtrees\Module\Cronjob\Services\CronExpressionService;
 
     $failures = 0;
 
@@ -61,7 +61,7 @@ namespace {
     }
 
     function hz(string $cron): string {
-        return ScheduleService::humanizeCron($cron);
+        return CronExpressionService::humanizeCron($cron);
     }
 
     // macros

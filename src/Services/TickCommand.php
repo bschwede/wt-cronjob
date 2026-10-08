@@ -125,7 +125,7 @@ final class TickCommand extends Command {
             // (catalogs). Skipped under --dry-run so a dry run has no side
             // effects on the registries.
             if (!$dry_run) {
-                ScheduleService::syncDiscoveredJobs();
+                JobDiscovery::syncDiscoveredJobs();
                 try {
                     EventCatalogService::syncCatalog($now);
                 } catch (Throwable $exception) {
@@ -220,10 +220,10 @@ final class TickCommand extends Command {
             // Which cron(s) were due since the previous run (anchor: last
             // run, or the job creation for never-run jobs)?
             $anchor = (string) ($job->last_run_at ?? $job->created_at);
-            $trigger_detail = implode(' + ', ScheduleService::dueTriggerDetails(
+            $trigger_detail = implode(' + ', TriggerService::dueTriggerDetails(
                 array_values(array_filter(
                     $triggers,
-                    static fn (array $t): bool => $t['type'] === ScheduleService::TRIGGER_TIME
+                    static fn (array $t): bool => $t['type'] === TriggerService::TRIGGER_TIME
                 )),
                 $anchor,
                 JobRepository::now()

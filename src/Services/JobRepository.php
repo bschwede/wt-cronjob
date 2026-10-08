@@ -65,7 +65,7 @@ final class JobRepository {
      * The current time in the storage basis (UTC).
      */
     public static function now(): string {
-        return (new \DateTime("now", new DateTimeZone(ScheduleService::TIMEZONE)))->format('Y-m-d H:i:s');
+        return (new \DateTime("now", new DateTimeZone(CronExpressionService::TIMEZONE)))->format('Y-m-d H:i:s');
     }
 
     // =========================================================================
@@ -159,7 +159,7 @@ final class JobRepository {
 
     /**
      * Insert or update a job row. $data keys: name, title, triggers
-     * (normalized list, see ScheduleService::normalizeTriggers()),
+      * (normalized list, see TriggerService::normalizeTriggers()),
      * command_type, command, args, timeout_sec, enabled, created_at.
      *
      * With $id > 0 the existing row is updated by id - renaming a job
@@ -180,7 +180,7 @@ final class JobRepository {
             'enabled'      => $data['enabled'] ? 1 : 0,
             'notify'       => (!empty($data['notify'])) ? 1 : 0,
             'timeout_sec'  => $data['timeout_sec'],
-            'next_run_at'  => ScheduleService::nextRunMin($triggers, $now),
+            'next_run_at'  => TriggerService::nextRunMin($triggers, $now),
             'updated_at'   => $now,
         ];
 
@@ -271,8 +271,8 @@ final class JobRepository {
             DB::table('cj_job_trigger')->insert([
                 'job_id'       => $job_id,
                 'trigger_type' => (string) $trigger['type'],
-                'cron'         => $trigger['type'] === ScheduleService::TRIGGER_TIME ? (string) $trigger['cron'] : null,
-                'event_name'   => $trigger['type'] === ScheduleService::TRIGGER_EVENT ? (string) $trigger['event'] : null,
+                'cron'         => $trigger['type'] === TriggerService::TRIGGER_TIME ? (string) $trigger['cron'] : null,
+                'event_name'   => $trigger['type'] === TriggerService::TRIGGER_EVENT ? (string) $trigger['event'] : null,
             ]);
         }
     }
@@ -310,7 +310,7 @@ final class JobRepository {
         return DB::table('cj_job')
             ->join('cj_job_trigger', 'cj_job_trigger.job_id', '=', 'cj_job.id')
             ->where('cj_job.enabled', 1)
-            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
+            ->where('cj_job_trigger.trigger_type', '=', TriggerService::TRIGGER_EVENT)
             ->where('cj_job_trigger.event_name', '=', $event_name)
             ->orderBy('cj_job.id')
             ->select('cj_job.*')
@@ -325,7 +325,7 @@ final class JobRepository {
         return DB::table('cj_job')
             ->join('cj_job_trigger', 'cj_job_trigger.job_id', '=', 'cj_job.id')
             ->where('cj_job.enabled', 1)
-            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
+            ->where('cj_job_trigger.trigger_type', '=', TriggerService::TRIGGER_EVENT)
             ->where('cj_job_trigger.event_name', '=', $event)
             ->exists();
     }
@@ -340,7 +340,7 @@ final class JobRepository {
         return DB::table('cj_job_trigger')
             ->join('cj_job', 'cj_job.id', '=', 'cj_job_trigger.job_id')
             ->where('cj_job.enabled', 1)
-            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
+            ->where('cj_job_trigger.trigger_type', '=', TriggerService::TRIGGER_EVENT)
             ->whereNotNull('cj_job_trigger.event_name')
             ->distinct()
             ->pluck('cj_job_trigger.event_name')
@@ -358,7 +358,7 @@ final class JobRepository {
         $rows = DB::table('cj_job_trigger')
             ->join('cj_job', 'cj_job.id', '=', 'cj_job_trigger.job_id')
             ->where('cj_job.enabled', '=', 1)
-            ->where('cj_job_trigger.trigger_type', '=', ScheduleService::TRIGGER_EVENT)
+            ->where('cj_job_trigger.trigger_type', '=', TriggerService::TRIGGER_EVENT)
             ->whereNotNull('cj_job_trigger.event_name')
             ->select('cj_job_trigger.event_name', 'cj_job.name')
             ->get()
@@ -411,7 +411,7 @@ final class JobRepository {
             ->all();
 
         foreach ($stranded as $job) {
-            $next = ScheduleService::nextRunForRepair(self::jobTriggers((int) $job->id), $now);
+            $next = TriggerService::nextRunForRepair(self::jobTriggers((int) $job->id), $now);
             if ($next !== null) {
                 self::updateJobById((int) $job->id, [
                     'next_run_at' => $next,
@@ -518,8 +518,8 @@ final class JobRepository {
             'updated_at'  => $now,
         ];
 
-        if (ScheduleService::hasCronLibrary()) {
-            $values['next_run_at'] = ScheduleService::nextRunMin($triggers, $now);
+        if (CronExpressionService::hasCronLibrary()) {
+            $values['next_run_at'] = TriggerService::nextRunMin($triggers, $now);
         }
 
         self::updateJobById((int) $job->id, $values);

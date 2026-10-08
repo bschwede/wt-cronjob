@@ -28,29 +28,24 @@ namespace Schwendinger\Webtrees\Module\Cronjob;
 use Fisharebest\Webtrees\I18N;
 use Fisharebest\Webtrees\Webtrees;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
-use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 use Throwable;
 
 use function array_is_list;
 use function array_values;
 use function basename;
-use function get_current_user;
 use function glob;
 use function in_array;
 use function is_array;
 use function preg_match;
-use function rtrim;
 use function str_contains;
-use function strlen;
 use function str_starts_with;
 use function str_replace;
-use function strpos;
-use function substr;
 
 /**
- * Module-level helpers: naming, script discovery and the generated
- * trigger-installation blocks. (Job registry access lives in
- * Services\JobRepository.)
+ * Module-level helpers: script discovery, manifest loading, command-type
+ * detection and i18n. (Naming lives in Services\JobNaming, trigger
+ * installation blocks in Services\TriggerInstallService, job registry
+ * access in Services\JobRepository.)
  */
 final class CronjobUtils {
 
@@ -59,78 +54,6 @@ final class CronjobUtils {
     public const SCHEMA_NAME = 'SCHEMA_VERSION';
 
     private const MODULE_SCRIPT_PATTERN = '#^modules_v4/[a-z0-9_\-]+/cli/[a-z0-9_\-]+\.php$#';
-
-    /**
-     * Next free slug for a duplicated job: <base>-copy, <base>-copy2, …
-     * The base is truncated to 59 chars so the suffix still fits into the
-     * 64-char cj_job.name column.
-     *
-     * @param (callable(string): bool)|null $exists returns true if $slug is taken (default: cj_job DB check)
-     */
-    public static function uniqueCopySlug(string $base, ?callable $exists = null): string {
-        $exists ??= static fn (string $slug): bool => Services\JobRepository::nameExists($slug);
-
-        $base = substr($base, 0, 59);
-        $n    = 1;
-
-        do {
-            $slug = $n === 1 ? $base . '-copy' : $base . '-copy' . (string) $n;
-            $n++;
-        } while ($exists($slug) && $n < 1000);
-
-        return $slug;
-    }
-
-    /**
-     * Name base for a duplicated job: module-offered jobs are keyed
-     * <module>:<name>, but the colon cannot be entered in the form (slug
-     * pattern), so the prefix is stripped for the copy. Anything else is
-     * returned unchanged.
-     */
-    public static function copySlugBase(string $name): string {
-        if (preg_match('/^[a-z0-9_\-]+:/', $name) === 1) {
-            return substr($name, strpos($name, ':') + 1);
-        }
-
-        return $name;
-    }
-
-    /**
-     * Whether a job name (slug) is valid.
-     *
-     * A plain slug is always valid. A module-offered key (`<module>:<slug>`) is
-     * accepted only when $allow_module_key is set - callers pass it true solely to
-     * preserve an existing offered name on update, never to create or retarget one.
-     * The whole name (colon included) must fit the 64-char cj_job.name column, so
-     * the two parts are not each allowed up to 64 characters.
-     */
-    public static function isValidJobName(string $name, bool $allow_module_key = false): bool {
-        if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1) {
-            return true;
-        }
-
-        return $allow_module_key
-            && strlen($name) <= 64
-            && preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}:[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1;
-    }
-
-    /**
-     * Whether an event name is valid under the event naming scheme (analogous
-     * to job names): a plain slug (custom / webhook events) or a namespaced
-     * `<domain>:<slug>` (route events `_route:*`, built-in pseudo-events
-     * `cronjob:*`, module-announced events `<module>:*`). Unlike job names,
-     * the domain part may start with an underscore (reserved domains like
-     * `_route`). The whole name must fit the 64-char cj_event.event_name
-     * column.
-     */
-    public static function isValidEventName(string $name): bool {
-        if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1) {
-            return true;
-        }
-
-        return strlen($name) <= 64
-            && preg_match('/^[a-z0-9_][a-z0-9_\-]{0,63}:[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1;
-    }
 
     /**
      * Discover all module CLI scripts that may be used as jobs
@@ -165,9 +88,9 @@ final class CronjobUtils {
      *
      * The file returns either a plain list of job specs (simple form) or an
      * associative array with optional 'jobs', 'events' and 'commands' lists
-     * (event announcements, see ScheduleService::discoverExternalEvents(),
-     * and command announcements, see
-     * ScheduleService::discoverExternalCommands()). Returns the normalized
+      * (event announcements, see JobDiscovery::discoverExternalEvents(),
+      * and command announcements, see
+      * JobDiscovery::discoverExternalCommands()). Returns the normalized
      * ['jobs' => …, 'events' => …, 'commands' => …] shape, or three empty
      * lists on any error - a broken or misbehaving manifest must never break
      * the tick. Same containment strategy as core's ModuleService::load()
@@ -229,135 +152,6 @@ final class CronjobUtils {
             return 'core';
         }
         return '';
-    }
-
-    /**
-     * Copy-paste blocks for the „Trigger-Installation" section:
-     * one classic cron line, a systemd service/timer pair (both for Unix)
-     * and a Windows Task Scheduler XML plus its import command (for
-     * Windows hosts) - all derived from this installation (paths, PHP
-     * binary). The admin view renders the pair matching PHP_OS_FAMILY.
-     * Every interpolated path is double-quoted unconditionally (paths may
-     * contain spaces, e.g. C:\Program Files\...); on Windows the cmd
-     * wrapper uses /S for deterministic quote handling.
-     *
-     * @return array<string, string>
-     */
-    public static function triggerInstallBlocks(): array {
-        $root = realpath(rtrim(str_replace('\\', '/', Webtrees::ROOT_DIR), '/'));
-        $php  = str_replace('\\', '/', WatchService::phpBinary());
-        $tick = 'modules_v4/cronjob/cli/tick.php';
-        $log  = $root . '/data/cronjob/tick.log';
-
-        // Windows Task Scheduler: native (backslash) paths, no normalization.
-        // The cmd wrapper mirrors the cron line: working directory, ensure
-        // data/cronjob exists (the redirect cannot create it), same log target.
-        $root_ws = rtrim(str_replace('/', '\\', (string) $root), '\\');
-        $php_ws  = str_replace('/', '\\', $php);
-        $cmd_ws  = '/S /c "cd /d "' . $root_ws . '" && if not exist data\\cronjob mkdir data\\cronjob && "' . $php_ws . '" modules_v4\\cronjob\\cli\\tick.php cron:tick >> data\\cronjob\\tick.log 2>&1"';
-        // XML-escape the element text: & first, then < and >.
-        $args_ws = str_replace('&', '&amp;', $cmd_ws);
-        $args_ws = str_replace('<', '&lt;', $args_ws);
-        $args_ws = str_replace('>', '&gt;', $args_ws);
-
-        $windows_task_xml = implode("\n", [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">',
-            '  <RegistrationInfo>',
-            '    <Description>webtrees cronjob module tick (runs due maintenance jobs)</Description>',
-            '  </RegistrationInfo>',
-            '  <Triggers>',
-            '    <CalendarTrigger>',
-            // StartBoundary = now + ScheduleByRun: active right after import,
-            // repeating every minute for as long as the machine is up.
-            '      <StartBoundary>' . date('Y-m-d\TH:i:s') . '</StartBoundary>',
-            '      <Enabled>true</Enabled>',
-            '      <ScheduleByRun>true</ScheduleByRun>',
-            '      <RepeatedTask>',
-            '        <Interval>PT1M</Interval>',
-            '        <Duration>PT0H</Duration>',
-            '      </RepeatedTask>',
-            '    </CalendarTrigger>',
-            '  </Triggers>',
-            '  <Principals>',
-            // InteractiveToken: runs as the logged-on user, no password for
-            // the copy-paste import. A server without a logged-in session
-            // must switch the task to "run whether the user is logged on or
-            // not" (task properties -> General, requires the password).
-            '    <Principal id="Author">',
-            '      <LogonType>InteractiveToken</LogonType>',
-            '    </Principal>',
-            '  </Principals>',
-            '  <Settings>',
-            // IgnoreNew: matches the module's own tick.lock single-instance guard.
-            '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>',
-            '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>',
-            '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>',
-            '    <AllowHardTerminate>true</AllowHardTerminate>',
-            // StartWhenAvailable: one tick after a sleep/off gap - safe, the
-            // tick is idempotent (coalescing, no catch-up flood).
-            '    <StartWhenAvailable>true</StartWhenAvailable>',
-            '    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>',
-            '    <AllowStartOnDemand>true</AllowStartOnDemand>',
-            '    <Enabled>true</Enabled>',
-            '    <Hidden>false</Hidden>',
-            '    <RunOnlyIfIdle>false</RunOnlyIfIdle>',
-            '    <WakeToRun>false</WakeToRun>',
-            // PT0H = no scheduler-side limit; the module applies its own
-            // per-job timeouts.
-            '    <ExecutionTimeLimit>PT0H</ExecutionTimeLimit>',
-            '    <Priority>7</Priority>',
-            '  </Settings>',
-            '  <Actions Context="Author">',
-            '    <Exec>',
-            '      <Command>cmd.exe</Command>',
-            '      <Arguments>' . $args_ws . '</Arguments>',
-            '    </Exec>',
-            '  </Actions>',
-            '</Task>',
-        ]);
-
-        return [
-            // mkdir -p: the redirect target must exist even when the first
-            // cron run happens before the first page load.
-            'cron_line'   => '* * * * * cd "' . $root . '" && mkdir -p data/cronjob && "' . $php . '" ' . $tick . ' cron:tick >> "' . $log . '" 2>&1',
-            'service_unit' => implode("\n", [
-                '[Unit]',
-                'Description=webtrees cronjob module tick (runs due maintenance jobs)',
-                '',
-                '[Service]',
-                'Type=oneshot',
-                'User=' . get_current_user(),
-                'WorkingDirectory="' . $root . '"',
-                'ExecStart="' . $php . '" ./' . $tick . ' cron:tick',
-            ]),
-            'timer_unit' => implode("\n", [
-                '[Unit]',
-                'Description=Run the webtrees cronjob tick every minute',
-                '',
-                '[Timer]',
-                'OnBootSec=1min',
-                'OnCalendar=*:*:00',
-                'Persistent=true',
-                '',
-                '[Install]',
-                'WantedBy=timers.target',
-            ]),
-            'install_commands' => implode("\n", [
-                '# as root, once:',
-                'sudo cp wt-cronjob-tick.service wt-cronjob-tick.timer /etc/systemd/system/',
-                'sudo systemctl daemon-reload',
-                'sudo systemctl enable --now wt-cronjob-tick.timer',
-            ]),
-            'windows_task_xml' => $windows_task_xml,
-            'windows_import' => implode("\n", [
-                ':: save the XML above as wt-cronjob-tick.xml (UTF-8), then, once, in an elevated prompt:',
-                'schtasks /Create /F /XML wt-cronjob-tick.xml',
-                ':: GUI alternative: Task Scheduler -> Actions -> "Import Task..." -> wt-cronjob-tick.xml',
-                ':: verify:',
-                'schtasks /Query /TN "wt-cronjob-tick" /FO LIST',
-            ]),
-        ];
     }
 
     /**

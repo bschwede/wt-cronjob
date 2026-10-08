@@ -33,7 +33,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\RouteEventService;
-use Schwendinger\Webtrees\Module\Cronjob\Services\ScheduleService;
+use Schwendinger\Webtrees\Module\Cronjob\Services\CronExpressionService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
 use Schwendinger\Webtrees\Services\CliBootstrap;
@@ -108,7 +108,7 @@ final class CronjobService {
      * expression library is present (time triggers need it).
      */
     public static function isFunctional(): bool {
-        return self::isEnabled() && self::isMigrated() && ScheduleService::hasCronLibrary();
+        return self::isEnabled() && self::isMigrated() && CronExpressionService::hasCronLibrary();
     }
 
     /**
@@ -124,7 +124,7 @@ final class CronjobService {
         if (!self::isMigrated()) {
             $problems[] = 'not_migrated';
         }
-        if (!ScheduleService::hasCronLibrary()) {
+        if (!CronExpressionService::hasCronLibrary()) {
             $problems[] = 'cron_library_missing';
         }
         // tick_stale only when the tick ran before and then stopped - and the
