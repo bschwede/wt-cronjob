@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-08 18:56+0200\n"
+"POT-Creation-Date: 2026-10-10 20:40+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -157,146 +157,154 @@ msgstr ""
 msgid "Invalid command: %s"
 msgstr ""
 
-#: src/Services/NotifyService.php:81
+#: src/Services/NotifyService.php:82
 #, php-format
 msgid "cronjob: job \"%1$s\" failed (%2$s)"
 msgstr ""
 
-#: src/Services/NotifyService.php:99
+#: src/Services/NotifyService.php:100
 msgid "A scheduled cronjob job failed. Details:"
 msgstr ""
 
-#: src/Services/NotifyService.php:101 resources/views/admin.phtml:131
+#: src/Services/NotifyService.php:102 resources/views/admin.phtml:131
 msgid "Job"
 msgstr ""
 
-#: src/Services/NotifyService.php:103
+#: src/Services/NotifyService.php:104
 msgid "Exit code"
 msgstr ""
 
-#: src/Services/NotifyService.php:104 resources/views/job-history.phtml:70
+#: src/Services/NotifyService.php:105 resources/views/job-history.phtml:70
 msgid "Duration"
 msgstr ""
 
-#: src/Services/NotifyService.php:105 resources/views/job-history.phtml:65
+#: src/Services/NotifyService.php:106 resources/views/job-history.phtml:65
 msgid "Started (UTC)"
 msgstr ""
 
-#: src/Services/NotifyService.php:111
+#: src/Services/NotifyService.php:112
 msgid "Last output"
 msgstr ""
 
-#: src/CronjobModule.php:131 src/CronjobModule.php:275
+#: src/CronjobModule.php:138 src/CronjobModule.php:293
 msgid "Cron Job Scheduler"
 msgstr ""
 
-#: src/CronjobModule.php:135
+#: src/CronjobModule.php:142
 msgid ""
 "Schedule and monitor maintenance jobs: cron expressions, run history and "
 "manual trigger."
 msgstr ""
 
-#: src/CronjobModule.php:349
+#: src/CronjobModule.php:367
 msgid "A job with this name already exists."
 msgstr ""
 
-#: src/CronjobModule.php:368
+#: src/CronjobModule.php:386
 msgid "Job saved."
 msgstr ""
 
-#: src/CronjobModule.php:431 resources/views/job-history.phtml:36
+#: src/CronjobModule.php:449 resources/views/job-history.phtml:36
 msgid "Run History"
 msgstr ""
 
-#: src/CronjobModule.php:458
+#: src/CronjobModule.php:476
 msgid "Job queued - it will run at the next tick (within 60 seconds)."
 msgstr ""
 
-#: src/CronjobModule.php:462
+#: src/CronjobModule.php:480
 msgid ""
 "Job queued - it is disabled, so it will run once at the next tick after it "
 "is (re-)enabled."
 msgstr ""
 
-#: src/CronjobModule.php:465 src/CronjobModule.php:487
-#: src/CronjobModule.php:509 src/CronjobModule.php:540
-#: src/CronjobModule.php:581 resources/views/job-history.phtml:43
+#: src/CronjobModule.php:483 src/CronjobModule.php:505
+#: src/CronjobModule.php:527 src/CronjobModule.php:558
+#: src/CronjobModule.php:599 resources/views/job-history.phtml:43
 msgid "Job not found."
 msgstr ""
 
-#: src/CronjobModule.php:483
+#: src/CronjobModule.php:501
 msgid "Job enabled."
 msgstr ""
 
-#: src/CronjobModule.php:483
+#: src/CronjobModule.php:501
 msgid "Job disabled."
 msgstr ""
 
-#: src/CronjobModule.php:505
+#: src/CronjobModule.php:523
 msgid "Failure notification enabled."
 msgstr ""
 
-#: src/CronjobModule.php:505
+#: src/CronjobModule.php:523
 msgid "Failure notification disabled."
 msgstr ""
 
-#: src/CronjobModule.php:522
+#: src/CronjobModule.php:540
 msgid "Route events disabled."
 msgstr ""
 
-#: src/CronjobModule.php:522
+#: src/CronjobModule.php:540
 msgid "Route events enabled."
 msgstr ""
 
-#: src/CronjobModule.php:547
+#: src/CronjobModule.php:565
 msgid ""
 "This job is not (any longer) offered by a module - reset is not possible."
 msgstr ""
 
-#: src/CronjobModule.php:565
+#: src/CronjobModule.php:583
 msgid "Job reset to the module defaults."
 msgstr ""
 
-#: src/CronjobModule.php:579
+#: src/CronjobModule.php:597
 msgid "Job deleted."
 msgstr ""
 
-#: src/CronjobModule.php:593
+#: src/CronjobModule.php:612
+msgid "Debug logging disabled."
+msgstr ""
+
+#: src/CronjobModule.php:612
+msgid "Debug logging enabled."
+msgstr ""
+
+#: src/CronjobModule.php:625
 msgid ""
 "The watch daemon needs proc_open(), which is disabled on this server. Use an "
 "OS cron or systemd timer instead."
 msgstr ""
 
-#: src/CronjobModule.php:600
+#: src/CronjobModule.php:632
 msgid "Watch daemon started."
 msgstr ""
 
-#: src/CronjobModule.php:602
+#: src/CronjobModule.php:634
 msgid ""
 "The watch daemon could not be started (proc_open is disabled or it is "
 "already running)."
 msgstr ""
 
-#: src/CronjobModule.php:614
+#: src/CronjobModule.php:646
 msgid ""
 "Watch daemon stopped - it exits within about a minute and will not restart."
 msgstr ""
 
-#: src/CronjobModule.php:632
+#: src/CronjobModule.php:664
 #, php-format
 msgid "The path may only contain letters, digits, spaces and the characters %s"
 msgstr ""
 
-#: src/CronjobModule.php:640
+#: src/CronjobModule.php:672
 msgid "PHP binary: automatic detection enabled."
 msgstr ""
 
-#: src/CronjobModule.php:641
+#: src/CronjobModule.php:673
 #, php-format
 msgid "PHP binary set to %s."
 msgstr ""
 
-#: src/CronjobModule.php:712
+#: src/CronjobModule.php:744
 msgid "Webhook token regenerated - update any external sender."
 msgstr ""
 
@@ -431,12 +439,12 @@ msgid "History"
 msgstr ""
 
 #: resources/views/admin.phtml:231 resources/views/admin.phtml:241
-#: resources/views/admin.phtml:448
+#: resources/views/admin.phtml:465
 msgid "on"
 msgstr ""
 
 #: resources/views/admin.phtml:231 resources/views/admin.phtml:241
-#: resources/views/admin.phtml:448
+#: resources/views/admin.phtml:465
 msgid "off"
 msgstr ""
 
@@ -617,11 +625,25 @@ msgid ""
 "it is restarted."
 msgstr ""
 
-#: resources/views/admin.phtml:432
+#: resources/views/admin.phtml:420
+msgid "Debug logging"
+msgstr ""
+
+#: resources/views/admin.phtml:422
+msgid ""
+"Enables verbose debug and trace log output to the PHP error log. Useful when "
+"diagnosing module issues."
+msgstr ""
+
+#: resources/views/admin.phtml:429
+msgid "Enable debug logging"
+msgstr ""
+
+#: resources/views/admin.phtml:449
 msgid "Pseudo-Events (log-table polling)"
 msgstr ""
 
-#: resources/views/admin.phtml:434
+#: resources/views/admin.phtml:451
 msgid ""
 "webtrees has no event bus, so core actions are observed by polling. The "
 "module reads new log-table entries (failed logins, logins, logouts, errors, "
@@ -630,18 +652,18 @@ msgid ""
 "baseline and does not fire."
 msgstr ""
 
-#: resources/views/admin.phtml:435
+#: resources/views/admin.phtml:452
 msgid ""
 "To activate, enable the \"cronjob:pseudo-events\" job in the table above. It "
 "runs in the tick child process - isolated from any web request and bounded "
 "by its timeout."
 msgstr ""
 
-#: resources/views/admin.phtml:442
+#: resources/views/admin.phtml:459
 msgid "Route events (request-triggered)"
 msgstr ""
 
-#: resources/views/admin.phtml:444
+#: resources/views/admin.phtml:461
 msgid ""
 "Detects mutations directly from their HTTP route (e.g. a note edit) and "
 "queues a matching event immediately - in addition to the polling pseudo-"
@@ -649,19 +671,19 @@ msgid ""
 "matching event job is listening."
 msgstr ""
 
-#: resources/views/admin.phtml:453
+#: resources/views/admin.phtml:470
 msgid "Disable route events"
 msgstr ""
 
-#: resources/views/admin.phtml:453
+#: resources/views/admin.phtml:470
 msgid "Enable route events"
 msgstr ""
 
-#: resources/views/admin.phtml:461
+#: resources/views/admin.phtml:478
 msgid "Event webhook (external trigger)"
 msgstr ""
 
-#: resources/views/admin.phtml:464
+#: resources/views/admin.phtml:481
 msgid ""
 "External systems can queue an event by GETting the endpoint below. Each "
 "queued event runs its matching event-triggered job(s) at the next tick. The "
@@ -669,29 +691,29 @@ msgid ""
 "is rate-limited."
 msgstr ""
 
-#: resources/views/admin.phtml:472
+#: resources/views/admin.phtml:489
 msgid "Endpoint"
 msgstr ""
 
-#: resources/views/admin.phtml:477
+#: resources/views/admin.phtml:494
 msgid ""
 "GET with query params event=<name> and data=<json> (optional); send the "
 "token in the X-Cronjob-Token header."
 msgstr ""
 
-#: resources/views/admin.phtml:482
+#: resources/views/admin.phtml:499
 msgid "Token"
 msgstr ""
 
-#: resources/views/admin.phtml:491
+#: resources/views/admin.phtml:508
 msgid "Regenerate token"
 msgstr ""
 
-#: resources/views/admin.phtml:501
+#: resources/views/admin.phtml:518
 msgid "Event catalog"
 msgstr ""
 
-#: resources/views/admin.phtml:503
+#: resources/views/admin.phtml:520
 msgid ""
 "All known event names: announced by modules, built-in pseudo-events "
 "(cronjob:…), route events (_route:…) and names currently listened for by an "
@@ -699,19 +721,19 @@ msgid ""
 "of an event job."
 msgstr ""
 
-#: resources/views/admin.phtml:515
+#: resources/views/admin.phtml:532
 msgid "Payload"
 msgstr ""
 
-#: resources/views/admin.phtml:536
+#: resources/views/admin.phtml:553
 msgid "Commands"
 msgstr ""
 
-#: resources/views/admin.phtml:544
+#: resources/views/admin.phtml:561
 msgid "Command catalog"
 msgstr ""
 
-#: resources/views/admin.phtml:546
+#: resources/views/admin.phtml:563
 msgid ""
 "Every command a job may run: the allowlisted core commands, commands "
 "announced by modules (with their available parameters) and module CLI "
@@ -720,16 +742,16 @@ msgid ""
 "in the “Command” field of a job."
 msgstr ""
 
-#: resources/views/admin.phtml:555 resources/views/job-form.phtml:206
+#: resources/views/admin.phtml:572 resources/views/job-form.phtml:206
 #: resources/views/job-form.phtml:209
 msgid "Command"
 msgstr ""
 
-#: resources/views/admin.phtml:559
+#: resources/views/admin.phtml:576
 msgid "Parameters"
 msgstr ""
 
-#: resources/views/admin.phtml:577 resources/views/job-form.phtml:284
+#: resources/views/admin.phtml:594 resources/views/job-form.phtml:284
 msgid "required"
 msgstr ""
 
