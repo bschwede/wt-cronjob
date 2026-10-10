@@ -111,7 +111,11 @@ final class JobDiscovery {
                 if (!is_array($raw)) {
                     continue;
                 }
-                $result = SpecValidator::validateJobSpec($raw, $root_dir);
+                $result = match ($discovery_type) {
+                    DiscoveryType::Job     => SpecValidator::validateJobSpec($raw, $root_dir),
+                    DiscoveryType::Event   => SpecValidator::validateEventSpec($raw),
+                    DiscoveryType::Command => SpecValidator::validateCommandSpec($raw),
+                };
                 if ($result['errors'] !== []) {
                     continue;
                 }
