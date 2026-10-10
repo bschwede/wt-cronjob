@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-08 18:56+0200\n"
+"POT-Creation-Date: 2026-10-10 20:40+0200\n"
 "PO-Revision-Date: 2026-09-19 11:04+0200\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -197,6 +197,12 @@ msgid "Job reset to the module defaults."
 msgstr ""
 
 msgid "Job deleted."
+msgstr ""
+
+msgid "Debug logging disabled."
+msgstr ""
+
+msgid "Debug logging enabled."
 msgstr ""
 
 msgid ""
@@ -478,6 +484,17 @@ msgstr ""
 msgid ""
 "A watch daemon that is already running keeps using its current binary until "
 "it is restarted."
+msgstr ""
+
+msgid "Debug logging"
+msgstr ""
+
+msgid ""
+"Enables verbose debug and trace log output to the PHP error log. Useful when "
+"diagnosing module issues."
+msgstr ""
+
+msgid "Enable debug logging"
 msgstr ""
 
 msgid "Pseudo-Events (log-table polling)"

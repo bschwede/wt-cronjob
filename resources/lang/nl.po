@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: modules_v 4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-08 18:56+0200\n"
+"POT-Creation-Date: 2026-10-10 20:40+0200\n"
 "PO-Revision-Date: 2026-09-25 17:25+0000\n"
 "Last-Translator: TheDutchJewel <thedutchjewel@noreply.codeberg.org>\n"
 "Language-Team: Dutch <https://translate.codeberg.org/projects/wt-modules/"
@@ -216,6 +216,14 @@ msgstr "Taak teruggezet naar de standaardwaarden van de module."
 
 msgid "Job deleted."
 msgstr "Taak verwijderd."
+
+#, fuzzy
+#| msgid "Job disabled."
+msgid "Debug logging disabled."
+msgstr "Taak uitgeschakeld."
+
+msgid "Debug logging enabled."
+msgstr ""
 
 msgid ""
 "The watch daemon needs proc_open(), which is disabled on this server. Use an "
@@ -556,6 +564,17 @@ msgid ""
 msgstr ""
 "Een reeds actieve watch-daemon blijft het huidige binaire bestand gebruiken "
 "totdat deze opnieuw wordt gestart."
+
+msgid "Debug logging"
+msgstr ""
+
+msgid ""
+"Enables verbose debug and trace log output to the PHP error log. Useful when "
+"diagnosing module issues."
+msgstr ""
+
+msgid "Enable debug logging"
+msgstr ""
 
 msgid "Pseudo-Events (log-table polling)"
 msgstr "Pseudo-gebeurtenissen (logtabel-polling)"
