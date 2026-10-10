@@ -415,6 +415,23 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                 </div>
             </form>
         </fieldset>
+
+        <fieldset class="border rounded p-3 mt-4 mb-2">
+            <legend><?= I18N::translate('Debug logging') ?></legend>
+            <p class="text-muted">
+                <?= I18N::translate('Enables verbose debug and trace log output to the PHP error log. Useful when diagnosing module issues.') ?>
+            </p>
+            <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminDebugLogToggle'])) ?>">
+                <?= csrf_field() ?>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="enabled" id="debug-log-toggle" <?= $debug_log ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="debug-log-toggle">
+                        <?= I18N::translate('Enable debug logging') ?>
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary mt-2"><?= MoreI18N::xlate('save') ?></button>
+            </form>
+        </fieldset>
       </div>
     </div>
   </div>

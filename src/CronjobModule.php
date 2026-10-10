@@ -251,6 +251,7 @@ class CronjobModule extends AbstractModule
             'event_token'   => $this->getPreference(self::PREF_EVENT_TOKEN),
             'offered'       => $offered,
             'route_events'  => $this->getPreference(RouteEventService::SETTING, '') === '1',
+            'debug_log'     => $this->getPreference(self::PREF_DEBUG_LOG, '') === '1',
             'event_catalog' => EventCatalogService::listCatalog(),
             'command_catalog' => CommandCatalogService::listCatalog(),
             'triggers_by_job' => $triggers_by_job,
@@ -597,6 +598,20 @@ class CronjobModule extends AbstractModule
         } else {
             FlashMessages::addMessage(I18N::translate('Job not found.'), 'danger');
         }
+
+        return redirect($this->getConfigLink());
+    }
+
+    /**
+     * Toggle debug logging (admin).
+     */
+    public function postAdminDebugLogToggleAction(ServerRequestInterface $request): ResponseInterface {
+        $enabled = $this->getPreference(self::PREF_DEBUG_LOG, '') === '1';
+        $this->setPreference(self::PREF_DEBUG_LOG, $enabled ? '0' : '1');
+        FlashMessages::addMessage(
+            $enabled ? I18N::translate('Debug logging disabled.') : I18N::translate('Debug logging enabled.'),
+            'success'
+        );
 
         return redirect($this->getConfigLink());
     }
