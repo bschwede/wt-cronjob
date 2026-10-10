@@ -55,7 +55,6 @@ final class SpecValidator {
     public const TIMEOUT_MAX = 3600;
     public const TIMEOUT_STD = 300;
 
-    public const FIELD_NAME_MAXLEN = 64;
     public const FIELD_TITLE_MAXLEN = 128;
     public const FIELD_DESCRIPTION_MAXLEN = 255;
     public const FIELD_COMMAND_MAXLEN = 255;
@@ -81,8 +80,8 @@ final class SpecValidator {
         $errors     = [];
 
         $name = trim((string) ($spec['name'] ?? ''));
-        if ($name === '' || strlen($name) > self::FIELD_NAME_MAXLEN || preg_match('/^[a-z0-9_\-]+$/', $name) !== 1) {
-            $errors[] = 'name must be a non-empty slug of [a-z0-9_-], max ' . self::FIELD_NAME_MAXLEN . ' chars';
+        if (!JobNaming::isValidBareSlug($name, true)) {
+            $errors[] = 'name must be a non-empty slug of [a-z0-9_-], max ' . JobNaming::NAME_MAXLEN . ' chars';
         }
 
         $title = trim((string) ($spec['title'] ?? ''));
@@ -152,8 +151,8 @@ final class SpecValidator {
         $errors = [];
 
         $name = trim((string) ($spec['name'] ?? ''));
-        if ($name === '' || strlen($name) > self::FIELD_NAME_MAXLEN || preg_match('/^[a-z0-9][a-z0-9_\-]*$/', $name) !== 1) {
-            $errors[] = 'event name must be a non-empty slug of [a-z0-9_-] (max ' . self::FIELD_NAME_MAXLEN . ' chars)';
+        if (!JobNaming::isValidBareSlug($name, false)) {
+            $errors[] = 'event name must be a non-empty slug of [a-z0-9_-] (max ' . JobNaming::NAME_MAXLEN . ' chars)';
         }
 
         $description = trim((string) ($spec['description'] ?? ''));
@@ -234,7 +233,7 @@ final class SpecValidator {
                 continue;
             }
             $name = trim((string) ($param['name'] ?? ''));
-            if ($name === '' || strlen($name) > self::FIELD_NAME_MAXLEN || preg_match('/\s/', $name) === 1) {
+            if ($name === '' || strlen($name) > JobNaming::NAME_MAXLEN || preg_match('/\s/', $name) === 1) {
                 continue; // malformed descriptor - drop it silently
             }
             $default = (isset($param['default']) && $param['default'] !== null) ? (string) $param['default'] : null;

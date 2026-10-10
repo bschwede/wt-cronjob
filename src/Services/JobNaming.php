@@ -38,13 +38,33 @@ use function substr;
  */
 final class JobNaming {
 
-    private const NAME_MAXLEN = 64;
+    public const NAME_MAXLEN = 64;
     private const COPY_SUFFIX = '-copy'; // 5 chars
     private const NAME_COPY_MAXLEN = 59;
     private const RE_ALLOWED_CHARS = '[a-z0-9_\-]';
     private const RE_STD_NAME = '[a-z0-9]' . self::RE_ALLOWED_CHARS . '{0,63}';
     private const RE_PREFIX_NAME = '[a-z0-9_]' . self::RE_ALLOWED_CHARS . '{0,63}';
     
+
+    /**
+     * Whether a bare slug (a manifest-provided name that will later be
+     * prefixed with a module/domain) is valid.
+     *
+     * @param bool $allow_leading_punct when true, the first character may
+     *        be an underscore or dash (job spec names); when false, the
+     *        first character must be alphanumeric (event spec names).
+     */
+    public static function isValidBareSlug(string $name, bool $allow_leading_punct = false): bool {
+        if ($name === '' || strlen($name) > self::NAME_MAXLEN) {
+            return false;
+        }
+
+        if ($allow_leading_punct) {
+            return preg_match('/^' . self::RE_ALLOWED_CHARS . '+$/', $name) === 1;
+        }
+
+        return preg_match('/^[a-z0-9]' . self::RE_ALLOWED_CHARS . '*$/', $name) === 1;
+    }
 
     /**
      * Next free slug for a duplicated job: <base>-copy, <base>-copy2, …
