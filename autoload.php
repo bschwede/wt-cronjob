@@ -32,7 +32,7 @@ for ($i = 0; $i < 14; $i++) {
 }
 require_once $root . '/vendor/autoload.php';
 
-require __DIR__ . '/vendor/bschwede/wt-shared-libs/autoload.php';
+require_once __DIR__ . '/vendor/bschwede/wt-shared-libs/autoload.php';
 
 spl_autoload_register(static function (string $class): void {
     $prefixes = [
