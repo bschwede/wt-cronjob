@@ -55,6 +55,13 @@ final class SpecValidator {
     public const TIMEOUT_MAX = 3600;
     public const TIMEOUT_STD = 300;
 
+    public const FIELD_NAME_MAXLEN = 64;
+    public const FIELD_TITLE_MAXLEN = 128;
+    public const FIELD_DESCRIPTION_MAXLEN = 255;
+    public const FIELD_COMMAND_MAXLEN = 255;
+    public const FIELD_DEFAULT_MAXLEN = 128;
+    public const PARAMETER_MAX = 8;
+
     /**
      * Normalize + validate a job spec offered by an external module (a
      * <module>/cron-jobs.php manifest or a getCronJobs() marker method).
@@ -74,16 +81,16 @@ final class SpecValidator {
         $errors     = [];
 
         $name = trim((string) ($spec['name'] ?? ''));
-        if ($name === '' || strlen($name) > 64 || preg_match('/^[a-z0-9_\-]+$/', $name) !== 1) {
-            $errors[] = 'name must be a non-empty slug of [a-z0-9_-], max 64 chars';
+        if ($name === '' || strlen($name) > self::FIELD_NAME_MAXLEN || preg_match('/^[a-z0-9_\-]+$/', $name) !== 1) {
+            $errors[] = 'name must be a non-empty slug of [a-z0-9_-], max ' . self::FIELD_NAME_MAXLEN . ' chars';
         }
 
         $title = trim((string) ($spec['title'] ?? ''));
         if ($title === '') {
             $title = $name;
         }
-        if (strlen($title) > 128) {
-            $errors[] = 'title must be at most 128 chars';
+        if (strlen($title) > self::FIELD_TITLE_MAXLEN) {
+            $errors[] = 'title must be at most ' . self::FIELD_TITLE_MAXLEN . ' chars';
         }
 
         $trigger_result = TriggerService::normalizeTriggers($spec);
@@ -145,13 +152,13 @@ final class SpecValidator {
         $errors = [];
 
         $name = trim((string) ($spec['name'] ?? ''));
-        if ($name === '' || strlen($name) > 64 || preg_match('/^[a-z0-9][a-z0-9_\-]*$/', $name) !== 1) {
-            $errors[] = 'event name must be a non-empty slug of [a-z0-9_-] (max 64 chars)';
+        if ($name === '' || strlen($name) > self::FIELD_NAME_MAXLEN || preg_match('/^[a-z0-9][a-z0-9_\-]*$/', $name) !== 1) {
+            $errors[] = 'event name must be a non-empty slug of [a-z0-9_-] (max ' . self::FIELD_NAME_MAXLEN . ' chars)';
         }
 
         $description = trim((string) ($spec['description'] ?? ''));
-        if (strlen($description) > 255) {
-            $errors[] = 'description must be at most 255 chars';
+        if (strlen($description) > self::FIELD_DESCRIPTION_MAXLEN) {
+            $errors[] = 'description must be at most ' . self::FIELD_DESCRIPTION_MAXLEN . ' chars';
         }
 
         $payload = $spec['payload'] ?? [];
@@ -163,8 +170,8 @@ final class SpecValidator {
             array_map('strval', array_values($payload)),
             static fn (string $p): bool => $p !== ''
         ));
-        if (count($payload) > 8) {
-            $errors[] = 'payload must list at most 8 parameter names';
+        if (count($payload) > self::PARAMETER_MAX) {
+            $errors[] = 'payload must list at most ' . self::PARAMETER_MAX . ' parameter names';
         }
 
         return [
@@ -199,8 +206,8 @@ final class SpecValidator {
         $errors = [];
 
         $command = trim((string) ($spec['command'] ?? ''));
-        if ($command === '' || strlen($command) > 255) {
-            $errors[] = 'command must be a non-empty path/name of at most 255 chars';
+        if ($command === '' || strlen($command) > self::FIELD_COMMAND_MAXLEN) {
+            $errors[] = 'command must be a non-empty path/name of at most ' . self::FIELD_COMMAND_MAXLEN . ' chars';
         }
 
         $command_type = trim((string) ($spec['command_type'] ?? ''));
@@ -212,8 +219,8 @@ final class SpecValidator {
         }
 
         $description = trim((string) ($spec['description'] ?? ''));
-        if (strlen($description) > 255) {
-            $errors[] = 'description must be at most 255 chars';
+        if (strlen($description) > self::FIELD_DESCRIPTION_MAXLEN) {
+            $errors[] = 'description must be at most ' . self::FIELD_DESCRIPTION_MAXLEN . ' chars';
         }
 
         $raw_params = $spec['params'] ?? [];
@@ -227,12 +234,12 @@ final class SpecValidator {
                 continue;
             }
             $name = trim((string) ($param['name'] ?? ''));
-            if ($name === '' || strlen($name) > 64 || preg_match('/\s/', $name) === 1) {
+            if ($name === '' || strlen($name) > self::FIELD_NAME_MAXLEN || preg_match('/\s/', $name) === 1) {
                 continue; // malformed descriptor - drop it silently
             }
             $default = (isset($param['default']) && $param['default'] !== null) ? (string) $param['default'] : null;
-            if ($default !== null && strlen($default) > 128) {
-                $default = substr($default, 0, 128);
+            if ($default !== null && strlen($default) > self::FIELD_DEFAULT_MAXLEN) {
+                $default = substr($default, 0, self::FIELD_DEFAULT_MAXLEN);
             }
             $params[] = [
                 'name'        => $name,
@@ -241,8 +248,8 @@ final class SpecValidator {
                 'description' => trim((string) ($param['description'] ?? '')),
             ];
         }
-        if (count($params) > 8) {
-            $errors[] = 'params must list at most 8 parameter descriptors';
+        if (count($params) > self::PARAMETER_MAX) {
+            $errors[] = 'params must list at most ' . self::PARAMETER_MAX . ' parameter descriptors';
         }
 
         return [

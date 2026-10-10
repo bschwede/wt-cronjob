@@ -38,6 +38,14 @@ use function substr;
  */
 final class JobNaming {
 
+    private const NAME_MAXLEN = 64;
+    private const COPY_SUFFIX = '-copy'; // 5 chars
+    private const NAME_COPY_MAXLEN = 59;
+    private const RE_ALLOWED_CHARS = '[a-z0-9_\-]';
+    private const RE_STD_NAME = '[a-z0-9]' . self::RE_ALLOWED_CHARS . '{0,63}';
+    private const RE_PREFIX_NAME = '[a-z0-9_]' . self::RE_ALLOWED_CHARS . '{0,63}';
+    
+
     /**
      * Next free slug for a duplicated job: <base>-copy, <base>-copy2, …
      * The base is truncated to 59 chars so the suffix still fits into the
@@ -48,11 +56,11 @@ final class JobNaming {
     public static function uniqueCopySlug(string $base, ?callable $exists = null): string {
         $exists ??= static fn (string $slug): bool => JobRepository::nameExists($slug);
 
-        $base = substr($base, 0, 59);
+        $base = substr($base, 0, self::NAME_COPY_MAXLEN);
         $n    = 1;
 
         do {
-            $slug = $n === 1 ? $base . '-copy' : $base . '-copy' . (string) $n;
+            $slug = $n === 1 ? $base . self::COPY_SUFFIX : $base . self::COPY_SUFFIX . (string) $n;
             $n++;
         } while ($exists($slug) && $n < 1000);
 
@@ -66,7 +74,7 @@ final class JobNaming {
      * returned unchanged.
      */
     public static function copySlugBase(string $name): string {
-        if (preg_match('/^[a-z0-9_\-]+:/', $name) === 1) {
+        if (preg_match('/^' . self::RE_ALLOWED_CHARS . '+:/', $name) === 1) {
             return substr($name, strpos($name, ':') + 1);
         }
 
@@ -83,13 +91,13 @@ final class JobNaming {
      * the two parts are not each allowed up to 64 characters.
      */
     public static function isValidJobName(string $name, bool $allow_module_key = false): bool {
-        if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1) {
+        if (preg_match('/^' . self::RE_STD_NAME . '$/', $name) === 1) {
             return true;
         }
 
         return $allow_module_key
-            && strlen($name) <= 64
-            && preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}:[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1;
+            && strlen($name) <= self::NAME_MAXLEN
+            && preg_match('/^' . self::RE_STD_NAME . ':' . self::RE_STD_NAME . '$/', $name) === 1;
     }
 
     /**
@@ -102,11 +110,11 @@ final class JobNaming {
      * column.
      */
     public static function isValidEventName(string $name): bool {
-        if (preg_match('/^[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1) {
+        if (preg_match('/^' . self::RE_STD_NAME . '$/', $name) === 1) {
             return true;
         }
 
         return strlen($name) <= 64
-            && preg_match('/^[a-z0-9_][a-z0-9_\-]{0,63}:[a-z0-9][a-z0-9_\-]{0,63}$/', $name) === 1;
+            && preg_match('/^' . self::RE_PREFIX_NAME . ':' . self::RE_STD_NAME . '$/', $name) === 1;
     }
 }

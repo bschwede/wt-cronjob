@@ -44,6 +44,22 @@ use function str_contains;
 use function strlen;
 use function trim;
 
+enum DiscoveryType: string {
+    
+    // string value is the key in cron-jobs.php array
+    case Job     = 'jobs';
+    case Event   = 'events';
+    case Command = 'commands';
+
+    public function methodName():string {
+        return match($this) {
+            self::Job     => 'getCronJobs',
+            self::Event   => 'getModuleEvents',
+            self::Command => 'getModuleCommands',
+        };
+    }
+}
+
 /**
  * External job self-registration (phase 2, §6.3): discovering jobs,
  * events and commands offered by other enabled modules and syncing them
@@ -54,18 +70,10 @@ use function trim;
  */
 final class JobDiscovery {
 
-    /**
-     * Discover jobs offered by other enabled modules: via a
-     * <module>/cron-jobs.php manifest file and/or a getCronJobs() marker
-     * method. Returns one entry per valid spec:
-     * `['module' => <short>, 'spec' => normalized]`. Malformed or throwing
-     * sources are skipped - they must never break the tick.
-     *
-     * @return list<array{module: string, spec: array<string, mixed>}>
-     */
-    public static function discoverExternalJobs(?string $root_dir = null): array {
+    private static function discoverExternalData(DiscoveryType $discovery_type, ?string $root_dir = null): array
+    {
         $root_dir ??= Webtrees::ROOT_DIR;
-        $found    = [];
+        $found = [];
 
         try {
             $modules = Registry::container()->get(ModuleService::class)->all(false);
@@ -80,16 +88,17 @@ final class JobDiscovery {
             // Core modules have no modules_v4/<name>/ dir, so is_file() below
             // filters them out naturally - no separate custom-module guard.
             $short = trim($module->name(), '_');
-            $dir   = Webtrees::MODULES_DIR . $short . DIRECTORY_SEPARATOR;
+            $dir = Webtrees::MODULES_DIR . $short . DIRECTORY_SEPARATOR;
 
             $raw_specs = [];
-            $manifest  = $dir . 'cron-jobs.php';
+            $manifest = $dir . 'cron-jobs.php';
             if (is_file($manifest)) {
-                $raw_specs = array_merge($raw_specs, CronjobUtils::loadManifestFile($manifest)['jobs']);
+                $raw_specs = array_merge($raw_specs, CronjobUtils::loadManifestFile($manifest)[$discovery_type->value]);
             }
-            if (method_exists($module, 'getCronJobs')) {
+            $method_name = $discovery_type->methodName();
+            if (method_exists($module, $method_name)) {
                 try {
-                    $offered = $module->getCronJobs();
+                    $offered = $module->$method_name();
                 } catch (Throwable) {
                     $offered = [];
                 }
@@ -107,19 +116,61 @@ final class JobDiscovery {
                     continue;
                 }
                 $spec = $result['spec'];
-                // Announced module events are namespaced <module>:<event>, like
-                // the offered job keys. A name that already carries a colon
-                // (e.g. a listener for cronjob:log-edit-update) is kept as-is.
-                foreach ($spec['triggers'] as $i => $trigger) {
-                    if ($trigger['type'] === TriggerService::TRIGGER_EVENT && !str_contains($trigger['event'], ':')) {
-                        $spec['triggers'][$i]['event'] = $short . ':' . $trigger['event'];
-                    }
+
+                switch ($discovery_type) {
+                    case DiscoveryType::Job:
+                        // Announced module events are namespaced <module>:<event>, like
+                        // the offered job keys. A name that already carries a colon
+                        // (e.g. a listener for cronjob:log-edit-update) is kept as-is.
+                        foreach ($spec['triggers'] as $i => $trigger) {
+                            if ($trigger['type'] === TriggerService::TRIGGER_EVENT && !str_contains($trigger['event'], ':')) {
+                                $spec['triggers'][$i]['event'] = $short . ':' . $trigger['event'];
+                            }
+                        }
+                        $found[] = ['module' => $short, 'spec' => $spec];
+
+                        break;
+
+                    case DiscoveryType::Event:
+                        $found[] = [
+                            'module' => $short,
+                            'name' => (string) $spec['name'],
+                            'description' => (string) $spec['description'],
+                            'payload' => $spec['payload'],
+                        ];
+
+                        break;
+
+                    case DiscoveryType::Command:
+                        $found[] = [
+                            'module' => $short,
+                            'command' => (string) $spec['command'],
+                            'command_type' => (string) $spec['command_type'],
+                            'description' => (string) $spec['description'],
+                            'params' => $spec['params'],
+                        ];
+
+                        break;
+
                 }
-                $found[] = ['module' => $short, 'spec' => $spec];
+
             }
         }
 
         return $found;
+    }
+
+    /**
+     * Discover jobs offered by other enabled modules: via a
+     * <module>/cron-jobs.php manifest file and/or a getCronJobs() marker
+     * method. Returns one entry per valid spec:
+     * `['module' => <short>, 'spec' => normalized]`. Malformed or throwing
+     * sources are skipped - they must never break the tick.
+     *
+     * @return list<array{module: string, spec: array<string, mixed>}>
+     */
+    public static function discoverExternalJobs(?string $root_dir = null): array {
+        return self::discoverExternalData(DiscoveryType::Job, $root_dir);
     }
 
     /**
@@ -135,53 +186,7 @@ final class JobDiscovery {
      * @return list<array{module: string, name: string, description: string, payload: list<string>}>
      */
     public static function discoverExternalEvents(): array {
-        $found = [];
-
-        try {
-            $modules = Registry::container()->get(ModuleService::class)->all(false);
-        } catch (Throwable) {
-            return $found;
-        }
-
-        /** @var ModuleInterface $module */
-        foreach ($modules as $module) {
-            $short = trim($module->name(), '_');
-            $dir   = Webtrees::MODULES_DIR . $short . DIRECTORY_SEPARATOR;
-
-            $raw_events = [];
-            $manifest   = $dir . 'cron-jobs.php';
-            if (is_file($manifest)) {
-                $raw_events = array_merge($raw_events, CronjobUtils::loadManifestFile($manifest)['events']);
-            }
-            if (method_exists($module, 'getModuleEvents')) {
-                try {
-                    $announced = $module->getModuleEvents();
-                } catch (Throwable) {
-                    $announced = [];
-                }
-                if (is_array($announced)) {
-                    $raw_events = array_merge($raw_events, array_values($announced));
-                }
-            }
-
-            foreach ($raw_events as $raw) {
-                if (!is_array($raw)) {
-                    continue;
-                }
-                $result = SpecValidator::validateEventSpec($raw);
-                if ($result['errors'] !== []) {
-                    continue;
-                }
-                $found[] = [
-                    'module'      => $short,
-                    'name'        => (string) $result['spec']['name'],
-                    'description' => (string) $result['spec']['description'],
-                    'payload'     => $result['spec']['payload'],
-                ];
-            }
-        }
-
-        return $found;
+        return self::discoverExternalData(DiscoveryType::Event);
     }
 
     /**
@@ -194,54 +199,7 @@ final class JobDiscovery {
      * @return list<array{module: string, command: string, command_type: string, description: string, params: list<array<string, mixed>>}>
      */
     public static function discoverExternalCommands(): array {
-        $found = [];
-
-        try {
-            $modules = Registry::container()->get(ModuleService::class)->all(false);
-        } catch (Throwable) {
-            return $found;
-        }
-
-        /** @var ModuleInterface $module */
-        foreach ($modules as $module) {
-            $short = trim($module->name(), '_');
-            $dir   = Webtrees::MODULES_DIR . $short . DIRECTORY_SEPARATOR;
-
-            $raw_commands = [];
-            $manifest     = $dir . 'cron-jobs.php';
-            if (is_file($manifest)) {
-                $raw_commands = array_merge($raw_commands, CronjobUtils::loadManifestFile($manifest)['commands']);
-            }
-            if (method_exists($module, 'getModuleCommands')) {
-                try {
-                    $announced = $module->getModuleCommands();
-                } catch (Throwable) {
-                    $announced = [];
-                }
-                if (is_array($announced)) {
-                    $raw_commands = array_merge($raw_commands, array_values($announced));
-                }
-            }
-
-            foreach ($raw_commands as $raw) {
-                if (!is_array($raw)) {
-                    continue;
-                }
-                $result = SpecValidator::validateCommandSpec($raw);
-                if ($result['errors'] !== []) {
-                    continue;
-                }
-                $found[] = [
-                    'module'       => $short,
-                    'command'      => (string) $result['spec']['command'],
-                    'command_type' => (string) $result['spec']['command_type'],
-                    'description'  => (string) $result['spec']['description'],
-                    'params'       => $result['spec']['params'],
-                ];
-            }
-        }
-
-        return $found;
+        return self::discoverExternalData(DiscoveryType::Command);
     }
 
     /**
