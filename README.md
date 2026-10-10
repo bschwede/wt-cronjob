@@ -40,6 +40,8 @@ It was originally developed as a support module for [LinkEnhancer](https://codeb
 
 ### Trigger installation (once)
 
+![Installation](resources/img/installation.png)
+
 > [!IMPORTANT]
 > **PHP CLI binary:** the admin page's *Installation* accordion shows which
 > PHP CLI interpreter is currently resolved (badge: *auto-detected* /
@@ -165,7 +167,7 @@ filled in (example with placeholder paths). Save it as `wt-cronjob-tick.xml`
 (UTF-8) and run `schtasks /Create /F /XML wt-cronjob-tick.xml` once in an
 elevated prompt (or use Task Scheduler → Actions → *Import Task…*):
 
-> [!INFO]
+> [!NOTE]
 > Config example was not yet tested!
 
 <details>
@@ -847,6 +849,8 @@ the next poll as well — pick the mechanism whose latency/precision fits the jo
 (route events are near-instant and precise per object, and carry `change_pending`;
 log pollers lag ~5 min but also catch changes made outside the web UI).
 
+![Events](resources/img/events.png)
+
 ## Event catalog
 
 The admin page (Events section) and the job form's event-name suggestions are fed by
@@ -887,6 +891,8 @@ Each entry carries its type (`module` / `core`), its source, a description (tran
 key, translated at render time) and the available parameters (structured: name,
 optional, default, description). In the job form, entering a command that matches an
 announced command shows its parameters as a hint under the field.
+
+![Commands](resources/img/commands.png)
 
 <a name="notification"></a>
 ## Failure notification
