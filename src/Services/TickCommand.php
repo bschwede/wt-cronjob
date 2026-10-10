@@ -28,6 +28,7 @@ namespace Schwendinger\Webtrees\Module\Cronjob\Services;
 use Fisharebest\Webtrees\DB;
 use Fisharebest\Webtrees\Webtrees;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobModule;
 use Throwable;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -130,11 +131,13 @@ final class TickCommand extends Command {
                     EventCatalogService::syncCatalog($now);
                 } catch (Throwable $exception) {
                     $output->writeln('<error>event catalog sync failed: ' . $exception->getMessage() . '</error>');
+                    CronjobModule::log()->error($exception->getMessage(), 'EventCatalogSync');
                 }
                 try {
                     CommandCatalogService::syncCatalog($now);
                 } catch (Throwable $exception) {
                     $output->writeln('<error>command catalog sync failed: ' . $exception->getMessage() . '</error>');
+                    CronjobModule::log()->error($exception->getMessage(), 'CommandCatalogSync');
                 }
 
                 // Self-heal: re-schedule enabled time jobs whose next_run_at
@@ -147,6 +150,7 @@ final class TickCommand extends Command {
                     }
                 } catch (Throwable $exception) {
                     $output->writeln('<error>schedule self-heal failed: ' . $exception->getMessage() . '</error>');
+                    CronjobModule::log()->error($exception->getMessage(), 'SelfHeal');
                 }
             }
 

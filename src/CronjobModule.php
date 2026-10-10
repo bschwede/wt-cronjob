@@ -60,6 +60,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobDiscovery;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobFormHandler;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobNaming;
 use Schwendinger\Webtrees\Module\Cronjob\Services\SpecValidator;
+use Schwendinger\Webtrees\Services\ModuleLog;
 use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerInstallService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
@@ -114,6 +115,12 @@ class CronjobModule extends AbstractModule
     /** Module preference key holding the webhook token (§6.1). */
     public const PREF_EVENT_TOKEN = 'event_token';
 
+    /** Module preference key enabling verbose debug/trace logging. */
+    public const PREF_DEBUG_LOG = 'debug_log';
+
+    /** ModuleLog identifier. */
+    public const LOG_ID = 'cronjob';
+
     /** Session key of the one-shot job-form stash (PRG after a failed save). */
     public const SESSION_JOB_FORM = 'cronjob_job_form';
 
@@ -142,7 +149,17 @@ class CronjobModule extends AbstractModule
     public function boot(): void {
         View::registerNamespace($this->name(), $this->resourcesFolder() . 'views/');
 
+        ModuleLog::for(self::LOG_ID, $this->getPreference(self::PREF_DEBUG_LOG, '') === '1');
+
         Functions::updateSchema($this, '\Schwendinger\Webtrees\Module\Cronjob\Schema', 'SCHEMA_VERSION', self::SCHEMA_TARGET_VERSION);
+    }
+
+    /**
+     * Get the module logger instance.
+     */
+    public static function log(): ModuleLog
+    {
+        return ModuleLog::for(self::LOG_ID);
     }
 
     // =========================================================================
@@ -165,8 +182,8 @@ class CronjobModule extends AbstractModule
 
         try {
             RouteEventService::maybeFire($request, $response);
-        } catch (Throwable) {
-            // Route-event detection must never break the request.
+        } catch (Throwable $exception) {
+            ModuleLog::for(self::LOG_ID)->error($exception->getMessage(), 'RouteEvent');
         }
 
         return $response;

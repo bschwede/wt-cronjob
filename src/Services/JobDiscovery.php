@@ -30,6 +30,7 @@ use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Services\ModuleService;
 use Fisharebest\Webtrees\Webtrees;
 use Schwendinger\Webtrees\Module\Cronjob\CronjobUtils;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobModule;
 use Throwable;
 
 use function array_flip;
@@ -99,7 +100,8 @@ final class JobDiscovery {
             if (method_exists($module, $method_name)) {
                 try {
                     $offered = $module->$method_name();
-                } catch (Throwable) {
+                } catch (Throwable $exception) {
+                    CronjobModule::log()->debug($short . '::$' . $method_name . '() threw: ' . $exception->getMessage(), 'Discovery');
                     $offered = [];
                 }
                 if (is_array($offered)) {

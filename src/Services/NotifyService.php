@@ -32,6 +32,7 @@ use Fisharebest\Webtrees\Services\MessageService;
 use Fisharebest\Webtrees\Services\UserService;
 use Fisharebest\Webtrees\SiteUser;
 use Schwendinger\Webtrees\Helpers\MoreI18N;
+use Schwendinger\Webtrees\Module\Cronjob\CronjobModule;
 use Throwable;
 
 use function array_slice;
@@ -86,8 +87,8 @@ final class NotifyService {
             foreach ($admins as $admin) {
                 $message_service->deliverMessage($sender, $admin, $subject, $body, '', '0.0.0.0');
             }
-        } catch (Throwable) {
-            // A notification problem must never break the tick.
+        } catch (Throwable $exception) {
+            CronjobModule::log()->error($exception->getMessage(), 'Notify');
         }
     }
 
