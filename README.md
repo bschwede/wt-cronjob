@@ -392,15 +392,50 @@ job's working directory and arguments are unchanged too.
 - **Requires the cronjob module to be installed.** If a script must also run as a
   standalone tool (no cronjob), keep the module's own `CliBootstrap` copy instead.
 
+## How can other custom modules make use of this cronjob module?
+You can query information about the status of the service or managed jobs.
+And it is possible to register own CLI scripts to be managed and executed by this service.
+Details can be found in the following sections.
+
+### Using the cronjob service from other modules
+
+Neighboring modules query the module's state through a stable, read-only facade
+(`CronjobService`) instead of its internal services. Check availability first -
+the module may not be installed, and the class is only autoloadable when its
+`module.php` has been loaded:
+
+```php
+use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService;
+
+if (class_exists(CronjobService::class) && CronjobService::isFunctional()) {
+    $status   = CronjobService::jobStatus('mymodule:backup'); // null = unknown job
+    $age      = CronjobService::lastTickAge();                // seconds since last tick
+    $listened = CronjobService::listenedEvents();             // event name => job names
+}
+```
+
+| Question | Method(s) |
+| --- | --- |
+| Is the service functional? | `isFunctional()`, `problems()` (codes: `module_disabled`, `not_migrated`, `cron_library_missing`, `tick_stale`) |
+| Which features are enabled? | `features()` (`watch`, `pseudo_events`, `route_events`), `watchStatus()` |
+| When did the last tick run? | `lastTick()` / `lastTickAge()` - both trigger types (marker file `data/cronjob/tick.last`) |
+| Is a job enabled / when did it last run? | `isJobEnabled($name)`, `jobStatus($name)`, `lastRun($name)` - job names are namespaced (`<module>:<name>`) |
+| Which events are listened for? | `listenedEvents()`, `listenersFor($event)`; catalogs: `eventCatalog()`, `pseudoEvents()`, `routeEvents()` |
+| Actions (the only two) | `runJobNow($name)` (queued at the next tick), `pushEvent($name, $payload)` (event queue) |
+
+Contract: read-only methods never throw when the schema is missing (safe defaults),
+descriptions are source strings (never pre-translated), and `lastRun()` deliberately
+excludes the job output, which may contain personal data.
+
 <a name="selfreg"></a>
-## Offering jobs to cronjob (self-registration)
+### Offering jobs to cronjob (self-registration)
 
 Other modules can *advertise* their scheduled jobs so they show up in this module's
 admin UI without anyone editing the registry by hand. There are two ways (a module
 may use both); both are discovered automatically on each tick, only for **enabled**
 modules:
 
-### 1. Manifest file (recommended)
+#### 1. Manifest file (recommended)
 
 `modules_v4/<module>/cron-jobs.php` that **returns an array of job specs**:
 
@@ -430,13 +465,13 @@ Translatable `title` / `description` literals in a manifest should be wrapped in
 so `xgettext` picks them up - translation happens at render time, never at manifest
 load.
 
-### 2. Marker method
+#### 2. Marker method
 
 `getCronJobs(): array` on the module's `module.php` class, returning the same shape.
 cronjob detects it with `method_exists()` - the module does **not** implement any
 cronjob interface (so an absent cronjob module is harmless).
 
-### Announcing events
+#### Announcing events
 
 The same manifest can also **announce events** your module emits (so they show up in
 the event catalog and the job form's suggestions). Instead of a plain job list, the
@@ -489,7 +524,7 @@ return [
 | `description` | no | shown in the event catalog (translation key, max 255) |
 | `payload` | no | list of payload parameter names (max 8), shown in the catalog |
 
-### Announcing commands
+#### Announcing commands
 
 The same manifest can also **announce commands** a job may run, with their available
 parameters. A plain manifest list is still "jobs only"; to announce commands the
@@ -536,7 +571,7 @@ value) and `description` (optional). Equivalent marker method:
 > commands. A module that announces nothing falls back to glob discovery of its
 > `cli/` scripts (backward compatible).
 
-### Job spec fields
+#### Job spec fields
 
 | Key | Required | Meaning |
 | :--- | :--- | :--- |
@@ -569,36 +604,6 @@ manifest (title, triggers, command, args, timeout, enabled state); the slug,
 the notify setting and the run history are kept. If the module is removed or no
 longer offers the spec, the badge and the reset button disappear.
 
-
-## Using the cronjob service from other modules
-
-Neighboring modules query the module's state through a stable, read-only facade
-(`CronjobService`) instead of its internal services. Check availability first -
-the module may not be installed, and the class is only autoloadable when its
-`module.php` has been loaded:
-
-```php
-use Schwendinger\Webtrees\Module\Cronjob\Services\CronjobService;
-
-if (class_exists(CronjobService::class) && CronjobService::isFunctional()) {
-    $status   = CronjobService::jobStatus('mymodule:backup'); // null = unknown job
-    $age      = CronjobService::lastTickAge();                // seconds since last tick
-    $listened = CronjobService::listenedEvents();             // event name => job names
-}
-```
-
-| Question | Method(s) |
-|---|---|
-| Is the service functional? | `isFunctional()`, `problems()` (codes: `module_disabled`, `not_migrated`, `cron_library_missing`, `tick_stale`) |
-| Which features are enabled? | `features()` (`watch`, `pseudo_events`, `route_events`), `watchStatus()` |
-| When did the last tick run? | `lastTick()` / `lastTickAge()` - both trigger types (marker file `data/cronjob/tick.last`) |
-| Is a job enabled / when did it last run? | `isJobEnabled($name)`, `jobStatus($name)`, `lastRun($name)` - job names are namespaced (`<module>:<name>`) |
-| Which events are listened for? | `listenedEvents()`, `listenersFor($event)`; catalogs: `eventCatalog()`, `pseudoEvents()`, `routeEvents()` |
-| Actions (the only two) | `runJobNow($name)` (queued at the next tick), `pushEvent($name, $payload)` (event queue) |
-
-Contract: read-only methods never throw when the schema is missing (safe defaults),
-descriptions are source strings (never pre-translated), and `lastRun()` deliberately
-excludes the job output, which may contain personal data.
 
 <a name="event"></a>
 ## Event-driven jobs (webhooks & event queue)
