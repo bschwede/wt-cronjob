@@ -25,7 +25,6 @@ declare(strict_types=1);
 
 namespace Schwendinger\Webtrees\Module\Cronjob;
 
-use DomainException;
 use Fisharebest\Webtrees\DB;
 use Fisharebest\Webtrees\FlashMessages;
 use Fisharebest\Webtrees\I18N;
@@ -33,18 +32,17 @@ use Fisharebest\Webtrees\Module\AbstractModule;
 use Fisharebest\Webtrees\Module\ModuleConfigInterface;
 use Fisharebest\Webtrees\Module\ModuleConfigTrait;
 use Fisharebest\Webtrees\Module\ModuleCustomInterface;
+use Schwendinger\Webtrees\Helpers\ClassName;
 use Schwendinger\Webtrees\Traits\ModuleCustomTrait;
 use Fisharebest\Webtrees\Registry;
 use Fisharebest\Webtrees\Session;
 use Fisharebest\Webtrees\Services\RateLimitService;
 use Fisharebest\Webtrees\Validator;
 use Fisharebest\Webtrees\View;
-use Fisharebest\Webtrees\Webtrees;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use RuntimeException;
 use Throwable;
 use Schwendinger\Webtrees\Helpers\Functions;
 use Schwendinger\Webtrees\Services\CliBootstrap;
@@ -52,7 +50,6 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\CommandCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventCatalogService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\JobRepository;
 use Schwendinger\Webtrees\Module\Cronjob\Services\EventQueue;
-use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 use Schwendinger\Webtrees\Module\Cronjob\Services\PseudoEvents\PseudoEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\RouteEventService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\CronExpressionService;
@@ -62,28 +59,18 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobNaming;
 use Schwendinger\Webtrees\Module\Cronjob\Services\SpecValidator;
 use Schwendinger\Webtrees\Services\ModuleLog;
 use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerInstallService;
-use Schwendinger\Webtrees\Module\Cronjob\Services\TriggerService;
 use Schwendinger\Webtrees\Module\Cronjob\Services\WatchService;
 
-use function array_column;
 use function array_filter;
 use function array_map;
 use function array_merge;
 use function bin2hex;
-use function dirname;
-use function fclose;
-use function fopen;
 use function function_exists;
 use function hash_equals;
-use function implode;
 use function is_array;
-use function is_readable;
 use function json_decode;
-use function mb_strlen;
 use function preg_match;
 use function random_bytes;
-use function str_ends_with;
-use function strlen;
 use function trim;
 
 /**
@@ -409,7 +396,7 @@ class CronjobModule extends AbstractModule
             $params['job'] = $job_id;
         }
 
-        return redirect(route('module', $params));
+        return redirect(route(ClassName::get(ClassName::MODULE), $params));
     }
 
     /**

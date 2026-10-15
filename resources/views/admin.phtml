@@ -45,7 +45,7 @@ if ($last_tick_age > $limitOrange) {
 }
 $marker60Percent = min(100, (int) round($limitGreen / $maxTime * 100));
 
-$admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
+$admin_url = route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'Admin']);
 
 ?>
 <?= view('components/breadcrumbs', [
@@ -111,7 +111,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
 
 
 <div class="mb-3">
-    <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm'])) ?>" class="btn btn-primary">
+    <a href="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobForm'])) ?>" class="btn btn-primary">
         <?= I18N::translate('New Job') ?>
     </a>
 </div>
@@ -151,7 +151,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
             ?>
             <tr>
                 <td>
-                    <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])) ?>">
+                    <a href="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])) ?>">
                         <strong><?= e(CronjobUtils::translateJobTitle((string) $job->title)) ?></strong>
                     </a>
                     <div class="text-muted"><?= e($job->name) ?></div>
@@ -219,13 +219,13 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                                 <br><?= I18N::translate('triggered by') ?> <code><?= e((string) $last->trigger_detail) ?></code>
                             <?php endif; ?>
                         </div>
-                        <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobHistory', 'job' => (int) $job->id])) ?>">
+                        <a href="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobHistory', 'job' => (int) $job->id])) ?>">
                             <?= I18N::translate('History') ?>
                         </a>
                     <?php endif; ?>
                 </td>
                 <td>
-                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobToggle'])) ?>" class="d-inline">
+                    <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobToggle'])) ?>" class="d-inline">
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                         <button type="submit" class="btn btn-sm <?= $enabled ? 'btn-success' : 'btn-warning' ?>" title="<?= $enabled ? I18N::translate('on') : I18N::translate('off') ?>">
@@ -234,7 +234,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     </form>
                 </td>
                 <td>
-                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobNotifyToggle'])) ?>" class="d-inline">
+                    <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobNotifyToggle'])) ?>" class="d-inline">
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                         <button type="submit" class="btn btn-sm <?= $notify ? 'btn-success' : 'btn-secondary' ?>"
@@ -247,7 +247,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                     <code><?= (int) $job->timeout_sec ?></code> <span class="text-muted"><?= I18N::translate('s') ?></span>
                 </td>
                 <td class="text-end">
-                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobRunNow'])) ?>" class="d-inline">
+                    <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobRunNow'])) ?>" class="d-inline">
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
                         <button type="submit" class="btn btn-sm btn-info m-1"
@@ -255,13 +255,13 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                             <?= I18N::translate('Run now') ?>
                         </button>
                     </form>
-                    <a href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'duplicate' => (int) $job->id])) ?>"
+                    <a href="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobForm', 'duplicate' => (int) $job->id])) ?>"
                        class="btn btn-sm btn-secondary m-1"
                        title="<?= e(I18N::translate('Open the form prefilled with a copy of this job (new -copy slug, starts disabled)')) ?>">
                         <?= I18N::translate('Duplicate') ?>
                     </a>
                     <?php if (isset($offered[$job->name])): ?>
-                        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobReset'])) ?>" class="d-inline"
+                        <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobReset'])) ?>" class="d-inline"
                               onsubmit='return confirm(<?= json_encode(I18N::translate('Reset this job to the module defaults? Your changes (title, schedule, command, arguments, enabled state) will be lost; the notification setting is kept.'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);'>
                             <?= csrf_field() ?>
                             <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
@@ -271,7 +271,7 @@ $admin_url = route('module', ['module' => $module->name(), 'action' => 'Admin'])
                             </button>
                         </form>
                     <?php endif; ?>
-                    <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobDelete'])) ?>" class="d-inline"
+                    <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobDelete'])) ?>" class="d-inline"
                           onsubmit='return confirm(<?= json_encode(I18N::translate('Delete this job and its run history?'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);'>
                         <?= csrf_field() ?>
                         <input type="hidden" name="job_id" value="<?= (int) $job->id ?>">
@@ -329,12 +329,12 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                         <?php endif; ?>
                     </p>
                     <?php if ($watch_enabled): ?>
-                        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStop'])) ?>" class="d-inline">
+                        <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminWatchStop'])) ?>" class="d-inline">
                             <?= csrf_field() ?>
                             <button type="submit" class="btn btn-sm btn-warning"><?= I18N::translate('Stop watch') ?></button>
                         </form>
                     <?php else: ?>
-                        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminWatchStart'])) ?>" class="d-inline">
+                        <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminWatchStart'])) ?>" class="d-inline">
                             <?= csrf_field() ?>
                             <button type="submit" class="btn btn-sm btn-primary"><?= I18N::translate('Start watch') ?></button>
                         </form>
@@ -403,7 +403,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                     <?= I18N::translate('No PHP CLI binary could be determined - the watch daemon cannot start and the install commands above are incomplete. Set a manual path below.') ?>
                 </div>
             <?php endif; ?>
-            <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminPhpBinary'])) ?>">
+            <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminPhpBinary'])) ?>">
                 <?= csrf_field() ?>
                 <div class="input-group">
                     <input type="text" name="php_binary" class="form-control font-monospace" value="<?= e($php['configured']) ?>"
@@ -421,7 +421,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
             <p class="text-muted">
                 <?= I18N::translate('Enables verbose debug and trace log output to the PHP error log. Useful when diagnosing module issues.') ?>
             </p>
-            <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminDebugLogToggle'])) ?>">
+            <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminDebugLogToggle'])) ?>">
                 <?= csrf_field() ?>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="enabled" id="debug-log-toggle" <?= $debug_log ? 'checked' : '' ?>>
@@ -464,7 +464,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                         <span class="badge bg-<?= $route_events ? 'success' : 'secondary' ?>">
                             <?= $route_events ? I18N::translate('on') : I18N::translate('off') ?>
                         </span>
-                        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminRouteEventsToggle'])) ?>" class="d-inline">
+                        <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminRouteEventsToggle'])) ?>" class="d-inline">
                             <?= csrf_field() ?>
                             <button type="submit" class="btn btn-sm btn-<?= $route_events ? 'warning' : 'primary' ?>">
                                 <?= $route_events ? I18N::translate('Disable route events') : I18N::translate('Enable route events') ?>
@@ -489,7 +489,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                                 <?= I18N::translate('Endpoint') ?>
                             </label>
                             <input type="text" class="form-control" id="cj_webhook_url" readonly
-                                value="<?= e(route('module', ['module' => $module->name(), 'action' => 'Event'])) ?>">
+                                value="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'Event'])) ?>">
                             <div class="form-text">
                                 <?= I18N::translate('GET with query params event=<name> and data=<json> (optional); send the token in the X-Cronjob-Token header.') ?>
                             </div>
@@ -501,7 +501,7 @@ $watch_last    = (int) ($watch['last_tick'] ?? 0);
                             <input type="text" class="form-control font-monospace" id="cj_event_token" readonly
                                 value="<?= e($event_token) ?>">
                         </div>
-                        <form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminEventToken'])) ?>"
+                        <form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminEventToken'])) ?>"
                             class="d-inline">
                             <?= csrf_field() ?>
                             <button type="submit" class="btn btn-sm btn-secondary">

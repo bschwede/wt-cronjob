@@ -25,7 +25,7 @@ use Schwendinger\Webtrees\Module\Cronjob\Services\JobRunner;
 
 $copy_of  = $copy_of ?? null;
 $fv       = $form_values ?? [];
-$back_url = route('module', ['module' => $module->name(), 'action' => 'Admin']);
+$back_url = route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'Admin']);
 $is_edit  = $job !== null;
 $job_id      = $is_edit ? (int) $job->id : 0;
 $event_catalog = $event_catalog ?? [];
@@ -69,7 +69,7 @@ if ($copy_of !== null) {
     $header = I18N::translate('New Job (copy of %s)', e($copy_of));
     $crumbs[0] = $header;
 } elseif ($is_edit) {
-    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e(CronjobUtils::translateJobTitle((string) $job->title));
+    $crumbs[route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e(CronjobUtils::translateJobTitle((string) $job->title));
     $header = I18N::translate('Edit Job');
     $crumbs[0] = $header;
 } else {
@@ -82,7 +82,7 @@ if ($copy_of !== null) {
 
 <h1><?= $header ?></h1>
 
-<form method="post" action="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobSave'])) ?>" class="needs-validation" novalidate>
+<form method="post" action="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobSave'])) ?>" class="needs-validation" novalidate>
     <?= csrf_field() ?>
     <input type="hidden" name="job_id" value="<?= $job_id ?>">
     <input type="hidden" name="copy_of" value="<?= e($copy_of ?? '') ?>">

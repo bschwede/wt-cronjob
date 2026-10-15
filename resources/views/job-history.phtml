@@ -21,11 +21,11 @@ use Schwendinger\Webtrees\Helpers\MoreI18N;
 
 $crumbs = [
     route(ClassName::get(ClassName::CONTROL_PANEL)) => MoreI18N::xlate('Control panel'),
-    route('module', ['module' => $module->name(), 'action' => 'Admin']) => $module->title(),
+    route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'Admin']) => $module->title(),
 ];
 if ($job !== null) {
     // The breadcrumb component renders labels unescaped (§16, F3).
-    $crumbs[route('module', ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e(CronjobUtils::translateJobTitle((string) $job->title));
+    $crumbs[route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobForm', 'job' => (int) $job->id])] = e(CronjobUtils::translateJobTitle((string) $job->title));
 }
 $crumbs[0] = I18N::translate('History');
 
@@ -126,7 +126,7 @@ $crumbs[0] = I18N::translate('History');
                 <ul class="pagination">
                     <?php for ($p = 1; $p <= $pages; $p++): ?>
                         <li class="page-item <?= $p === $page ? 'active' : '' ?>">
-                            <a class="page-link" href="<?= e(route('module', ['module' => $module->name(), 'action' => 'AdminJobHistory', 'job' => (int) $job->id, 'page' => $p])) ?>"><?= $p ?></a>
+                            <a class="page-link" href="<?= e(route(ClassName::get(ClassName::MODULE), ['module' => $module->name(), 'action' => 'AdminJobHistory', 'job' => (int) $job->id, 'page' => $p])) ?>"><?= $p ?></a>
                         </li>
                     <?php endfor; ?>
                 </ul>
