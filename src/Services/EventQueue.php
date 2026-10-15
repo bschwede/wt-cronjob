@@ -212,11 +212,11 @@ final class EventQueue {
      * @return list<object> rows with run_id, event_name, payload, created_at
      */
     public static function eventsForRuns(array $run_ids): array {
-        return DB::table('cj_event_run', 'r')
-            ->join('cj_event', 'cj_event.id', '=', 'r.event_id')
-            ->whereIn('r.run_id', $run_ids)
+        return DB::table('cj_event_run')
+            ->join('cj_event', 'cj_event.id', '=', 'cj_event_run.event_id')
+            ->whereIn('cj_event_run.run_id', $run_ids)
             ->orderBy('cj_event.created_at')
-            ->get(['r.run_id', 'cj_event.event_name', 'cj_event.payload', 'cj_event.created_at'])
+            ->get(['cj_event_run.run_id', 'cj_event.event_name', 'cj_event.payload', 'cj_event.created_at'])
             ->all();
     }
 
