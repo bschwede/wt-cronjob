@@ -195,6 +195,11 @@ final class RouteEventService {
             $error  = null;
             try {
                 $collection = Registry::container()->get(RouteCollection::class);
+                // CLI: the container's collection exists but is empty (routes
+                // are loaded in the HTTP lifecycle, not in bootstrap).
+                if ($collection->all() === []) {
+                    throw new \RuntimeException('RouteCollection in container is empty (CLI context)');
+                }
             } catch (Throwable $e) {
                 $source = 'fallback';
                 $error  = $e->getMessage();
@@ -229,6 +234,10 @@ final class RouteEventService {
             /** @var RouterContainer $router */
             $router = Registry::container()->get(RouterContainer::class);
             $collection = $router->getCollection();
+            // CLI: same issue – collection exists but has no routes loaded.
+            if ($collection->getRoutes() === []) {
+                throw new \RuntimeException('Router collection in container is empty (CLI context)');
+            }
         } catch (Throwable $e) {
             $source = 'fallback';
             $error  = $e->getMessage();
