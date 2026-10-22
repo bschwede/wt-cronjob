@@ -158,6 +158,9 @@ final class RouteEventService {
     /** Per-process map cache (handler class => ['event' => …, 'path' => …]). */
     private static ?array $cached_map = null;
 
+    /** Per-process metadata about the last collect+build cycle. */
+    private static ?array $collect_meta = null;
+
     /**
      * The route -> event map, keyed by the fully-qualified handler class.
      *
@@ -188,13 +191,19 @@ final class RouteEventService {
      */
     private static function collectRouteTriples(): array {
         if (Functions::wtIsAtLeast2_3()) {
+            $source = 'container';
+            $error  = null;
             try {
                 $collection = Registry::container()->get(RouteCollection::class);
-            } catch (Throwable) {
+            } catch (Throwable $e) {
+                $source = 'fallback';
+                $error  = $e->getMessage();
                 try {
                     $collection = new RouteCollection();
                     (new WebRoutes())->load($collection);
-                } catch (Throwable) {
+                } catch (Throwable $e2) {
+                    $source   = 'none';
+                    $error   .= ' | fallback: ' . $e2->getMessage();
                     $collection = null;
                 }
             }
@@ -208,25 +217,35 @@ final class RouteEventService {
                 ];
             }
 
+            self::$collect_meta = ['routes' => count($routes), 'source' => $source, 'error' => $error];
+
             return $routes;
         }
 
+        $source = 'container';
+        $error  = null;
         $collection = null;
         try {
             /** @var RouterContainer $router */
             $router = Registry::container()->get(RouterContainer::class);
             $collection = $router->getCollection();
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            $source = 'fallback';
+            $error  = $e->getMessage();
             try {
                 $collection = (new RouterContainer('/'))->getMap();
                 (new WebRoutes())->load($collection);
-            } catch (Throwable) {
+            } catch (Throwable $e2) {
+                $source   = 'none';
+                $error   .= ' | fallback: ' . $e2->getMessage();
                 $collection = null;
             }
         }
 
         $routes = [];
         if ($collection === null) {
+            self::$collect_meta = ['routes' => 0, 'source' => $source, 'error' => $error];
+
             return $routes;
         }
         foreach ($collection->getRoutes() as $route) {
@@ -236,6 +255,8 @@ final class RouteEventService {
                 'handler' => (string) ($route->handler ?? ''),
             ];
         }
+
+        self::$collect_meta = ['routes' => count($routes), 'source' => $source, 'error' => $error];
 
         return $routes;
     }
@@ -389,10 +410,35 @@ final class RouteEventService {
         // No route table available (CLI) or nothing matched - keep the known
         // pilot route working in any context.
         if ($map === []) {
+            if (self::$collect_meta !== null) {
+                self::$collect_meta['mapped'] = 0;
+            }
+
             return self::fallbackMap();
         }
 
+        if (self::$collect_meta !== null) {
+            self::$collect_meta['mapped'] = count($map);
+        }
+
         return $map;
+    }
+
+    /**
+     * Summary stats about the last route-collect + map-build cycle.
+     * Safe to call multiple times (reads the per-process cache).
+     *
+     * @return array{routes: int, mapped: int, source: string, error: ?string}
+     */
+    public static function collectStats(): array {
+        $meta = self::$collect_meta ?? ['routes' => 0, 'mapped' => 0, 'source' => 'none', 'error' => null];
+
+        return [
+            'routes' => $meta['routes'] ?? 0,
+            'mapped' => $meta['mapped'] ?? 0,
+            'source' => $meta['source'] ?? 'none',
+            'error'  => $meta['error'] ?? null,
+        ];
     }
 
     /**

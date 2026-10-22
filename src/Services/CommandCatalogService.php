@@ -186,8 +186,10 @@ final class CommandCatalogService {
      * Sync the collected catalog into cj_command_catalog (upsert + delete
      * vanished). Called by the tick - cheap, offline-safe, exception-safe at
      * the call site (a catalog problem must never break the tick).
+     *
+     * @return array{collected: int, upserted: int, deleted: int}
      */
-    public static function syncCatalog(string $now): void {
+    public static function syncCatalog(string $now): array {
         $rows = self::collect();
 
         $seen = [];
@@ -204,9 +206,12 @@ final class CommandCatalogService {
             ]);
         }
 
+        $deleted = 0;
         if ($seen !== []) {
-            DB::table('cj_command_catalog')->whereNotIn('command', $seen)->delete();
+            $deleted = DB::table('cj_command_catalog')->whereNotIn('command', $seen)->delete();
         }
+
+        return ['collected' => count($rows), 'upserted' => count($seen), 'deleted' => $deleted];
     }
 
     /**

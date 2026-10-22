@@ -127,17 +127,47 @@ final class TickCommand extends Command {
             // effects on the registries.
             if (!$dry_run) {
                 JobDiscovery::syncDiscoveredJobs();
+                $event_sync = null;
                 try {
-                    EventCatalogService::syncCatalog($now);
+                    $event_sync = EventCatalogService::syncCatalog($now);
                 } catch (Throwable $exception) {
                     $output->writeln('<error>event catalog sync failed: ' . $exception->getMessage() . '</error>');
                     CronjobModule::log()->error($exception->getMessage(), 'EventCatalogSync');
                 }
+                $cmd_sync = null;
                 try {
-                    CommandCatalogService::syncCatalog($now);
+                    $cmd_sync = CommandCatalogService::syncCatalog($now);
                 } catch (Throwable $exception) {
                     $output->writeln('<error>command catalog sync failed: ' . $exception->getMessage() . '</error>');
                     CronjobModule::log()->error($exception->getMessage(), 'CommandCatalogSync');
+                }
+
+                if ($output->isVerbose()) {
+                    $stats = RouteEventService::collectStats();
+                    if ($event_sync !== null) {
+                        $output->writeln(sprintf(
+                            '  event catalog: %d upserted (%d deleted), route map: %d routes → %d mapped [%s]',
+                            $event_sync['upserted'], $event_sync['deleted'],
+                            $stats['routes'], $stats['mapped'], $stats['source']
+                        ));
+                    }
+                    if ($stats['error'] !== null) {
+                        $output->writeln('  route map error: ' . $stats['error']);
+                    }
+                    if ($cmd_sync !== null) {
+                        $output->writeln(sprintf(
+                            '  command catalog: %d upserted (%d deleted)',
+                            $cmd_sync['upserted'], $cmd_sync['deleted']
+                        ));
+                    }
+                    if ($output->isVeryVerbose()) {
+                        foreach (RouteEventService::map() as $handler => $entry) {
+                            $output->writeln(sprintf(
+                                '    %s  ←  %s  (%s)',
+                                $entry['event'], $handler, $entry['path']
+                            ));
+                        }
+                    }
                 }
 
                 // Self-heal: re-schedule enabled time jobs whose next_run_at
@@ -311,8 +341,11 @@ final class TickCommand extends Command {
      */
     private function drainEvents(InputInterface $input, OutputInterface $output): int {
         $dry_run  = (bool) $input->getOption('dry-run');
+        $verbose  = $output->isVerbose();
         $failures = 0;
         $started  = microtime(true);
+        $event_count = 0;
+        $fired_count = 0;
 
         foreach (EventQueue::pendingCoalesced() as $event) {
             if (microtime(true) - $started >= self::DRAIN_BUDGET_SECONDS) {
@@ -321,15 +354,24 @@ final class TickCommand extends Command {
                 break;
             }
 
+            $event_count++;
             $name    = (string) $event->event_name;
             $payload = EventQueue::decodePayload($event);
             $matched = JobRepository::jobsForEvent($name);
 
-            $output->writeln('event ' . $name . ($matched === [] ? ': no matching job - discarded' : ':'));
+            if ($verbose) {
+                $output->writeln('event ' . $name . ($matched === [] ? ': no matching job - discarded' : ':'));
+                if ($output->isVeryVerbose() && $payload !== []) {
+                    $output->writeln('  payload: ' . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+                }
+            }
 
             $run_id = 0;
             foreach ($matched as $job) {
-                $output->writeln('  job ' . $job->name . ':');
+                $fired_count++;
+                if ($verbose) {
+                    $output->writeln('  job ' . $job->name . ':');
+                }
                 $result = $this->runOneJob($job, 'event', $input, $output, $name, $payload);
                 if ($run_id === 0 && $result['run_id'] !== 0) {
                     $run_id = $result['run_id'];
@@ -345,6 +387,12 @@ final class TickCommand extends Command {
             if (!$dry_run) {
                 EventQueue::markHandled((int) $event->id, $run_id);
                 EventQueue::forgetSuperseded($name, (int) $event->id);
+            }
+        }
+
+        if ($event_count > 0) {
+            if (!$verbose) {
+                $output->writeln(sprintf('  event drain: %d events, %d jobs fired', $event_count, $fired_count));
             }
         }
 
