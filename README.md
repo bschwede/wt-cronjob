@@ -1,6 +1,6 @@
 # webtrees module Cronjob
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0) ![webtrees major version](https://img.shields.io/badge/webtrees-v2.2.x-green) ![Latest Release](https://img.shields.io/github/v/release/bschwede/wt-cronjob) ![Downloads](https://img.shields.io/github/downloads/bschwede/wt-cronjob/total.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0) ![webtrees major version](https://img.shields.io/badge/webtrees-v2.2|v2.3-green) ![Latest Release](https://img.shields.io/github/v/release/bschwede/wt-cronjob) ![Downloads](https://img.shields.io/github/downloads/bschwede/wt-cronjob/total.svg)
 
 A **cron job scheduler service** for webtrees: schedule maintenance/batch jobs with
 standard cron expressions, watch their run history in the admin UI, and trigger them
